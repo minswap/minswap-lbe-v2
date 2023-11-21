@@ -1,0 +1,14 @@
+name = "minswap/lb_v2"
+version = "0.0.0"
+license = "Apache-2.0"
+description = "Aiken contracts for project 'minswap/lb_v2'"
+
+[repository]
+user = "minswap"
+project = "lb_v2"
+platform = "github"
+
+[[dependencies]]
+name = "aiken-lang/stdlib"
+version = "1.7.0"
+source = "github"

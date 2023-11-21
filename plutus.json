@@ -1,0 +1,45 @@
+{
+  "preamble": {
+    "title": "minswap/lb_v2",
+    "description": "Aiken contracts for project 'minswap/lb_v2'",
+    "version": "0.0.0",
+    "plutusVersion": "v2",
+    "license": "Apache-2.0"
+  },
+  "validators": [
+    {
+      "title": "order_validator.validate_order",
+      "datum": {
+        "title": "raw_datum",
+        "schema": {
+          "$ref": "#/definitions/Data"
+        }
+      },
+      "redeemer": {
+        "title": "_redeemer",
+        "schema": {
+          "$ref": "#/definitions/lb_v2~1types~1OrderRedeemer"
+        }
+      },
+      "compiledCode": "5902030100003232323232323232222533300632323232533300a3370e90011804800899191919191919191919191919191919299980d19b8748000c0640044c8c8c8cc004004024894ccc08400452809919299981019b8f00200514a226600800800260480046eb8c088004dd7180f800980c0008b180e800980b000980d800980a009999119299980c19b87480000044c8c94ccc074c07c0084c92632533301b3370e9000000899191919299981118120010991924c64a66604266e1d20000011323253330263028002132498c94ccc090cdc3a400000226464a66605260560042649318088008b181480098110010a99981219b87480080044c8c8c8c8c8c94ccc0b4c0bc00852616375a605a002605a0046eb4c0ac004c0ac008dd6981480098110010b18110008b1813000980f8018a99981099b874800800454ccc090c07c00c5261616301f002300a00316302200130220023020001301900216301900116301d001301600216301600123253330173370e900000089919299980e180f0010a4c2c6eb8c070004c05400854ccc05ccdc3a400400226464a666038603c0042930b1bae301c0013015002163015001012375860300026030002602e002602c002602a0026028002602600260240026022002601200860100022c601a002601a004601600260080022930b118029baa001230033754002ae6955ceaab9e5573eae855d11",
+      "hash": "4adf51ac87e7edf9db851ae614f730e51ad9d407f24bf826a4a83a23"
+    }
+  ],
+  "definitions": {
+    "Data": {
+      "title": "Data",
+      "description": "Any Plutus data."
+    },
+    "lb_v2/types/OrderRedeemer": {
+      "title": "OrderRedeemer",
+      "anyOf": [
+        {
+          "title": "CancelOrder",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        }
+      ]
+    }
+  }
+}
