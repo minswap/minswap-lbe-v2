@@ -1,4 +1,7 @@
 use aiken/builtin
+use aiken/dict
+use aiken/transaction.{Datum, DatumHash, InlineDatum, NoDatum}
+use lb_v2/types.{DatumMap, FactoryDatum, TreasuryDatum}
 
 pub fn list_at_index(outputs: List<a>, payout_outputs_offset: Int) -> a {
   if payout_outputs_offset >= 10 {
@@ -35,4 +38,34 @@ pub fn skip_10_items(some_list: List<a>) -> List<a> {
     |> builtin.tail_list
     |> builtin.tail_list
     |> builtin.tail_list
+}
+
+pub fn must_parse_option(op: Option<a>) -> a {
+  expect Some(t) = op
+  t
+}
+
+pub fn must_find_factory_datum(datums: DatumMap, datum: Datum) -> FactoryDatum {
+  expect factory_datum: FactoryDatum = must_find_script_datum(datums, datum)
+  factory_datum
+}
+
+pub fn must_find_script_datum(datums: DatumMap, datum: Datum) -> Data {
+  let datum_opt = find_script_datum(datums, datum)
+  must_parse_option(datum_opt)
+}
+
+pub fn find_script_datum(datums: DatumMap, datum: Datum) -> Option<Data> {
+  when datum is {
+    NoDatum -> None
+    DatumHash(dh) ->
+      datums
+        |> dict.get(dh)
+    InlineDatum(dat) -> Some(dat)
+  }
+}
+
+pub fn must_find_treasury_datum(datums: DatumMap, datum: Datum) -> TreasuryDatum {
+  expect pool_datum: TreasuryDatum = must_find_script_datum(datums, datum)
+  pool_datum
 }

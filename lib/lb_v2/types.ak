@@ -1,4 +1,5 @@
-use aiken/hash.{Blake2b_224, Hash}
+use aiken/dict.{Dict}
+use aiken/hash.{Blake2b_224, Blake2b_256, Hash}
 use aiken/time.{PosixTime}
 use aiken/transaction/credential.{Address, Script}
 use aiken/transaction/value.{AssetName, PolicyId}
@@ -6,10 +7,12 @@ use aiken/transaction/value.{AssetName, PolicyId}
 pub type ValidatorHash =
   Hash<Blake2b_224, Script>
 
-pub type DepositRedeemer {
-  Deposit
-  Cancel
-  Redeem
+pub type DatumMap =
+  Dict<Hash<Blake2b_256, Data>, Data>
+
+pub type Asset {
+  policy_id: PolicyId,
+  asset_name: AssetName,
 }
 
 pub type TreasuryDatum {
@@ -18,12 +21,12 @@ pub type TreasuryDatum {
   lbe_asset_name: AssetName,
   start_time: PosixTime,
   end_time: PosixTime,
+  order_hash: ValidatorHash,
 }
 
 pub type TreasuryRedeemer {
   CreatePool
-  RedeemADA
-  RedeemLP
+  Batching
 }
 
 pub type OrderDatum {
@@ -40,6 +43,15 @@ pub type OrderBatchingRedeemer {
 }
 
 pub type AuthenRedeemer {
-  MintAuthen
-  MintRedeem
+  MintFactoryAuthen
+  CreateTreasury
+}
+
+pub type FactoryDatum {
+  head: ByteArray,
+  tail: ByteArray,
+}
+
+pub type FactoryRedeemer {
+  lbe_asset: Asset,
 }
