@@ -16,9 +16,10 @@ pub type Asset {
 }
 
 pub type TreasuryDatum {
+  asset_a: Asset,
+  asset_b: Asset,
+  reserve_a: Int,
   lbe_owner: Address,
-  lbe_policy_id: PolicyId,
-  lbe_asset_name: AssetName,
   start_time: PosixTime,
   end_time: PosixTime,
   order_hash: ValidatorHash,
@@ -53,5 +54,6 @@ pub type FactoryDatum {
 }
 
 pub type FactoryRedeemer {
-  lbe_asset: Asset,
+  asset_a: Asset,
+  asset_b: Asset,
 }

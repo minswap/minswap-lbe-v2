@@ -1,6 +1,4 @@
-use aiken/bytearray
 use aiken/dict
-use aiken/hash
 use aiken/list
 use aiken/transaction.{
   Input, Mint, Output, OutputReference, ScriptContext, Spend, Transaction,
@@ -65,6 +63,8 @@ validator(
       }
       CreateTreasury -> {
         let Transaction { inputs, mint, redeemers, .. } = transaction
+        // validate that there's a single Factory UTxO in the Transaction Inputs. 
+        // Factory UTxO must contain Factory NFT Token in the value
         expect [factory_input] =
           list.filter(
             inputs,
@@ -92,16 +92,28 @@ validator(
             },
           )
         expect factory_redeemer: FactoryRedeemer = raw_factory_redeemer
-        let FactoryRedeemer { lbe_asset } = factory_redeemer
-        let Asset { policy_id: lbe_policy_id, asset_name: lbe_asset_name } =
-          lbe_asset
-        let hash_lbe_asset =
-          hash.sha3_256(bytearray.concat(lbe_policy_id, lbe_asset_name))
+        let FactoryRedeemer { asset_a, asset_b } = factory_redeemer
+        let Asset {
+          policy_id: asset_a_policy_id,
+          asset_name: asset_a_asset_name,
+        } = asset_a
+        let Asset {
+          policy_id: asset_b_policy_id,
+          asset_name: asset_b_asset_name,
+        } = asset_b
+        expect utils.sorted_asset(asset_a, asset_b)
+        let lp_asset_name =
+          utils.compute_lp_asset_name(
+            asset_a_policy_id,
+            asset_a_asset_name,
+            asset_b_policy_id,
+            asset_b_asset_name,
+          )
         value.from_minted_value(mint) == treasury_validation.get_treasury_creation_expected_mint(
           authen_policy_id: authen_policy_id,
           factory_auth_asset_name: factory_auth_asset_name,
           treasury_auth_asset_name: treasury_auth_asset_name,
-          hash_lbe_asset: hash_lbe_asset,
+          lp_asset_name: lp_asset_name,
         )
       }
     }

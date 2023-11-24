@@ -1,3 +1,5 @@
+use aiken/interval.{Finite, Interval, IntervalBound}
+use aiken/transaction.{ValidityRange}
 use aiken/transaction/value.{AssetName, PolicyId, Value}
 
 pub fn validate_discovery_pharse_ended(
@@ -15,11 +17,11 @@ pub fn validate_discovery_pharse_ended(
 pub fn get_treasury_creation_expected_mint(
   authen_policy_id: PolicyId,
   factory_auth_asset_name: AssetName,
-  pool_auth_asset_name: AssetName,
-  hash_lbe_asset: AssetName,
+  treasury_auth_asset_name: AssetName,
+  lp_asset_name: AssetName,
 ) -> Value {
   value.zero()
     |> value.add(authen_policy_id, factory_auth_asset_name, 1)
-    |> value.add(authen_policy_id, pool_auth_asset_name, 1)
-    |> value.add(authen_policy_id, hash_lbe_asset, 9223372036854775807)
+    |> value.add(authen_policy_id, treasury_auth_asset_name, 1)
+    |> value.add(authen_policy_id, lp_asset_name, 9223372036854775807)
 }
