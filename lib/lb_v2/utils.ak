@@ -4,7 +4,7 @@ use aiken/dict
 use aiken/hash
 use aiken/transaction.{Datum, DatumHash, InlineDatum, NoDatum}
 use aiken/transaction/value.{AssetName, PolicyId}
-use lb_v2/types.{Asset, DatumMap, FactoryDatum, TreasuryDatum}
+use lb_v2/types.{AmmPoolDatum, Asset, DatumMap, FactoryDatum, TreasuryDatum}
 
 pub fn list_at_index(outputs: List<a>, payout_outputs_offset: Int) -> a {
   if payout_outputs_offset >= 10 {
@@ -71,6 +71,11 @@ pub fn find_script_datum(datums: DatumMap, datum: Datum) -> Option<Data> {
 pub fn must_find_treasury_datum(datums: DatumMap, datum: Datum) -> TreasuryDatum {
   expect pool_datum: TreasuryDatum = must_find_script_datum(datums, datum)
   pool_datum
+}
+
+pub fn must_find_amm_pool_datum(datums: DatumMap, datum: Datum) -> AmmPoolDatum {
+  expect amm_pool_datum: AmmPoolDatum = must_find_script_datum(datums, datum)
+  amm_pool_datum
 }
 
 pub fn sorted_asset(asset_a: Asset, asset_b: Asset) -> Bool {

@@ -19,10 +19,14 @@ pub type TreasuryDatum {
   asset_a: Asset,
   asset_b: Asset,
   reserve_a: Int,
+  reserve_b: Int,
   lbe_owner: Address,
   start_time: PosixTime,
   end_time: PosixTime,
+  create_pool_time: PosixTime,
   order_hash: ValidatorHash,
+  total_liquidity: Int,
+  lp_asset: Asset,
 }
 
 pub type TreasuryRedeemer {
@@ -31,7 +35,10 @@ pub type TreasuryRedeemer {
 }
 
 pub type OrderDatum {
-  owner: Address,
+  sender: Address,
+  receiver: Address,
+  output_asset: Asset,
+  minimum_receive: Int,
 }
 
 pub type OrderRedeemer {
@@ -56,4 +63,12 @@ pub type FactoryDatum {
 pub type FactoryRedeemer {
   asset_a: Asset,
   asset_b: Asset,
+}
+
+pub type AmmPoolDatum {
+  asset_a: Asset,
+  asset_b: Asset,
+  reserve_a: Int,
+  reserve_b: Int,
+  total_liquidity: Int,
 }
