@@ -1,12 +1,13 @@
 use aiken/builtin
 use aiken/bytearray
+use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 // use aiken/cbor
 // use aiken/list
 // use aiken/math
 use aiken/transaction.{
   Datum, InlineDatum, Input, Mint, NoDatum, Output, OutputReference, Redeemer,
-  ScriptContext, ScriptPurpose, Transaction, TransactionId,
+  ScriptContext, ScriptPurpose, Transaction, TransactionId, ValidityRange,
 }
 use aiken/transaction/credential.{
   Address, Inline, Referenced, ScriptCredential, StakeCredential,
@@ -15,12 +16,12 @@ use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
 use lb_v2/types.{
-  Asset, AuthenRedeemer, CreateTreasury, DiscoveryPhase, EncouterPhase,
-  FactoryDatum, FactoryRedeemer, MintFactoryAuthen, Penalty, TreasuryDatum,
-  ValidatorHash,
+  Asset, AuthenRedeemer, CreateTreasury, Deposit, DiscoveryPhase, EncouterPhase,
+  FactoryDatum, FactoryRedeemer, MintFactoryAuthen, OrderDatum, Penalty,
+  RedeemLP, RedeemRaiseAsset, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils
-use lb_v2/validation
+use lb_v2/validation.{validate_order_time}
 
 // AUTHEN_MINTING_POLICY_ID = @"h'ceee94bdc6c54c1d7361b3dd1a0d586188082f8a8ab55f1fa0e90352'"
 pub type AuthenValidatorParams {
@@ -273,4 +274,74 @@ fn gen_authen_out_ref() -> OutputReference {
     transaction_id: TransactionId { hash: tx_id |> bytearray.from_string },
     output_index: 0,
   }
+}
+
+test test_validate_order_time() {
+  let start_time = 100
+  let end_time = 500
+  let validity_range: ValidityRange =
+    Interval {
+      lower_bound: IntervalBound {
+        is_inclusive: False,
+        bound_type: Finite(150),
+      },
+      upper_bound: IntervalBound {
+        is_inclusive: False,
+        bound_type: Finite(200),
+      },
+    }
+  let address =
+    @"h'6508d97458392cbc453922493dacb743c405c7a7c254ee8b85fa6af5'"
+      |> bytearray.from_string
+      |> credential.from_verification_key
+  let order_datum =
+    OrderDatum {
+      owner: address,
+      expect_output_asset: Asset {
+        policy_id: ada_policy_id,
+        asset_name: ada_asset_name,
+      },
+      minimum_receive: 100,
+      step: Deposit,
+      lp_asset_name: #"",
+    }
+  let order_datums =
+    [order_datum, OrderDatum { ..order_datum, step: RedeemRaiseAsset }]
+  validate_order_time(start_time, end_time, validity_range, order_datums)
+}
+
+test test_validate_order_time_failed() fail {
+  let start_time = 100
+  let end_time = 500
+  let validity_range: ValidityRange =
+    Interval {
+      lower_bound: IntervalBound {
+        is_inclusive: False,
+        bound_type: Finite(150),
+      },
+      upper_bound: IntervalBound {
+        is_inclusive: False,
+        bound_type: Finite(200),
+      },
+    }
+  let address =
+    @"h'6508d97458392cbc453922493dacb743c405c7a7c254ee8b85fa6af5'"
+      |> bytearray.from_string
+      |> credential.from_verification_key
+  let order_datum =
+    OrderDatum {
+      owner: address,
+      expect_output_asset: Asset {
+        policy_id: ada_policy_id,
+        asset_name: ada_asset_name,
+      },
+      minimum_receive: 100,
+      step: Deposit,
+      lp_asset_name: #"",
+    }
+
+  let order_datums =
+    [order_datum, OrderDatum { ..order_datum, step: RedeemLP }]
+  expect validate_order_time(start_time, end_time, validity_range, order_datums)
+  True
 }

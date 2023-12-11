@@ -23,15 +23,7 @@ validator(
     redeemer: TreasuryRedeemer,
     context: ScriptContext,
   ) {
-    let treasury_input =
-      validation.get_treasury_input(
-        context,
-        authen_policy_id,
-        treasury_auth_asset_name,
-      )
-    let Input { output: Output { address: treasury_address, .. }, .. } =
-      treasury_input
-    let ScriptContext {
+    expect ScriptContext {
       transaction: Transaction {
         inputs,
         outputs,
@@ -40,20 +32,24 @@ validator(
         validity_range,
         ..
       },
-      ..
+      purpose: Spend(self_out_ref),
     } = context
-    let Output { value: treasury_out_value, datum: treasury_out_raw_datum, .. } =
+    let treasury_input =
+      validation.get_treasury_input(
+        inputs,
+        self_out_ref,
+        authen_policy_id,
+        treasury_auth_asset_name,
+      )
+    let Input { output: Output { address: treasury_address, .. }, .. } =
+      treasury_input
+    let treasury_output =
       validation.get_treasury_output(
         outputs,
         treasury_address,
         authen_policy_id,
         treasury_auth_asset_name,
       )
-    expect treasury_out_datum: TreasuryDatum =
-      when treasury_out_raw_datum is {
-        InlineDatum(d) -> d
-        _ -> utils.must_find_script_datum(datums, treasury_out_raw_datum)
-      }
     let mint_value = from_minted_value(mint)
     when redeemer is {
       CreatePool -> {
@@ -66,9 +62,8 @@ validator(
             amm_pool_validation_hash,
           )
         validation.validate_create_dex_pool(
-          treasury_in_datum: datum,
-          treasury_out_value: treasury_out_value,
-          treasury_out_datum: treasury_out_datum,
+          treasury_input: treasury_input,
+          treasury_output: treasury_output,
           amm_pool_raw_datum: amm_pool_raw_datum,
           mint_value: mint_value,
           amm_authen_policy_id: amm_authen_policy_id,
@@ -80,9 +75,8 @@ validator(
       }
       Batching ->
         validation.validate_apply_order(
-          treasury_in_datum: datum,
-          treasury_out_datum: treasury_out_datum,
-          treasury_out_value: treasury_out_value,
+          treasury_input: treasury_input,
+          treasury_output: treasury_output,
           all_inputs: inputs,
           all_outputs: outputs,
           datums: datums,

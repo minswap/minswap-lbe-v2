@@ -59,6 +59,7 @@ pub type OrderStep {
 
 pub type OrderDatum {
   owner: Address,
+  lp_asset_name: AssetName,
   expect_output_asset: Asset,
   minimum_receive: Int,
   step: OrderStep,
@@ -101,4 +102,18 @@ pub type PoolDatum {
   trading_fee_denominator: Int,
   order_hash: ValidatorHash,
   profit_sharing_opt: Option<ProfitSharing>,
+}
+
+// Datum Reserve Raise Asset
+// Value Reserve Raise Asset
+// Datum Total Liquidity
+// Value Total Liquidity
+pub type TreasuryState =
+  (Int, Int, Int, Int)
+
+pub type ApplyOrderData {
+  raise_asset_policy_id: PolicyId,
+  raise_asset_name: AssetName,
+  authen_policy_id: PolicyId,
+  lp_asset_name: AssetName,
 }

@@ -125,6 +125,7 @@ test test_validate_order() {
       expect_output_asset: Asset { policy_id: #"", asset_name: #"" },
       minimum_receive: 10000000,
       step: Deposit,
+      lp_asset_name: #"",
     }
   let redeemer = ApplyOrder
   validate_order(order_batching_stake_credential, datum, redeemer, sc)
