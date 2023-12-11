@@ -25,7 +25,7 @@ validator(stake_credential: StakeCredential) {
         let Transaction { inputs, extra_signatories, .. } = transaction
         expect order_datum: OrderDatum = raw_datum
         let OrderDatum {
-          sender: Address { payment_credential: owner_payment_credential, .. },
+          owner: Address { payment_credential: owner_payment_credential, .. },
           ..
         } = order_datum
         // validate that the transaction has _sender_'s signature or _sender_ script UTxO in the Transaction Inputs

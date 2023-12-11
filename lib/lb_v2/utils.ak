@@ -3,8 +3,12 @@ use aiken/bytearray
 use aiken/dict
 use aiken/hash
 use aiken/transaction.{Datum, DatumHash, InlineDatum, NoDatum}
-use aiken/transaction/value.{AssetName, PolicyId}
-use lb_v2/types.{AmmPoolDatum, Asset, DatumMap, FactoryDatum, TreasuryDatum}
+use aiken/transaction/value.{
+  AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
+}
+use lb_v2/types.{
+  AmmPoolDatum, Asset, DatumMap, FactoryDatum, OrderDatum, TreasuryDatum,
+}
 
 pub fn list_at_index(outputs: List<a>, payout_outputs_offset: Int) -> a {
   if payout_outputs_offset >= 10 {
@@ -78,6 +82,16 @@ pub fn must_find_amm_pool_datum(datums: DatumMap, datum: Datum) -> AmmPoolDatum 
   amm_pool_datum
 }
 
+pub fn must_find_order_datum(datums: DatumMap, datum: Datum) -> OrderDatum {
+  expect order_datum: OrderDatum = must_find_script_datum(datums, datum)
+  order_datum
+}
+
+pub fn quantity_of_asset(value: Value, asset: Asset) {
+  let Asset { policy_id, asset_name } = asset
+  value.quantity_of(value, policy_id, asset_name)
+}
+
 pub fn sorted_asset(asset_a: Asset, asset_b: Asset) -> Bool {
   let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
     asset_a
@@ -102,4 +116,23 @@ pub fn compute_lp_asset_name(
     hash.sha3_256(bytearray.concat(asset_b_policy_id, asset_b_asset_name))
   let pair_ident = bytearray.concat(asset_a_ident, asset_b_ident)
   hash.sha3_256(pair_ident)
+}
+
+pub fn compare_list_length(arr1: List<a>, arr2: List<b>) -> Bool {
+  when arr1 is {
+    [] -> arr2 == []
+    _ ->
+      when arr2 is {
+        [] -> False
+        _ ->
+          compare_list_length(
+            arr1 |> builtin.tail_list,
+            arr2 |> builtin.tail_list,
+          )
+      }
+  }
+}
+
+pub fn is_ada_asset(pid: PolicyId, name: AssetName) -> Bool {
+  pid == ada_policy_id && name == ada_asset_name
 }

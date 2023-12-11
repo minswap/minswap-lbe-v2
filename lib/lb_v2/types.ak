@@ -16,17 +16,18 @@ pub type Asset {
 }
 
 pub type TreasuryDatum {
+  raise_asset: Asset,
   asset_a: Asset,
   asset_b: Asset,
-  reserve_a: Int,
-  reserve_b: Int,
   lbe_owner: Address,
   start_time: PosixTime,
   end_time: PosixTime,
   create_pool_time: PosixTime,
   order_hash: ValidatorHash,
+  lp_asset_name: AssetName,
+  reserve_a: Int,
+  reserve_b: Int,
   total_liquidity: Int,
-  lp_asset: Asset,
 }
 
 pub type TreasuryRedeemer {
@@ -34,11 +35,17 @@ pub type TreasuryRedeemer {
   Batching
 }
 
+pub type OrderStep {
+  Deposit
+  RedeemRaiseAsset
+  RedeemLP
+}
+
 pub type OrderDatum {
-  sender: Address,
-  receiver: Address,
-  output_asset: Asset,
+  owner: Address,
+  expect_output_asset: Asset,
   minimum_receive: Int,
+  step: OrderStep,
 }
 
 pub type OrderRedeemer {
@@ -71,4 +78,19 @@ pub type AmmPoolDatum {
   reserve_a: Int,
   reserve_b: Int,
   total_liquidity: Int,
+}
+
+pub type ProfitSharing =
+  (Int, Int)
+
+pub type PoolDatum {
+  asset_a: Asset,
+  asset_b: Asset,
+  total_liquidity: Int,
+  reserve_a: Int,
+  reserve_b: Int,
+  trading_fee_numerator: Int,
+  trading_fee_denominator: Int,
+  order_hash: ValidatorHash,
+  profit_sharing_opt: Option<ProfitSharing>,
 }
