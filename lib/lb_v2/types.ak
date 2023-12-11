@@ -1,6 +1,5 @@
 use aiken/dict.{Dict}
 use aiken/hash.{Blake2b_224, Blake2b_256, Hash}
-use aiken/time.{PosixTime}
 use aiken/transaction/credential.{Address, Script}
 use aiken/transaction/value.{AssetName, PolicyId}
 
@@ -15,18 +14,35 @@ pub type Asset {
   asset_name: AssetName,
 }
 
+pub type Penalty {
+  remain_percent: Int,
+  start_time: Int,
+  end_time: Option<Int>,
+}
+
+pub type DiscoveryPhase {
+  start_time: Int,
+  end_time: Int,
+}
+
+pub type EncouterPhase {
+  start_time: Int,
+  end_time: Option<Int>,
+}
+
 pub type TreasuryDatum {
+  base_asset: Asset,
   raise_asset: Asset,
-  asset_a: Asset,
-  asset_b: Asset,
-  lbe_owner: Address,
-  start_time: PosixTime,
-  end_time: PosixTime,
-  create_pool_time: PosixTime,
+  lp_alloc_points: List<(Address, Int)>,
+  raise_alloc_points: List<(Address, Int)>,
+  penalty: Option<Penalty>,
+  discovery_phase: DiscoveryPhase,
+  encounter_phase: EncouterPhase,
+  minimum_raise: Option<Int>,
+  maximum_raise: Option<Int>,
   order_hash: ValidatorHash,
-  lp_asset_name: AssetName,
-  reserve_a: Int,
-  reserve_b: Int,
+  reserve_base: Int,
+  reserve_raise: Int,
   total_liquidity: Int,
 }
 
@@ -68,16 +84,8 @@ pub type FactoryDatum {
 }
 
 pub type FactoryRedeemer {
-  asset_a: Asset,
-  asset_b: Asset,
-}
-
-pub type AmmPoolDatum {
-  asset_a: Asset,
-  asset_b: Asset,
-  reserve_a: Int,
-  reserve_b: Int,
-  total_liquidity: Int,
+  base_asset: Asset,
+  raise_asset: Asset,
 }
 
 pub type ProfitSharing =

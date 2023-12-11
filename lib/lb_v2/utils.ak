@@ -6,9 +6,7 @@ use aiken/transaction.{Datum, DatumHash, InlineDatum, NoDatum}
 use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
-use lb_v2/types.{
-  AmmPoolDatum, Asset, DatumMap, FactoryDatum, OrderDatum, TreasuryDatum,
-}
+use lb_v2/types.{Asset, DatumMap}
 
 pub fn list_at_index(outputs: List<a>, payout_outputs_offset: Int) -> a {
   if payout_outputs_offset >= 10 {
@@ -47,44 +45,17 @@ pub fn skip_10_items(some_list: List<a>) -> List<a> {
     |> builtin.tail_list
 }
 
-pub fn must_parse_option(op: Option<a>) -> a {
-  expect Some(t) = op
-  t
-}
-
-pub fn must_find_factory_datum(datums: DatumMap, datum: Datum) -> FactoryDatum {
-  expect factory_datum: FactoryDatum = must_find_script_datum(datums, datum)
-  factory_datum
-}
-
 pub fn must_find_script_datum(datums: DatumMap, datum: Datum) -> Data {
-  let datum_opt = find_script_datum(datums, datum)
-  must_parse_option(datum_opt)
-}
-
-pub fn find_script_datum(datums: DatumMap, datum: Datum) -> Option<Data> {
-  when datum is {
-    NoDatum -> None
-    DatumHash(dh) ->
-      datums
-        |> dict.get(dh)
-    InlineDatum(dat) -> Some(dat)
-  }
-}
-
-pub fn must_find_treasury_datum(datums: DatumMap, datum: Datum) -> TreasuryDatum {
-  expect pool_datum: TreasuryDatum = must_find_script_datum(datums, datum)
-  pool_datum
-}
-
-pub fn must_find_amm_pool_datum(datums: DatumMap, datum: Datum) -> AmmPoolDatum {
-  expect amm_pool_datum: AmmPoolDatum = must_find_script_datum(datums, datum)
-  amm_pool_datum
-}
-
-pub fn must_find_order_datum(datums: DatumMap, datum: Datum) -> OrderDatum {
-  expect order_datum: OrderDatum = must_find_script_datum(datums, datum)
-  order_datum
+  let datum_opt =
+    when datum is {
+      NoDatum -> None
+      DatumHash(dh) ->
+        datums
+          |> dict.get(dh)
+      InlineDatum(dat) -> Some(dat)
+    }
+  expect Some(datum) = datum_opt
+  datum
 }
 
 pub fn quantity_of_asset(value: Value, asset: Asset) {
@@ -101,6 +72,66 @@ pub fn sorted_asset(asset_a: Asset, asset_b: Asset) -> Bool {
     builtin.less_than_bytearray(asset_a_asset_name, asset_b_asset_name)
   } else {
     builtin.less_than_bytearray(asset_a_policy_id, asset_b_policy_id)
+  }
+}
+
+pub fn sort_two_assets(asset_a: Asset, asset_b: Asset) -> (Asset, Asset) {
+  let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
+    asset_a
+  let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
+    asset_b
+  if asset_a_policy_id == asset_b_policy_id {
+    if builtin.less_than_bytearray(asset_a_asset_name, asset_b_asset_name) {
+      (asset_a, asset_b)
+    } else {
+      (asset_b, asset_a)
+    }
+  } else {
+    if builtin.less_than_bytearray(asset_a_policy_id, asset_b_policy_id) {
+      (asset_a, asset_b)
+    } else {
+      (asset_b, asset_a)
+    }
+  }
+}
+
+test sort_two_assets_1() {
+  let asset_a = Asset { policy_id: #"00", asset_name: #"01" }
+  let asset_b = Asset { policy_id: #"00", asset_name: #"02" }
+  let (a1, a2) = sort_two_assets(asset_a, asset_b)
+  and {
+    a1 == asset_a,
+    a2 == asset_b,
+  }
+}
+
+test sort_two_assets_2() {
+  let asset_a = Asset { policy_id: #"00", asset_name: #"05" }
+  let asset_b = Asset { policy_id: #"00", asset_name: #"02" }
+  let (a1, a2) = sort_two_assets(asset_a, asset_b)
+  and {
+    a1 == asset_b,
+    a2 == asset_a,
+  }
+}
+
+test sort_two_assets_3() {
+  let asset_a = Asset { policy_id: #"01", asset_name: #"05" }
+  let asset_b = Asset { policy_id: #"00", asset_name: #"02" }
+  let (a1, a2) = sort_two_assets(asset_a, asset_b)
+  and {
+    a1 == asset_b,
+    a2 == asset_a,
+  }
+}
+
+test sort_two_assets_4() {
+  let asset_a = Asset { policy_id: #"01", asset_name: #"00" }
+  let asset_b = Asset { policy_id: #"05", asset_name: #"02" }
+  let (a1, a2) = sort_two_assets(asset_a, asset_b)
+  and {
+    a1 == asset_a,
+    a2 == asset_b,
   }
 }
 

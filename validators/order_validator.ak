@@ -1,3 +1,4 @@
+use aiken/bytearray
 use aiken/dict
 use aiken/list
 use aiken/transaction.{
@@ -6,9 +7,10 @@ use aiken/transaction.{
 use aiken/transaction/credential.{
   Address, ScriptCredential, StakeCredential, VerificationKeyCredential,
 }
+use lb_v2/test_suits
 use lb_v2/types.{
-  ApplyOrder, CancelOrder, OrderBatchingRedeemer, OrderDatum, OrderRedeemer,
-  ValidatorHash,
+  ApplyOrder, Asset, CancelOrder, Deposit, OrderBatchingRedeemer, OrderDatum,
+  OrderRedeemer, ValidatorHash,
 }
 use lb_v2/utils
 
@@ -70,4 +72,60 @@ validator(treasury_hash: ValidatorHash) {
     expect ScriptCredential(hash) = payment_credential
     treasury_hash == hash
   }
+}
+
+test test_validate_batching_order() {
+  let treasury_hash = test_suits.gen_treasury_hash()
+  let order_batching_stake_credential =
+    test_suits.gen_order_batching_stake_credential()
+
+  let treasury_input =
+    Input {
+      output_reference: test_suits.gen_dummy_output_ref(),
+      output: test_suits.gen_dummy_treasury_out(),
+    }
+  let purpose = WithdrawFrom(order_batching_stake_credential)
+  let sc =
+    ScriptContext {
+      transaction: Transaction {
+        ..transaction.placeholder(),
+        inputs: [treasury_input],
+      },
+      purpose,
+    }
+  let redeemer = OrderBatchingRedeemer { treasury_input_index: 0 }
+  validate_order_spending_in_batching(treasury_hash, redeemer, sc)
+}
+
+test test_validate_order() {
+  let order_batching_stake_credential =
+    test_suits.gen_order_batching_stake_credential()
+  let purpose = Spend(test_suits.gen_dummy_output_ref())
+  let withdrawals =
+    dict.new()
+      |> dict.insert(
+           order_batching_stake_credential,
+           0,
+           test_suits.compare_stake_credential,
+         )
+  let sc =
+    ScriptContext {
+      transaction: Transaction {
+        ..transaction.placeholder(),
+        withdrawals: withdrawals,
+      },
+      purpose,
+    }
+  let datum =
+    OrderDatum {
+      owner: credential.from_verification_key(
+        @"h'6508d97458392cbc453922493dacb743c405c7a7c254ee8b85fa6af5'"
+          |> bytearray.from_string,
+      ),
+      expect_output_asset: Asset { policy_id: #"", asset_name: #"" },
+      minimum_receive: 10000000,
+      step: Deposit,
+    }
+  let redeemer = ApplyOrder
+  validate_order(order_batching_stake_credential, datum, redeemer, sc)
 }

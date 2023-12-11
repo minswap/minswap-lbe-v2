@@ -1,13 +1,13 @@
 use aiken/builtin
-use aiken/bytearray
-use aiken/cbor
+// use aiken/bytearray
+// use aiken/cbor
 use aiken/dict
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/math
 use aiken/transaction.{
-  Input, Mint, Output, OutputReference, ScriptContext, Spend, Transaction,
-  ValidityRange,
+  InlineDatum, Input, Mint, Output, OutputReference, ScriptContext, Spend,
+  Transaction, ValidityRange,
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{
@@ -20,246 +20,40 @@ use lb_v2/types.{
 }
 use lb_v2/utils
 
-pub fn validate_authen(
-  out_ref: OutputReference,
-  factory_auth_an: AssetName,
-  treasury_auth_an: AssetName,
-  redeemer: AuthenRedeemer,
-  context: ScriptContext,
-) -> Bool {
-  let ScriptContext { transaction, purpose } = context
-  expect Mint(authen_policy_id) = purpose
-  when redeemer is {
-    MintFactoryAuthen -> {
-      let Transaction { inputs, mint, outputs, datums, .. } = transaction
-
-      // Transaction must has @out_ref in the input to make sure that this redeemer can only be executed once
-      expect
-        list.any(
-          inputs,
-          fn(input) {
-            let Input { output_reference, .. } = input
-            output_reference == out_ref
-          },
-        )
-      let mint_value = value.from_minted_value(mint)
-      expect [(minted_pid, minted_an, minted_amount)] =
-        value.flatten(mint_value)
-      // Transaction must mint only 1 Factory Auth Asset
-      expect and {
-          minted_pid == authen_policy_id,
-          minted_an == factory_auth_an,
-          minted_amount == 1,
-        }
-      expect [factory_output] =
-        list.filter(
-          outputs,
-          fn(output) {
-            let Output { value: out_value, .. } = output
-            value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1
-          },
-        )
-      let Output { datum: factory_raw_datum, .. } = factory_output
-      let FactoryDatum { head, tail } =
-        utils.must_find_factory_datum(datums, factory_raw_datum)
-      and {
-        head == #"00",
-        tail == #"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
-      }
-    }
-    CreateTreasury -> {
-      let Transaction { inputs, mint, redeemers, .. } = transaction
-      // validate that there's a single Factory UTxO in the Transaction Inputs. 
-      // Factory UTxO must contain Factory NFT Token in the value
-      expect [factory_input] =
-        list.filter(
-          inputs,
-          fn(input) {
-            let Input { output, .. } = input
-            let Output { value: out_value, .. } = output
-            value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1
-          },
-        )
-      let Input { output_reference: factory_input_ref, .. } = factory_input
-      let redeemer_list = dict.to_list(redeemers)
-      expect [(_, raw_factory_redeemer)] =
-        list.filter(
-          redeemer_list,
-          fn(r) {
-            let (p, _) = r
-            when p is {
-              Spend(ref) -> factory_input_ref == ref
-              _ -> False
-            }
-          },
-        )
-      expect factory_redeemer: FactoryRedeemer = raw_factory_redeemer
-      let FactoryRedeemer { asset_a, asset_b } = factory_redeemer
-      let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
-        asset_a
-      let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
-        asset_b
-      expect utils.sorted_asset(asset_a, asset_b)
-      let lp_asset_name =
-        utils.compute_lp_asset_name(
-          asset_a_policy_id,
-          asset_a_asset_name,
-          asset_b_policy_id,
-          asset_b_asset_name,
-        )
-      value.from_minted_value(mint) == get_treasury_creation_expected_mint(
-        authen_policy_id: authen_policy_id,
-        factory_auth_an: factory_auth_an,
-        treasury_auth_an: treasury_auth_an,
-        lp_asset_name: lp_asset_name,
-      )
-    }
-  }
-}
-
-pub fn validate_factory(
-  authen_policy_id: PolicyId,
-  treasury_hash: ValidatorHash,
+pub fn validate_creating_treasury_out(
+  treasury_out_value: Value,
+  treasury_out_datum: TreasuryDatum,
+  base_asset: Asset,
+  raise_asset: Asset,
   order_hash: ValidatorHash,
-  factory_auth_an: AssetName,
+  authen_policy_id: PolicyId,
   treasury_auth_an: AssetName,
-  datum: FactoryDatum,
-  redeemer: FactoryRedeemer,
-  context: ScriptContext,
+  lp_asset_name: AssetName,
 ) -> Bool {
-  let ScriptContext { transaction, purpose } = context
-  expect Spend(factory_ref) = purpose
-  let Transaction { inputs, mint, outputs, datums, .. } = transaction
-  let FactoryRedeemer { asset_a, asset_b } = redeemer
-  let FactoryDatum { head: current_head, tail: current_tail } = datum
-  let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
-    asset_a
-  let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
-    asset_b
-  // validate that Asset A and Asset B must be sorted
-  expect utils.sorted_asset(asset_a, asset_b)
-  let lp_asset_name =
-    utils.compute_lp_asset_name(
-      asset_a_policy_id,
-      asset_a_asset_name,
-      asset_b_policy_id,
-      asset_b_asset_name,
-    )
-  expect Some(factory_input) =
-    list.find(
-      inputs,
-      fn(input) {
-        let Input { output_reference: out_ref, .. } = input
-        out_ref == factory_ref
-      },
-    )
-  let Input {
-    output: Output { value: factory_input_value, address: factory_address, .. },
-    ..
-  } = factory_input
-  let Address { payment_credential: factory_payment_credential, .. } =
-    factory_address
-  expect [_] =
-    list.filter(
-      inputs,
-      fn(input) {
-        let Input {
-          output: Output {
-            address: Address { payment_credential: payment_cred, .. },
-            ..
-          },
-          ..
-        } = input
-        factory_payment_credential == payment_cred
-      },
-    )
-  // Transaction must have a Factory Asset in the Spending Script
-  expect
-    value.quantity_of(factory_input_value, authen_policy_id, factory_auth_an) == 1
-  expect [factory_output_1, factory_output_2] =
-    list.filter(
-      outputs,
-      fn(output) {
-        let Output { address: out_addr, value: out_value, .. } = output
-        out_addr == factory_address && value.quantity_of(
-          out_value,
-          authen_policy_id,
-          factory_auth_an,
-        ) == 1
-      },
-    )
-  let Output { datum: factory_output_1_raw_datum, .. } = factory_output_1
-  let Output { datum: factory_output_2_raw_datum, .. } = factory_output_2
-  let FactoryDatum { head: new_head_1, tail: new_tail_1 } =
-    utils.must_find_factory_datum(datums, factory_output_1_raw_datum)
-  let FactoryDatum { head: new_head_2, tail: new_tail_2 } =
-    utils.must_find_factory_datum(datums, factory_output_2_raw_datum)
-  // validate that new Factory UTxO datum must be followed by Linked List rule
-  // (old head, old tail) -> (old head, Pool LP Token Name) and (Pool LP Token Name, old tail)
-  // old head < Pool LP Token Name < old tail
-  expect and {
-      builtin.less_than_bytearray(new_head_1, new_tail_1),
-      builtin.less_than_bytearray(new_head_2, new_tail_2),
-      new_head_1 == current_head,
-      new_tail_2 == current_tail,
-      lp_asset_name == new_tail_1,
-      lp_asset_name == new_head_2,
-    }
-  expect [treasury_output] =
-    list.filter(
-      outputs,
-      fn(output) {
-        let Output { address: out_addr, value: out_value, .. } = output
-        let Address { payment_credential: out_addr_payment_credential, .. } =
-          out_addr
-        when out_addr_payment_credential is {
-          ScriptCredential(hash) ->
-            treasury_hash == hash && value.quantity_of(
-              out_value,
-              authen_policy_id,
-              treasury_auth_an,
-            ) == 1
-          _ -> False
-        }
-      },
-    )
-  let Output {
-    value: treasury_output_value,
-    datum: treasury_output_raw_datum,
-    ..
-  } = treasury_output
-  let amount_a =
-    value.quantity_of(
-      treasury_output_value,
-      asset_a_policy_id,
-      asset_a_asset_name,
-    )
   let TreasuryDatum {
-    asset_a: treasury_datum_asset_a,
-    asset_b: treasury_datum_asset_b,
-    reserve_a: treasury_datum_reserve_a,
-    order_hash: treasury_datum_order_hash,
+    base_asset: t_base_asset,
+    raise_asset: t_raise_asset,
+    order_hash: t_order_hash,
+    reserve_base: t_reserve_base,
+    reserve_raise,
+    total_liquidity,
     ..
-  } = utils.must_find_treasury_datum(datums, treasury_output_raw_datum)
+  } = treasury_out_datum
+  let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
+    base_asset
   let expected_treasury_out_value =
     value.zero()
-      |> value.add(ada_policy_id, ada_asset_name, 3000000)
-      |> value.add(authen_policy_id, lp_asset_name, 9223372036854775807)
+      |> value.add(ada_policy_id, ada_asset_name, 10000000) // TODO: consider minimum ada for treasury output
       |> value.add(authen_policy_id, treasury_auth_an, 1)
+      |> value.add(authen_policy_id, lp_asset_name, 9223372036854775807)
+      |> value.add(base_asset_pid, base_asset_an, t_reserve_base)
   and {
-    // asset_a and asset_b must be the same with Factory Redeemer
-    treasury_datum_asset_a == asset_a,
-    treasury_datum_asset_b == asset_b,
-    treasury_datum_reserve_a == amount_a,
-    // Order Hash in Pool Datum must be matched with Order Hash in parameters
-    treasury_datum_order_hash == order_hash,
-    value.from_minted_value(mint) == get_treasury_creation_expected_mint(
-      authen_policy_id: authen_policy_id,
-      factory_auth_an: factory_auth_an,
-      treasury_auth_an: treasury_auth_an,
-      lp_asset_name: lp_asset_name,
-    ),
-    expected_treasury_out_value == treasury_output_value,
+    treasury_out_value == expected_treasury_out_value,
+    t_base_asset == base_asset,
+    t_raise_asset == raise_asset,
+    t_order_hash == order_hash,
+    total_liquidity == 0,
+    reserve_raise == 0,
   }
 }
 
@@ -360,11 +154,12 @@ pub fn get_treasury_output(
     list.filter(
       outputs,
       fn(output) {
-        let Output { address, value, .. } = output
-        expect quantity_of(value, authen_policy_id, treasury_auth_an) == 1
+        let Output { address, .. } = output
         address == treasury_address
       },
     )
+  let Output { value, .. } = treasury_output
+  expect value.quantity_of(value, authen_policy_id, treasury_auth_an) == 1
   treasury_output
 }
 
@@ -405,62 +200,62 @@ pub fn validate_create_dex_pool(
   all_outputs: List<Output>,
   all_inputs: List<Input>,
 ) -> Bool {
-  let TreasuryDatum {
-    asset_a: treasury_in_asset_a,
-    asset_b: treasury_in_asset_b,
-    reserve_a: treasury_in_reserve_a,
-    reserve_b: treasury_in_reserve_b,
-    create_pool_time,
-    lp_asset_name,
-    lbe_owner,
-    order_hash,
-    ..
-  } = treasury_in_datum
-  let TreasuryDatum { total_liquidity: treasury_out_total_liquidity, .. } =
-    treasury_out_datum
-  expect amm_pool_datum: PoolDatum = amm_pool_raw_datum
-  let PoolDatum {
-    asset_a: pool_asset_a,
-    asset_b: pool_asset_b,
-    reserve_a: pool_reserve_a,
-    reserve_b: pool_reserve_b,
-    total_liquidity: pool_total_liquidity,
-    ..
-  } = amm_pool_datum
-  expect [Output { value: lbe_owner_value, .. }] =
-    list.filter(
-      all_outputs,
-      fn(output) {
-        let Output { address, .. } = output
-        address == lbe_owner
-      },
-    )
-  and {
-    // for sure it's time to create pool
-    validate_create_dex_pool_time(create_pool_time, validity_range),
-    // for sure mint amm pool auth token
-    quantity_of(mint_value, amm_authen_policy_id, amm_pool_auth_asset_name) == 1,
-    // for sure the same asset_a, asset_b
-    treasury_in_asset_a == pool_asset_a,
-    treasury_in_asset_b == pool_asset_b,
-    // for sure the same reserve_a, reserve_b
-    treasury_in_reserve_a == pool_reserve_a,
-    treasury_in_reserve_b == pool_reserve_b,
-    // for sure 50% quantity LP Asset for treasury output
-    quantity_of(treasury_out_value, amm_authen_policy_id, lp_asset_name) == treasury_out_total_liquidity,
-    math.abs(
-      treasury_out_total_liquidity + treasury_out_total_liquidity - pool_total_liquidity,
-    ) <= 1,
-    // for sure 50% quantity LP Asset for lbe's owner
-    quantity_of(lbe_owner_value, amm_authen_policy_id, lp_asset_name) == pool_total_liquidity - treasury_out_total_liquidity,
-    // for sure treasury output datum
-    treasury_out_datum == TreasuryDatum {
-      ..treasury_in_datum,
-      total_liquidity: treasury_out_total_liquidity,
-    },
-    // for sure no order's input
-    get_order_inputs(all_inputs, order_hash) |> builtin.null_list,
-  }
+  True
+  // let TreasuryDatum {
+  //   asset_a: treasury_in_asset_a,
+  //   asset_b: treasury_in_asset_b,
+  //   reserve_a: treasury_in_reserve_a,
+  //   reserve_b: treasury_in_reserve_b,
+  //   create_pool_time,
+  //   lp_asset_name,
+  //   order_hash,
+  //   ..
+  // } = treasury_in_datum
+  // let TreasuryDatum { total_liquidity: treasury_out_total_liquidity, .. } =
+  //   treasury_out_datum
+  // expect amm_pool_datum: PoolDatum = amm_pool_raw_datum
+  // let PoolDatum {
+  //   asset_a: pool_asset_a,
+  //   asset_b: pool_asset_b,
+  //   reserve_a: pool_reserve_a,
+  //   reserve_b: pool_reserve_b,
+  //   total_liquidity: pool_total_liquidity,
+  //   ..
+  // } = amm_pool_datum
+  // // expect [Output { value: lbe_owner_value, .. }] =
+  // //   list.filter(
+  // //     all_outputs,
+  // //     fn(output) {
+  // //       let Output { address, .. } = output
+  // //       address == lbe_owner
+  // //     },
+  // //   )
+  // and {
+  //   // for sure it's time to create pool
+  //   validate_create_dex_pool_time(create_pool_time, validity_range),
+  //   // for sure mint amm pool auth token
+  //   quantity_of(mint_value, amm_authen_policy_id, amm_pool_auth_asset_name) == 1,
+  //   // for sure the same asset_a, asset_b
+  //   treasury_in_asset_a == pool_asset_a,
+  //   treasury_in_asset_b == pool_asset_b,
+  //   // for sure the same reserve_a, reserve_b
+  //   treasury_in_reserve_a == pool_reserve_a,
+  //   treasury_in_reserve_b == pool_reserve_b,
+  //   // for sure 50% quantity LP Asset for treasury output
+  //   quantity_of(treasury_out_value, amm_authen_policy_id, lp_asset_name) == treasury_out_total_liquidity,
+  //   math.abs(
+  //     treasury_out_total_liquidity + treasury_out_total_liquidity - pool_total_liquidity,
+  //   ) <= 1,
+  //   // for sure 50% quantity LP Asset for lbe's owner
+  //   // quantity_of(lbe_owner_value, amm_authen_policy_id, lp_asset_name) == pool_total_liquidity - treasury_out_total_liquidity,
+  //   // for sure treasury output datum
+  //   treasury_out_datum == TreasuryDatum {
+  //     ..treasury_in_datum,
+  //     total_liquidity: treasury_out_total_liquidity,
+  //   },
+  //   // for sure no order's input
+  //   get_order_inputs(all_inputs, order_hash) |> builtin.null_list,
+  // }
 }
 
 fn validate_order(
@@ -470,8 +265,13 @@ fn validate_order(
 ) -> Bool {
   let Input { output: Output { datum: in_datum_raw, .. }, .. } = order_input
   let Output { value: out_value, address: out_address, .. } = order_output
+  expect order_datum: OrderDatum =
+    when in_datum_raw is {
+      InlineDatum(d) -> d
+      _ -> utils.must_find_script_datum(datums, in_datum_raw)
+    }
   let OrderDatum { owner, expect_output_asset, minimum_receive, .. } =
-    utils.must_find_order_datum(datums, in_datum_raw)
+    order_datum
   and {
     // for sure output to owner
     out_address == owner,
@@ -540,52 +340,7 @@ fn validate_batching_treasury_datum(
   in_datum: TreasuryDatum,
   out_datum: TreasuryDatum,
 ) -> Bool {
-  let TreasuryDatum {
-    raise_asset: in_raise_asset,
-    asset_a: in_asset_a,
-    asset_b: in_asset_b,
-    lbe_owner: in_lbe_owner,
-    start_time: in_start_time,
-    end_time: in_end_time,
-    create_pool_time: in_create_pool_time,
-    order_hash: in_order_hash,
-    lp_asset_name: in_lp_asset_name,
-    reserve_a: in_reserve_a,
-    reserve_b: in_reserve_b,
-    ..
-  } = in_datum
-  let TreasuryDatum {
-    raise_asset: out_raise_asset,
-    asset_a: out_asset_a,
-    asset_b: out_asset_b,
-    lbe_owner: out_lbe_owner,
-    start_time: out_start_time,
-    end_time: out_end_time,
-    create_pool_time: out_create_pool_time,
-    order_hash: out_order_hash,
-    lp_asset_name: out_lp_asset_name,
-    reserve_a: out_reserve_a,
-    reserve_b: out_reserve_b,
-    ..
-  } = out_datum
-  let check_reserve_from =
-    if in_raise_asset == in_asset_a {
-      in_reserve_b == out_reserve_b
-    } else {
-      in_reserve_a == out_reserve_a
-    }
-  and {
-    in_raise_asset == out_raise_asset,
-    in_asset_a == out_asset_a,
-    in_asset_b == out_asset_b,
-    in_lbe_owner == out_lbe_owner,
-    in_start_time == out_start_time,
-    in_end_time == out_end_time,
-    in_create_pool_time == out_create_pool_time,
-    in_order_hash == out_order_hash,
-    in_lp_asset_name == out_lp_asset_name,
-    check_reserve_from,
-  }
+  in_datum == out_datum
 }
 
 fn apply_deposit_orders(
@@ -794,6 +549,7 @@ pub fn validate_apply_order(
   validity_range: ValidityRange,
   authen_policy_id: PolicyId,
   amm_authen_policy_id: PolicyId,
+  mint_value: Value,
 ) -> Bool {
   let TreasuryDatum {
     order_hash,
@@ -815,7 +571,8 @@ pub fn validate_apply_order(
       order_inputs,
       fn(input) {
         let Input { output: Output { datum, .. }, .. } = input
-        let order_datum = utils.must_find_order_datum(datums, datum)
+        expect order_datum: OrderDatum =
+          utils.must_find_script_datum(datums, datum)
         order_datum
       },
     )
@@ -892,5 +649,6 @@ pub fn validate_apply_order(
     quantity_of(treasury_out_value, raise_asset_policy_id, raise_asset_name) == raise_amount_out,
     utils.quantity_of_asset(treasury_out_value, base_asset) == base_amount,
     new_total_liquidity == total_liquidity,
+    mint_value == value.zero(),
   }
 }

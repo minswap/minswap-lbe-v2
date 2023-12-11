@@ -1,0 +1,12 @@
+aiken build -> plutus.json
+script apply params for:
+  - authen minting policy
+  - factory 
+  - treasury
+  - order
+=> output: new plutus.json file
+
+
+script deploy 4 script
+
+
