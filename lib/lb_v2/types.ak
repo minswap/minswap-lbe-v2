@@ -1,7 +1,7 @@
 use aiken/dict.{Dict}
 use aiken/hash.{Blake2b_224, Blake2b_256, Hash}
 use aiken/transaction/credential.{Address, Script}
-use aiken/transaction/value.{AssetName, PolicyId}
+use aiken/transaction/value.{AssetName, PolicyId, Value}
 
 pub type ValidatorHash =
   Hash<Blake2b_224, Script>
@@ -12,12 +12,6 @@ pub type DatumMap =
 pub type Asset {
   policy_id: PolicyId,
   asset_name: AssetName,
-}
-
-pub type Penalty {
-  remain_percent: Int,
-  start_time: Int,
-  end_time: Option<Int>,
 }
 
 pub type DiscoveryPhase {
@@ -35,7 +29,6 @@ pub type TreasuryDatum {
   raise_asset: Asset,
   lp_alloc_points: List<(Address, Int)>,
   raise_alloc_points: List<(Address, Int)>,
-  penalty: Option<Penalty>,
   discovery_phase: DiscoveryPhase,
   encounter_phase: EncouterPhase,
   minimum_raise: Option<Int>,
@@ -116,4 +109,14 @@ pub type ApplyOrderData {
   raise_asset_name: AssetName,
   authen_policy_id: PolicyId,
   lp_asset_name: AssetName,
+  amm_authen_policy_id: PolicyId,
+}
+
+pub type ApplyOrderParams {
+  in_value: Value,
+  out_value: Value,
+  expect_output_asset: Asset,
+  minimum_receive: Int,
+  treasury_state: TreasuryState,
+  data: ApplyOrderData,
 }

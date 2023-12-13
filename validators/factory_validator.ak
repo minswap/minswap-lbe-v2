@@ -1,5 +1,4 @@
 use aiken/builtin
-use aiken/cbor
 use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Output, ScriptContext, Spend, Transaction,

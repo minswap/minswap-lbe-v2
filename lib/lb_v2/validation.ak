@@ -2,18 +2,16 @@ use aiken/builtin
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
-  InlineDatum, Input, Mint, Output, OutputReference, ScriptContext, Spend,
-  Transaction, ValidityRange,
+  InlineDatum, Input, Output, OutputReference, ValidityRange,
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id, quantity_of,
 }
 use lb_v2/types.{
-  ApplyOrderData, Asset, AuthenRedeemer, CreateTreasury, DatumMap, Deposit,
-  DiscoveryPhase, EncouterPhase, FactoryDatum, FactoryRedeemer,
-  MintFactoryAuthen, OrderDatum, PoolDatum, RedeemLP, RedeemRaiseAsset,
-  TreasuryDatum, TreasuryState, ValidatorHash,
+  ApplyOrderData, ApplyOrderParams, Asset, DatumMap, Deposit, DiscoveryPhase,
+  OrderDatum, RedeemLP, RedeemRaiseAsset, TreasuryDatum, TreasuryState,
+  ValidatorHash,
 }
 use lb_v2/utils
 
@@ -154,65 +152,20 @@ pub fn get_amm_pool_raw_datum(
   utils.must_find_script_datum(datums, datum)
 }
 
-pub fn validate_create_dex_pool(
-  treasury_input: treasury_input,
-  treasury_output: treasury_output,
-  amm_pool_raw_datum: Data,
-  mint_value: Value,
-  amm_authen_policy_id: PolicyId,
-  amm_pool_auth_asset_name: AssetName,
-  validity_range: ValidityRange,
-  all_outputs: List<Output>,
-  all_inputs: List<Input>,
-) -> Bool {
-  True
-}
-
-fn validate_order(
-  order_input: Input,
-  order_output: Output,
-  datums: DatumMap,
-) -> Bool {
-  let Input { output: Output { datum: in_datum_raw, .. }, .. } = order_input
-  let Output { value: out_value, address: out_address, .. } = order_output
-  expect order_datum: OrderDatum =
-    when in_datum_raw is {
-      InlineDatum(d) -> d
-      _ -> utils.must_find_script_datum(datums, in_datum_raw)
-    }
-  let OrderDatum { owner, expect_output_asset, minimum_receive, .. } =
-    order_datum
-  and {
-    // for sure output to owner
-    out_address == owner,
-    // for sure output has correct value
-    utils.quantity_of_asset(out_value, expect_output_asset) == minimum_receive,
-  }
-}
-
-fn apply_orders(
-  order_inputs: List<Input>,
-  order_outputs: List<Output>,
-  datums: DatumMap,
-) -> Bool {
-  when order_inputs is {
-    [] ->
-      when order_outputs is {
-        [] -> True
-        _ -> False
-      }
-    [input, ..inputs] ->
-      when order_outputs is {
-        [] -> fail
-        [output, ..outputs] ->
-          validate_order(input, output, datums) && apply_orders(
-            inputs,
-            outputs,
-            datums,
-          )
-      }
-  }
-}
+// pub fn validate_create_dex_pool(
+//   datum: TreasuryDatum,
+//   treasury_input: treasury_input,
+//   treasury_output: treasury_output,
+//   amm_pool_raw_datum: Data,
+//   mint_value: Value,
+//   amm_authen_policy_id: PolicyId,
+//   amm_pool_auth_asset_name: AssetName,
+//   validity_range: ValidityRange,
+//   all_outputs: List<Output>,
+//   all_inputs: List<Input>,
+// ) -> Bool {
+//   True
+// }
 
 pub fn validate_order_time(
   start_time: Int,
@@ -350,61 +303,6 @@ fn apply_redeem_raise_asset_orders(
   }
 }
 
-fn apply_redeem_lp_orders(
-  order_in_values: List<Value>,
-  order_in_datums: List<OrderDatum>,
-  order_outputs: List<Output>,
-  raise_asset_policy_id: PolicyId,
-  raise_asset_name: AssetName,
-  authen_policy_id: PolicyId,
-  lp_asset_name: AssetName,
-  total_liquidity: Int,
-  total_raise_amount: Int,
-) -> Int {
-  if order_in_values |> builtin.null_list {
-    0
-  } else {
-    let OrderDatum { step, expect_output_asset, owner, minimum_receive, .. } =
-      order_in_datums |> builtin.head_list
-    if step == RedeemRaiseAsset {
-      let in_value = order_in_values |> builtin.head_list
-      let estimate_in = quantity_of(in_value, authen_policy_id, lp_asset_name)
-      expect value.lovelace_of(in_value) >= 2000000
-      let Output { value: out_value, address: out_address, .. } =
-        order_outputs |> builtin.head_list
-      let estimate_out = utils.quantity_of_asset(out_value, expect_output_asset)
-      expect and {
-          minimum_receive == estimate_out,
-          out_address == owner,
-          estimate_out * total_raise_amount == estimate_in * total_liquidity,
-        }
-      estimate_out + apply_redeem_lp_orders(
-        order_in_values |> builtin.tail_list,
-        order_in_datums |> builtin.tail_list,
-        order_outputs |> builtin.tail_list,
-        raise_asset_policy_id,
-        raise_asset_name,
-        authen_policy_id,
-        lp_asset_name,
-        total_liquidity,
-        total_raise_amount,
-      )
-    } else {
-      apply_redeem_lp_orders(
-        order_in_values |> builtin.tail_list,
-        order_in_datums |> builtin.tail_list,
-        order_outputs |> builtin.tail_list,
-        raise_asset_policy_id,
-        raise_asset_name,
-        authen_policy_id,
-        lp_asset_name,
-        total_liquidity,
-        total_raise_amount,
-      )
-    }
-  }
-}
-
 pub fn get_order_inputs_and_outputs(
   inputs: List<Input>,
   outputs: List<Output>,
@@ -468,7 +366,120 @@ pub fn get_order_datums(
   )
 }
 
-pub fn apply_deposit_order()
+pub fn apply_deposit_order(params: ApplyOrderParams) {
+  let ApplyOrderParams {
+    in_value,
+    out_value,
+    expect_output_asset,
+    minimum_receive,
+    treasury_state,
+    data: ApplyOrderData { raise_asset_policy_id, raise_asset_name, .. },
+  } = params
+  let amount_in =
+    value.quantity_of(in_value, raise_asset_policy_id, raise_asset_name)
+  let estimate_in =
+    if utils.is_ada_asset(raise_asset_policy_id, raise_asset_name) {
+      amount_in - 2000000
+    } else {
+      amount_in
+    }
+  let estimate_out = utils.quantity_of_asset(out_value, expect_output_asset)
+  expect and {
+      estimate_in == estimate_out,
+      minimum_receive == estimate_out,
+      value.quantity_of(out_value, ada_policy_id, ada_asset_name) >= 1500000,
+    }
+  let (
+    datum_reserve_raise,
+    value_reserve_raise,
+    datum_total_liquidity,
+    value_total_liquidity,
+  ) = treasury_state
+  (
+    datum_reserve_raise + estimate_in,
+    value_reserve_raise + estimate_in,
+    datum_total_liquidity,
+    value_total_liquidity,
+  )
+}
+
+pub fn apply_redeem_raise_asset_order(params: ApplyOrderParams) -> TreasuryState {
+  let ApplyOrderParams {
+    in_value,
+    out_value,
+    minimum_receive,
+    treasury_state,
+    data: ApplyOrderData {
+      raise_asset_policy_id,
+      raise_asset_name,
+      authen_policy_id,
+      lp_asset_name,
+      ..
+    },
+    ..
+  } = params
+  let estimate_in = value.quantity_of(in_value, authen_policy_id, lp_asset_name)
+  let amount_out =
+    value.quantity_of(out_value, raise_asset_policy_id, raise_asset_name)
+  let estimate_out =
+    if utils.is_ada_asset(raise_asset_policy_id, raise_asset_name) {
+      amount_out - 1500000
+    } else {
+      amount_out
+    }
+  expect and {
+      estimate_in == estimate_out,
+      minimum_receive == estimate_out,
+      value.quantity_of(out_value, ada_policy_id, ada_asset_name) >= 1500000,
+    }
+  let (
+    datum_reserve_raise,
+    value_reserve_raise,
+    datum_total_liquidity,
+    value_total_liquidity,
+  ) = treasury_state
+  (
+    datum_reserve_raise - estimate_in,
+    value_reserve_raise - estimate_in,
+    datum_total_liquidity,
+    value_total_liquidity,
+  )
+}
+
+pub fn apply_redeem_lp(params: ApplyOrderParams) -> TreasuryState {
+  let ApplyOrderParams {
+    in_value,
+    out_value,
+    treasury_state,
+    data: ApplyOrderData {
+      authen_policy_id,
+      lp_asset_name,
+      amm_authen_policy_id,
+      ..
+    },
+    ..
+  } = params
+  let estimate_in = value.quantity_of(in_value, authen_policy_id, lp_asset_name)
+  let estimate_out =
+    value.quantity_of(out_value, amm_authen_policy_id, lp_asset_name)
+  let (
+    datum_reserve_raise,
+    value_reserve_raise,
+    datum_total_liquidity,
+    value_total_liquidity,
+  ) = treasury_state
+  expect and {
+      datum_total_liquidity * estimate_in == datum_reserve_raise * estimate_out,
+      value.quantity_of(out_value, ada_policy_id, ada_asset_name) >= 1500000,
+    }
+  (
+    datum_reserve_raise,
+    value_reserve_raise,
+    datum_total_liquidity - estimate_out,
+    value_total_liquidity - estimate_out,
+  )
+}
+
 pub fn apply_orders(
   order_in_values: List<Value>,
   order_in_datums: List<OrderDatum>,
@@ -481,34 +492,34 @@ pub fn apply_orders(
   } else {
     let OrderDatum { step, expect_output_asset, owner, minimum_receive, .. } =
       order_in_datums |> builtin.head_list
-    when step is {
-      Deposit -> apply_deposit_order()
-    }
-    if step == Deposit {
-      let in_value = order_in_values |> builtin.head_list
-      let amount_in =
-        quantity_of(in_value, raise_asset_policy_id, raise_asset_name)
-      let estimate_in =
-        if utils.is_ada_asset(raise_asset_policy_id, raise_asset_name) {
-          amount_in - 2000000
-        } else {
-          amount_in
-        }
-      let Output { value: out_value, address: out_address, .. } =
-        order_outputs |> builtin.head_list
-      let estimate_out = utils.quantity_of_asset(out_value, expect_output_asset)
-      expect and {
-          estimate_in == estimate_out,
-          minimum_receive == estimate_out,
-          out_address == owner,
-        }
-      estimate_out + apply_deposit_orders(
-        order_in_values |> builtin.tail_list,
-        order_in_datums |> builtin.tail_list,
-        order_outputs |> builtin.tail_list,
-        raise_asset_policy_id,
-        raise_asset_name,
-      )
+    let in_value = order_in_values |> builtin.head_list
+    let Output { value: out_value, address: out_address, .. } =
+      order_outputs |> builtin.head_list
+    expect out_address == owner
+    let params =
+      ApplyOrderParams {
+        in_value,
+        out_value,
+        expect_output_asset,
+        minimum_receive,
+        treasury_state,
+        data,
+      }
+
+    let new_treasury_state =
+      params
+        |> when step is {
+             Deposit -> apply_deposit_order
+             RedeemRaiseAsset -> apply_redeem_raise_asset_order
+             RedeemLP -> apply_redeem_lp
+           }
+    apply_orders(
+      order_in_values |> builtin.tail_list,
+      order_in_datums |> builtin.tail_list,
+      order_outputs |> builtin.tail_list,
+      new_treasury_state,
+      data,
+    )
   }
 }
 
@@ -523,8 +534,14 @@ pub fn validate_apply_order(
   amm_authen_policy_id: PolicyId,
   mint_value: Value,
 ) -> Bool {
-  let Input { output: Output { datum: treasury_in_datum_raw, .. }, .. } =
-    treasury_input
+  let Input {
+    output: Output {
+      value: treasury_in_value,
+      datum: treasury_in_datum_raw,
+      ..
+    },
+    ..
+  } = treasury_input
   expect treasury_in_datum: TreasuryDatum =
     when treasury_in_datum_raw is {
       InlineDatum(d) -> d
@@ -535,7 +552,8 @@ pub fn validate_apply_order(
     raise_asset,
     order_hash,
     discovery_phase,
-    reserve_raise: raise_amount_in,
+    reserve_raise: in_datum_reserve_raise,
+    total_liquidity: in_datum_total_liquidity,
     ..
   } = treasury_in_datum
   let Output { value: treasury_out_value, datum: treasury_out_datum_raw, .. } =
@@ -545,7 +563,11 @@ pub fn validate_apply_order(
       InlineDatum(d) -> d
       _ -> utils.must_find_script_datum(datums, treasury_out_datum_raw)
     }
-  let TreasuryDatum { reserve_raise: raise_amount_out, .. } = treasury_out_datum
+  let TreasuryDatum {
+    reserve_raise: out_datum_reserve_raise,
+    total_liquidity: out_datum_total_liquidity,
+    ..
+  } = treasury_out_datum
   let DiscoveryPhase {
     start_time: discovery_phase_start,
     end_time: discovery_phase_end,
@@ -587,23 +609,41 @@ pub fn validate_apply_order(
     )
   let Asset { policy_id: raise_asset_policy_id, asset_name: raise_asset_name } =
     raise_asset
-  let reserve_raise =
-    apply_deposit_orders(
-      order_in_values,
-      order_datums,
-      order_outputs,
-      raise_asset_policy_id,
-      raise_asset_name,
+  let pool_state_out: TreasuryState =
+    (
+      out_datum_reserve_raise,
+      value.quantity_of(
+        treasury_out_value,
+        raise_asset_policy_id,
+        raise_asset_name,
+      ),
+      out_datum_total_liquidity,
+      value.quantity_of(treasury_out_value, amm_authen_policy_id, lp_asset_name),
     )
-  let reserve_redeem_raise_asset =
-    apply_redeem_raise_asset_orders(
-      order_in_values,
-      order_datums,
-      order_outputs,
-      raise_asset_policy_id,
-      raise_asset_name,
-      authen_policy_id,
-      lp_asset_name,
+  let pool_state_in: TreasuryState =
+    (
+      in_datum_reserve_raise,
+      value.quantity_of(
+        treasury_in_value,
+        raise_asset_policy_id,
+        raise_asset_name,
+      ),
+      in_datum_total_liquidity,
+      value.quantity_of(treasury_in_value, amm_authen_policy_id, lp_asset_name),
+    )
+  expect
+    pool_state_out == apply_orders(
+      order_in_values: order_in_values,
+      order_in_datums: order_datums,
+      order_outputs: order_outputs,
+      treasury_state: pool_state_in,
+      data: ApplyOrderData {
+        raise_asset_policy_id,
+        raise_asset_name,
+        authen_policy_id,
+        lp_asset_name,
+        amm_authen_policy_id,
+      },
     )
   and {
     validate_order_time(
@@ -612,12 +652,6 @@ pub fn validate_apply_order(
       validity_range: validity_range,
       order_datums: order_datums,
     ),
-    raise_amount_in + reserve_raise - reserve_redeem_raise_asset == raise_amount_out,
-    value.quantity_of(
-      treasury_out_value,
-      raise_asset_policy_id,
-      raise_asset_name,
-    ) == raise_amount_out,
     mint_value == value.zero(),
   }
 }

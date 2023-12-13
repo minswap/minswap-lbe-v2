@@ -1,23 +1,16 @@
 use aiken/builtin
 use aiken/bytearray
 use aiken/interval.{Finite, Interval, IntervalBound}
-use aiken/list
-// use aiken/cbor
-// use aiken/list
-// use aiken/math
 use aiken/transaction.{
-  Datum, InlineDatum, Input, Mint, NoDatum, Output, OutputReference, Redeemer,
-  ScriptContext, ScriptPurpose, Transaction, TransactionId, ValidityRange,
+  InlineDatum, Input, NoDatum, Output, OutputReference, ScriptPurpose,
+  TransactionId, ValidityRange,
 }
 use aiken/transaction/credential.{
-  Address, Inline, Referenced, ScriptCredential, StakeCredential,
+  Address, Inline, ScriptCredential, StakeCredential,
 }
-use aiken/transaction/value.{
-  AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
-}
+use aiken/transaction/value.{AssetName, PolicyId, ada_asset_name, ada_policy_id}
 use lb_v2/types.{
-  Asset, AuthenRedeemer, CreateTreasury, Deposit, DiscoveryPhase, EncouterPhase,
-  FactoryDatum, FactoryRedeemer, MintFactoryAuthen, OrderDatum, Penalty,
+  Asset, Deposit, DiscoveryPhase, EncouterPhase, FactoryDatum, OrderDatum,
   RedeemLP, RedeemRaiseAsset, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils
@@ -210,9 +203,6 @@ pub fn gen_dummy_treasury_out() -> Output {
       raise_asset,
       lp_alloc_points: [],
       raise_alloc_points: [],
-      penalty: Some(
-        Penalty { remain_percent: 75, start_time: 1701837708, end_time: None },
-      ),
       discovery_phase: DiscoveryPhase {
         start_time: 1701405708,
         end_time: 1702615308,

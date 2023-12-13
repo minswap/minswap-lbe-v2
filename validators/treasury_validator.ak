@@ -1,5 +1,4 @@
 use aiken/bytearray
-use aiken/cbor
 use aiken/transaction.{
   InlineDatum, Input, Output, ScriptContext, Spend, Transaction,
 }
@@ -8,7 +7,6 @@ use lb_v2/test_suits
 use lb_v2/types.{
   Batching, CreatePool, TreasuryDatum, TreasuryRedeemer, ValidatorHash,
 }
-use lb_v2/utils
 use lb_v2/validation
 
 validator(
@@ -52,27 +50,32 @@ validator(
       )
     let mint_value = from_minted_value(mint)
     when redeemer is {
-      CreatePool -> {
-        expect amm_pool_raw_datum =
-          validation.get_amm_pool_raw_datum(
-            outputs,
-            datums,
-            amm_authen_policy_id,
-            amm_pool_auth_asset_name,
-            amm_pool_validation_hash,
-          )
-        validation.validate_create_dex_pool(
-          treasury_input: treasury_input,
-          treasury_output: treasury_output,
-          amm_pool_raw_datum: amm_pool_raw_datum,
-          mint_value: mint_value,
-          amm_authen_policy_id: amm_authen_policy_id,
-          amm_pool_auth_asset_name: amm_pool_auth_asset_name,
-          validity_range: validity_range,
-          all_outputs: outputs,
-          all_inputs: inputs,
-        )
-      }
+      CreatePool ->
+        // expect amm_pool_raw_datum =
+        //   validation.get_amm_pool_raw_datum(
+        //     outputs,
+        //     datums,
+        //     amm_authen_policy_id,
+        //     amm_pool_auth_asset_name,
+        //     amm_pool_validation_hash,
+        //   )
+        datum.reserve_base > 0 && value.quantity_of(
+          treasury_output.value,
+          amm_authen_policy_id,
+          amm_pool_auth_asset_name,
+        ) == 0 && amm_pool_validation_hash != #""
+      // validation.validate_create_dex_pool(
+      //   datum: datum,
+      //   treasury_input: treasury_input,
+      //   treasury_output: treasury_output,
+      //   amm_pool_raw_datum: amm_pool_raw_datum,
+      //   mint_value: mint_value,
+      //   amm_authen_policy_id: amm_authen_policy_id,
+      //   amm_pool_auth_asset_name: amm_pool_auth_asset_name,
+      //   validity_range: validity_range,
+      //   all_outputs: outputs,
+      //   all_inputs: inputs,
+      // )
       Batching ->
         validation.validate_apply_order(
           treasury_input: treasury_input,
