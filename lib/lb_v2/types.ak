@@ -24,11 +24,15 @@ pub type EncouterPhase {
   end_time: Option<Int>,
 }
 
+pub type ProjectFee {
+  owner: Address,
+  percent: Int,
+}
+
 pub type TreasuryDatum {
   base_asset: Asset,
   raise_asset: Asset,
-  lp_alloc_points: List<(Address, Int)>,
-  raise_alloc_points: List<(Address, Int)>,
+  project_fee: ProjectFee,
   discovery_phase: DiscoveryPhase,
   encounter_phase: EncouterPhase,
   minimum_raise: Option<Int>,
@@ -37,11 +41,15 @@ pub type TreasuryDatum {
   reserve_base: Int,
   reserve_raise: Int,
   total_liquidity: Int,
+  is_cancel: Bool,
+  is_created_pool: Bool,
 }
 
 pub type TreasuryRedeemer {
+  UpdateLBE
   CreatePool
   Batching
+  CancelLBE
 }
 
 pub type OrderStep {

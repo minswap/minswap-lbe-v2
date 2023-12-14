@@ -5,9 +5,12 @@ use aiken/transaction.{
 use aiken/transaction/value.{AssetName, PolicyId, from_minted_value}
 use lb_v2/test_suits
 use lb_v2/types.{
-  Batching, CreatePool, TreasuryDatum, TreasuryRedeemer, ValidatorHash,
+  Batching, CancelLBE, CreatePool, ProjectFee, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
+  ValidatorHash,
 }
 use lb_v2/validation
+use aiken/transaction/credential.{Address, VerificationKeyCredential}
+use aiken/list
 
 validator(
   authen_policy_id: PolicyId,
@@ -28,6 +31,8 @@ validator(
         mint,
         datums,
         validity_range,
+        reference_inputs,
+        extra_signatories,
         ..
       },
       purpose: Spend(self_out_ref),
@@ -50,31 +55,34 @@ validator(
       )
     let mint_value = from_minted_value(mint)
     when redeemer is {
-      CreatePool ->
-        // expect amm_pool_raw_datum =
-        //   validation.get_amm_pool_raw_datum(
-        //     outputs,
-        //     datums,
-        //     amm_authen_policy_id,
-        //     amm_pool_auth_asset_name,
-        //     amm_pool_validation_hash,
-        //   )
-        datum.reserve_base > 0 && value.quantity_of(
-          treasury_output.value,
-          amm_authen_policy_id,
-          amm_pool_auth_asset_name,
-        ) == 0 && amm_pool_validation_hash != #""
+      CreatePool -> {
+        expect amm_pool_datum =
+          validation.get_amm_pool_datum(
+            outputs,
+            datums,
+            amm_authen_policy_id,
+            amm_pool_auth_asset_name,
+            amm_pool_validation_hash,
+          )
+        validation.validate_create_dex_pool(
+          treasury_in_datum: datum,
+          treasury_input: treasury_input,
+          treasury_output: treasury_output,
+          all_inputs: inputs,
+          all_outputs: outputs,
+        )
+      }
       // validation.validate_create_dex_pool(
       //   datum: datum,
       //   treasury_input: treasury_input,
       //   treasury_output: treasury_output,
-      //   amm_pool_raw_datum: amm_pool_raw_datum,
-      //   mint_value: mint_value,
-      //   amm_authen_policy_id: amm_authen_policy_id,
-      //   amm_pool_auth_asset_name: amm_pool_auth_asset_name,
-      //   validity_range: validity_range,
-      //   all_outputs: outputs,
-      //   all_inputs: inputs,
+      //   amm_pool_datum: amm_pool_datum,
+      // mint_value: mint_value,
+      // amm_authen_policy_id: amm_authen_policy_id,
+      // amm_pool_auth_asset_name: amm_pool_auth_asset_name,
+      // validity_range: validity_range,
+      // all_outputs: outputs,
+      // all_inputs: inputs,
       // )
       Batching ->
         validation.validate_apply_order(
@@ -88,6 +96,38 @@ validator(
           amm_authen_policy_id: amm_authen_policy_id,
           mint_value: mint_value,
         )
+      CancelLBE ->
+        validation.validate_cancel_lbe(
+          treasury_in_datum: datum,
+          treasury_input: treasury_input,
+          treasury_output: treasury_output,
+          datums: datums,
+          validity_range: validity_range,
+          reference_inputs: reference_inputs,
+          amm_pool_validation_hash: amm_pool_validation_hash,
+          amm_authen_policy_id: amm_authen_policy_id,
+          amm_pool_auth_asset_name: amm_pool_auth_asset_name,
+        )
+      UpdateLBE -> {
+        let TreasuryDatum {
+          project_fee: ProjectFee { owner: project_owner_address, .. },
+          ..
+        } = datum
+        expect Address {
+          payment_credential: VerificationKeyCredential(owner_pkh),
+          ..
+        } = project_owner_address
+        and {
+          list.has(extra_signatories, owner_pkh),
+          validation.validate_update_lbe(
+            treasury_in_datum: datum,
+            treasury_input: treasury_input,
+            treasury_output: treasury_output,
+            datums: datums,
+            validity_range: validity_range,
+          ),
+        }
+      }
     }
   }
 }

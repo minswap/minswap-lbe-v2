@@ -10,10 +10,152 @@ use aiken/transaction/value.{
 }
 use lb_v2/types.{
   ApplyOrderData, ApplyOrderParams, Asset, DatumMap, Deposit, DiscoveryPhase,
-  OrderDatum, RedeemLP, RedeemRaiseAsset, TreasuryDatum, TreasuryState,
-  ValidatorHash,
+  OrderDatum, ProjectFee, RedeemLP, RedeemRaiseAsset, TreasuryDatum,
+  TreasuryState, ValidatorHash,
 }
 use lb_v2/utils
+
+pub fn validate_update_lbe(
+  treasury_in_datum: TreasuryDatum,
+  treasury_input: Input,
+  treasury_output: Output,
+  datums: DatumMap,
+  validity_range: ValidityRange,
+) -> Bool {
+  expect Interval {
+    upper_bound: IntervalBound { bound_type: Finite(end_valid_time_range), .. },
+    ..
+  } = validity_range
+  let TreasuryDatum {
+    base_asset,
+    discovery_phase: DiscoveryPhase { start_time, .. },
+    project_fee: ProjectFee { owner, .. },
+    ..
+  } = treasury_in_datum
+  let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
+    base_asset
+  let Input { output: Output { value: treasury_in_value, .. }, .. } =
+    treasury_input
+  let Output { value: treasury_out_value, datum: treasury_out_datum_raw, .. } =
+    treasury_output
+  expect treasury_out_datum: TreasuryDatum =
+    when treasury_out_datum_raw is {
+      InlineDatum(d) -> d
+      _ -> utils.must_find_script_datum(datums, treasury_out_datum_raw)
+    }
+  let TreasuryDatum {
+    reserve_base: new_reserve_base,
+    minimum_raise: new_min_raise,
+    maximum_raise: new_max_raise,
+    project_fee: ProjectFee { percent: new_pf_percent, .. },
+    ..
+  } = treasury_out_datum
+  and {
+    end_valid_time_range < start_time,
+    value.quantity_of(treasury_in_value, ada_policy_id, ada_asset_name) == value.quantity_of(
+      treasury_out_value,
+      ada_policy_id,
+      ada_asset_name,
+    ),
+    value.quantity_of(treasury_out_value, base_asset_pid, base_asset_an) == new_reserve_base,
+    treasury_out_datum == TreasuryDatum {
+      ..treasury_in_datum,
+      reserve_base: new_reserve_base,
+      minimum_raise: new_min_raise,
+      maximum_raise: new_max_raise,
+      project_fee: ProjectFee { owner, percent: new_pf_percent },
+    },
+  }
+}
+
+pub fn validate_cancel_lbe(
+  treasury_in_datum: TreasuryDatum,
+  treasury_input: Input,
+  treasury_output: Output,
+  datums: DatumMap,
+  validity_range: ValidityRange,
+  reference_inputs: List<Input>,
+  amm_pool_validation_hash: ValidatorHash,
+  amm_authen_policy_id: PolicyId,
+  amm_pool_auth_asset_name: AssetName,
+) -> Bool {
+  let TreasuryDatum {
+    base_asset,
+    raise_asset,
+    is_cancel,
+    is_created_pool,
+    minimum_raise,
+    reserve_raise,
+    discovery_phase: DiscoveryPhase { end_time: discovery_end, .. },
+    ..
+  } = treasury_in_datum
+  let Input { output: Output { value: treasury_in_value, .. }, .. } =
+    treasury_input
+  let Output { value: treasury_out_value, datum: treasury_out_datum_raw, .. } =
+    treasury_output
+  expect treasury_out_datum: TreasuryDatum =
+    when treasury_out_datum_raw is {
+      InlineDatum(d) -> d
+      _ -> utils.must_find_script_datum(datums, treasury_out_datum_raw)
+    }
+  expect and {
+      is_cancel == False,
+      is_created_pool == False,
+      treasury_in_value == treasury_out_value,
+      treasury_out_datum == TreasuryDatum {
+        ..treasury_in_datum,
+        is_cancel: True,
+      },
+    }
+  let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
+    base_asset
+  let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
+    raise_asset
+  let dex_pool_input =
+    list.find(
+      reference_inputs,
+      fn(ref_input) {
+        let Input {
+          output: Output {
+            address: Address { payment_credential, .. },
+            value,
+            ..
+          },
+          ..
+        } = ref_input
+        when payment_credential is {
+          ScriptCredential(hash) -> and {
+              hash == amm_pool_validation_hash,
+              value.quantity_of(
+                value,
+                amm_authen_policy_id,
+                amm_pool_auth_asset_name,
+              ) == 1,
+              value.quantity_of(value, base_asset_pid, base_asset_an) > 0,
+              value.quantity_of(value, raise_asset_pid, raise_asset_an) > 0,
+            }
+          _ -> False
+        }
+      },
+    )
+  when dex_pool_input is {
+    Some(_) -> True
+    None -> {
+      expect Some(min_raise) = minimum_raise
+      expect Interval {
+        lower_bound: IntervalBound {
+          bound_type: Finite(start_valid_time_range),
+          ..
+        },
+        ..
+      } = validity_range
+      and {
+        reserve_raise < min_raise,
+        discovery_end < start_valid_time_range,
+      }
+    }
+  }
+}
 
 pub fn validate_creating_treasury_out(
   treasury_out_value: Value,
@@ -32,6 +174,7 @@ pub fn validate_creating_treasury_out(
     reserve_base: t_reserve_base,
     reserve_raise,
     total_liquidity,
+    is_cancel,
     ..
   } = treasury_out_datum
   let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
@@ -46,9 +189,12 @@ pub fn validate_creating_treasury_out(
     treasury_out_value == expected_treasury_out_value,
     t_base_asset == base_asset,
     t_raise_asset == raise_asset,
+    base_asset != raise_asset,
+    t_reserve_base > 0,
     t_order_hash == order_hash,
     total_liquidity == 0,
     reserve_raise == 0,
+    is_cancel == False,
   }
 }
 
@@ -127,7 +273,7 @@ pub fn get_treasury_output(
   treasury_output
 }
 
-pub fn get_amm_pool_raw_datum(
+pub fn get_amm_pool_datum(
   outputs: List<Output>,
   datums: DatumMap,
   amm_authen_policy_id: PolicyId,
@@ -140,10 +286,15 @@ pub fn get_amm_pool_raw_datum(
       fn(output) {
         let Output { address: Address { payment_credential, .. }, value, .. } =
           output
-        expect
-          quantity_of(value, amm_authen_policy_id, amm_pool_auth_asset_name) == 1
         when payment_credential is {
-          ScriptCredential(hash) -> hash == amm_pool_validation_hash
+          ScriptCredential(hash) -> and {
+              hash == amm_pool_validation_hash,
+              value.quantity_of(
+                value,
+                amm_authen_policy_id,
+                amm_pool_auth_asset_name,
+              ) == 1,
+            }
           _ -> False
         }
       },
@@ -152,20 +303,24 @@ pub fn get_amm_pool_raw_datum(
   utils.must_find_script_datum(datums, datum)
 }
 
-// pub fn validate_create_dex_pool(
-//   datum: TreasuryDatum,
-//   treasury_input: treasury_input,
-//   treasury_output: treasury_output,
-//   amm_pool_raw_datum: Data,
-//   mint_value: Value,
-//   amm_authen_policy_id: PolicyId,
-//   amm_pool_auth_asset_name: AssetName,
-//   validity_range: ValidityRange,
-//   all_outputs: List<Output>,
-//   all_inputs: List<Input>,
-// ) -> Bool {
-//   True
-// }
+pub fn validate_create_dex_pool(
+  treasury_in_datum: TreasuryDatum,
+  treasury_input: Input,
+  treasury_output: Output,
+  all_inputs: List<Input>,
+  all_outputs: List<Output>,
+) -> Bool {
+  let TreasuryDatum { minimum_raise, reserve_raise, .. } = treasury_in_datum
+  let actual_min_raise =
+    when minimum_raise is {
+      Some(d) -> d
+      None -> 0
+    }
+  and {
+    reserve_raise > actual_min_raise,
+    1 > 0,
+  }
+}
 
 pub fn validate_order_time(
   start_time: Int,
