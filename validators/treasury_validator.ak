@@ -1,16 +1,18 @@
 use aiken/bytearray
+use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Output, ScriptContext, Spend, Transaction,
+}
+use aiken/transaction/credential.{
+  Address, ScriptCredential, VerificationKeyCredential,
 }
 use aiken/transaction/value.{AssetName, PolicyId, from_minted_value}
 use lb_v2/test_suits
 use lb_v2/types.{
-  Batching, CancelLBE, CreatePool, ProjectFee, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
-  ValidatorHash,
+  Batching, CancelLBE, CreatePool, PoolDatum, ProjectFee, TreasuryDatum,
+  TreasuryRedeemer, UpdateLBE, ValidatorHash,
 }
 use lb_v2/validation
-use aiken/transaction/credential.{Address, VerificationKeyCredential}
-use aiken/list
 
 validator(
   authen_policy_id: PolicyId,
@@ -56,7 +58,7 @@ validator(
     let mint_value = from_minted_value(mint)
     when redeemer is {
       CreatePool -> {
-        expect amm_pool_datum =
+        expect amm_pool_datum: PoolDatum =
           validation.get_amm_pool_datum(
             outputs,
             datums,
@@ -64,26 +66,33 @@ validator(
             amm_pool_auth_asset_name,
             amm_pool_validation_hash,
           )
+        let TreasuryDatum { order_hash, .. } = datum
+        expect [] =
+          list.filter(
+            inputs,
+            fn(input) {
+              let Input { output: out, .. } = input
+              let Output { address: addr, .. } = out
+              let Address { payment_credential: payment_cred, .. } = addr
+              when payment_cred is {
+                ScriptCredential(hash) -> hash == order_hash
+                _ -> False
+              }
+            },
+          )
         validation.validate_create_dex_pool(
           treasury_in_datum: datum,
           treasury_input: treasury_input,
           treasury_output: treasury_output,
           all_inputs: inputs,
           all_outputs: outputs,
+          validity_range: validity_range,
+          mint_value: mint_value,
+          amm_authen_policy_id: amm_authen_policy_id,
+          amm_pool_auth_asset_name: amm_pool_auth_asset_name,
+          amm_pool_datum: amm_pool_datum,
         )
       }
-      // validation.validate_create_dex_pool(
-      //   datum: datum,
-      //   treasury_input: treasury_input,
-      //   treasury_output: treasury_output,
-      //   amm_pool_datum: amm_pool_datum,
-      // mint_value: mint_value,
-      // amm_authen_policy_id: amm_authen_policy_id,
-      // amm_pool_auth_asset_name: amm_pool_auth_asset_name,
-      // validity_range: validity_range,
-      // all_outputs: outputs,
-      // all_inputs: inputs,
-      // )
       Batching ->
         validation.validate_apply_order(
           treasury_input: treasury_input,

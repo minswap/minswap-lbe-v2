@@ -9,9 +9,9 @@ use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id, quantity_of,
 }
 use lb_v2/types.{
-  ApplyOrderData, ApplyOrderParams, Asset, DatumMap, Deposit, DiscoveryPhase,
-  OrderDatum, ProjectFee, RedeemLP, RedeemRaiseAsset, TreasuryDatum,
-  TreasuryState, ValidatorHash,
+  ApplyOrderData, ApplyOrderParams, Asset, DatumMap, Deposit, OrderDatum,
+  PoolDatum, RedeemLP, RedeemRaiseAsset, TreasuryDatum, TreasuryState,
+  ValidatorHash,
 }
 use lb_v2/utils
 
@@ -28,7 +28,7 @@ pub fn validate_update_lbe(
   } = validity_range
   let TreasuryDatum {
     base_asset,
-    discovery_phase: DiscoveryPhase { start_time, .. },
+    start_time,
     project_fee: ProjectFee { owner, .. },
     ..
   } = treasury_in_datum
@@ -309,16 +309,96 @@ pub fn validate_create_dex_pool(
   treasury_output: Output,
   all_inputs: List<Input>,
   all_outputs: List<Output>,
+  validity_range: ValidityRange,
+  mint_value: Value,
+  amm_authen_policy_id: PolicyId,
+  amm_pool_auth_asset_name: AssetName,
+  amm_pool_datum: PoolDatum,
 ) -> Bool {
-  let TreasuryDatum { minimum_raise, reserve_raise, .. } = treasury_in_datum
-  let actual_min_raise =
-    when minimum_raise is {
-      Some(d) -> d
-      None -> 0
+  expect Interval {
+    lower_bound: IntervalBound {
+      bound_type: Finite(start_valid_time_range),
+      ..
+    },
+    ..
+  } = validity_range
+  expect TreasuryDatum {
+    base_asset,
+    raise_asset,
+    end_time,
+    owner,
+    minimum_raise,
+    maximum_raise,
+    reserve_base,
+    reserve_raise,
+    is_cancel: False,
+    is_created_pool: False,
+    ..
+  } = treasury_in_datum
+  expect and {
+      when minimum_raise is {
+        Some(m) -> reserve_raise >= m
+        None -> True
+      },
+      start_valid_time_range > end_time,
+    } || when maximum_raise is {
+      Some(m) -> reserve_raise >= m
+      None -> False
     }
+  let (asset_a, asset_b) = utils.sort_two_assets(base_asset, raise_asset)
+  let (datum_in_reserve_a, datum_in_reserve_b) =
+    when asset_a == base_asset is {
+      True -> (reserve_base, reserve_raise)
+      False -> (reserve_raise, reserve_base)
+    }
+  let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
+    asset_a
+  let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
+    asset_b
+  let lp_asset_name =
+    utils.compute_lp_asset_name(
+      asset_a_policy_id,
+      asset_a_asset_name,
+      asset_b_policy_id,
+      asset_b_asset_name,
+    )
+  let PoolDatum {
+    asset_a: pool_asset_a,
+    asset_b: pool_asset_b,
+    reserve_a: pool_reserve_a,
+    reserve_b: pool_reserve_b,
+    ..
+  } = amm_pool_datum
+  expect [project_owner_output] =
+    list.filter(
+      all_outputs,
+      fn(output) {
+        let Output { address, .. } = output
+        address == project_owner_address
+      },
+    )
+  let Output { value: treasury_out_value, datum: treasury_out_datum_raw, .. } =
+    treasury_output
+  expect treasury_out_datum: TreasuryDatum =
+    when treasury_out_datum_raw is {
+      InlineDatum(d) -> d
+      _ -> utils.must_find_script_datum(datums, treasury_out_datum_raw)
+    }
+  expect TreasuryDatum {
+    total_liquidity: out_datum_total_liquidity,
+    is_created_pool: True,
+    ..
+  } = treasury_out_datum
   and {
-    reserve_raise > actual_min_raise,
-    1 > 0,
+    value.quantity_of(
+      mint_value,
+      amm_authen_policy_id,
+      amm_pool_auth_asset_name,
+    ) == 1,
+    asset_a == pool_asset_a,
+    asset_b == pool_asset_b,
+    datum_in_reserve_a == pool_reserve_a,
+    datum_in_reserve_b == pool_reserve_b,
   }
 }
 

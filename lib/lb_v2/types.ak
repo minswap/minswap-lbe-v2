@@ -14,27 +14,12 @@ pub type Asset {
   asset_name: AssetName,
 }
 
-pub type DiscoveryPhase {
-  start_time: Int,
-  end_time: Int,
-}
-
-pub type EncouterPhase {
-  start_time: Int,
-  end_time: Option<Int>,
-}
-
-pub type ProjectFee {
-  owner: Address,
-  percent: Int,
-}
-
 pub type TreasuryDatum {
   base_asset: Asset,
   raise_asset: Asset,
-  project_fee: ProjectFee,
-  discovery_phase: DiscoveryPhase,
-  encounter_phase: EncouterPhase,
+  start_time: Int,
+  end_time: Int,
+  owner: Address,
   minimum_raise: Option<Int>,
   maximum_raise: Option<Int>,
   order_hash: ValidatorHash,
