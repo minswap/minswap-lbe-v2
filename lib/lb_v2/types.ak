@@ -17,8 +17,9 @@ pub type Asset {
 pub type TreasuryDatum {
   base_asset: Asset,
   raise_asset: Asset,
-  start_time: Int,
-  end_time: Int,
+  discovery_start_time: Int,
+  discovery_end_time: Int,
+  encounter_start_time: Int,
   owner: Address,
   minimum_raise: Option<Int>,
   maximum_raise: Option<Int>,

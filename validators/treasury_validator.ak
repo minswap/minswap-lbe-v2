@@ -1,16 +1,12 @@
-use aiken/bytearray
 use aiken/list
-use aiken/transaction.{
-  InlineDatum, Input, Output, ScriptContext, Spend, Transaction,
-}
+use aiken/transaction.{Input, Output, ScriptContext, Spend, Transaction}
 use aiken/transaction/credential.{
   Address, ScriptCredential, VerificationKeyCredential,
 }
 use aiken/transaction/value.{AssetName, PolicyId, from_minted_value}
-use lb_v2/test_suits
 use lb_v2/types.{
-  Batching, CancelLBE, CreatePool, PoolDatum, ProjectFee, TreasuryDatum,
-  TreasuryRedeemer, UpdateLBE, ValidatorHash,
+  Batching, CancelLBE, CreatePool, PoolDatum, TreasuryDatum, TreasuryRedeemer,
+  UpdateLBE, ValidatorHash,
 }
 use lb_v2/validation
 
@@ -80,12 +76,18 @@ validator(
               }
             },
           )
+        let Output { value: treasury_out_value, .. } = treasury_output
+        expect
+          value.quantity_of(
+            treasury_out_value,
+            authen_policy_id,
+            treasury_auth_asset_name,
+          ) == 1
         validation.validate_create_dex_pool(
           treasury_in_datum: datum,
-          treasury_input: treasury_input,
           treasury_output: treasury_output,
-          all_inputs: inputs,
           all_outputs: outputs,
+          datums: datums,
           validity_range: validity_range,
           mint_value: mint_value,
           amm_authen_policy_id: amm_authen_policy_id,
@@ -118,14 +120,11 @@ validator(
           amm_pool_auth_asset_name: amm_pool_auth_asset_name,
         )
       UpdateLBE -> {
-        let TreasuryDatum {
-          project_fee: ProjectFee { owner: project_owner_address, .. },
-          ..
-        } = datum
+        let TreasuryDatum { owner, .. } = datum
         expect Address {
           payment_credential: VerificationKeyCredential(owner_pkh),
           ..
-        } = project_owner_address
+        } = owner
         and {
           list.has(extra_signatories, owner_pkh),
           validation.validate_update_lbe(
@@ -139,42 +138,4 @@ validator(
       }
     }
   }
-}
-
-test test_validate_treasury_apply_order() {
-  let authen_policy_id = test_suits.gen_authen_minting_policy_id()
-  let treasury_auth_asset_name = @"TA" |> bytearray.from_string
-  let (
-    amm_authen_policy_id,
-    (amm_pool_auth_asset_name, amm_pool_validation_hash),
-  ) = test_suits.gen_dummy_amm_params()
-  let treasury_input =
-    Input {
-      output_reference: test_suits.gen_dummy_output_ref(),
-      output: test_suits.gen_dummy_treasury_out(),
-    }
-  expect InlineDatum(treasury_datum_raw) = treasury_input.output.datum
-  expect treasury_datum: TreasuryDatum = treasury_datum_raw
-  let treasury_redeemer = Batching
-  let purpose = Spend(treasury_input.output_reference)
-  let output = test_suits.gen_dummy_treasury_out()
-  let sc =
-    ScriptContext {
-      transaction: Transaction {
-        ..transaction.placeholder(),
-        inputs: [treasury_input],
-        outputs: [output],
-      },
-      purpose,
-    }
-  validate_treasury(
-    authen_policy_id,
-    treasury_auth_asset_name,
-    amm_authen_policy_id,
-    amm_pool_auth_asset_name,
-    amm_pool_validation_hash,
-    datum: treasury_datum,
-    redeemer: treasury_redeemer,
-    context: sc,
-  )
 }

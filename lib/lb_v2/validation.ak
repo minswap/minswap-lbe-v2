@@ -1,6 +1,7 @@
 use aiken/builtin
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
+use aiken/math
 use aiken/transaction.{
   InlineDatum, Input, Output, OutputReference, ValidityRange,
 }
@@ -26,12 +27,7 @@ pub fn validate_update_lbe(
     upper_bound: IntervalBound { bound_type: Finite(end_valid_time_range), .. },
     ..
   } = validity_range
-  let TreasuryDatum {
-    base_asset,
-    start_time,
-    project_fee: ProjectFee { owner, .. },
-    ..
-  } = treasury_in_datum
+  let TreasuryDatum { base_asset, discovery_start_time, .. } = treasury_in_datum
   let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
     base_asset
   let Input { output: Output { value: treasury_in_value, .. }, .. } =
@@ -47,11 +43,10 @@ pub fn validate_update_lbe(
     reserve_base: new_reserve_base,
     minimum_raise: new_min_raise,
     maximum_raise: new_max_raise,
-    project_fee: ProjectFee { percent: new_pf_percent, .. },
     ..
   } = treasury_out_datum
   and {
-    end_valid_time_range < start_time,
+    end_valid_time_range < discovery_start_time,
     value.quantity_of(treasury_in_value, ada_policy_id, ada_asset_name) == value.quantity_of(
       treasury_out_value,
       ada_policy_id,
@@ -63,7 +58,6 @@ pub fn validate_update_lbe(
       reserve_base: new_reserve_base,
       minimum_raise: new_min_raise,
       maximum_raise: new_max_raise,
-      project_fee: ProjectFee { owner, percent: new_pf_percent },
     },
   }
 }
@@ -86,7 +80,7 @@ pub fn validate_cancel_lbe(
     is_created_pool,
     minimum_raise,
     reserve_raise,
-    discovery_phase: DiscoveryPhase { end_time: discovery_end, .. },
+    discovery_end_time,
     ..
   } = treasury_in_datum
   let Input { output: Output { value: treasury_in_value, .. }, .. } =
@@ -151,7 +145,7 @@ pub fn validate_cancel_lbe(
       } = validity_range
       and {
         reserve_raise < min_raise,
-        discovery_end < start_valid_time_range,
+        discovery_end_time < start_valid_time_range,
       }
     }
   }
@@ -305,10 +299,9 @@ pub fn get_amm_pool_datum(
 
 pub fn validate_create_dex_pool(
   treasury_in_datum: TreasuryDatum,
-  treasury_input: Input,
   treasury_output: Output,
-  all_inputs: List<Input>,
   all_outputs: List<Output>,
+  datums: DatumMap,
   validity_range: ValidityRange,
   mint_value: Value,
   amm_authen_policy_id: PolicyId,
@@ -325,7 +318,7 @@ pub fn validate_create_dex_pool(
   expect TreasuryDatum {
     base_asset,
     raise_asset,
-    end_time,
+    encounter_start_time,
     owner,
     minimum_raise,
     maximum_raise,
@@ -340,7 +333,7 @@ pub fn validate_create_dex_pool(
         Some(m) -> reserve_raise >= m
         None -> True
       },
-      start_valid_time_range > end_time,
+      start_valid_time_range >= encounter_start_time,
     } || when maximum_raise is {
       Some(m) -> reserve_raise >= m
       None -> False
@@ -367,16 +360,9 @@ pub fn validate_create_dex_pool(
     asset_b: pool_asset_b,
     reserve_a: pool_reserve_a,
     reserve_b: pool_reserve_b,
+    total_liquidity: pool_total_liquidity,
     ..
   } = amm_pool_datum
-  expect [project_owner_output] =
-    list.filter(
-      all_outputs,
-      fn(output) {
-        let Output { address, .. } = output
-        address == project_owner_address
-      },
-    )
   let Output { value: treasury_out_value, datum: treasury_out_datum_raw, .. } =
     treasury_output
   expect treasury_out_datum: TreasuryDatum =
@@ -389,6 +375,18 @@ pub fn validate_create_dex_pool(
     is_created_pool: True,
     ..
   } = treasury_out_datum
+  expect [Output { value: owner_output_value, .. }] =
+    list.filter(
+      all_outputs,
+      fn(output) {
+        let Output { address, .. } = output
+        address == owner
+      },
+    )
+  let owner_total_liquidity =
+    value.quantity_of(owner_output_value, amm_authen_policy_id, lp_asset_name)
+  let treasury_total_liquidity =
+    value.quantity_of(treasury_out_value, amm_authen_policy_id, lp_asset_name)
   and {
     value.quantity_of(
       mint_value,
@@ -399,6 +397,11 @@ pub fn validate_create_dex_pool(
     asset_b == pool_asset_b,
     datum_in_reserve_a == pool_reserve_a,
     datum_in_reserve_b == pool_reserve_b,
+    out_datum_total_liquidity == treasury_total_liquidity,
+    math.abs(
+      treasury_total_liquidity + treasury_total_liquidity - pool_total_liquidity,
+    ) <= 1,
+    owner_total_liquidity == pool_total_liquidity - treasury_total_liquidity,
   }
 }
 
@@ -786,7 +789,8 @@ pub fn validate_apply_order(
     base_asset,
     raise_asset,
     order_hash,
-    discovery_phase,
+    discovery_start_time,
+    discovery_end_time,
     reserve_raise: in_datum_reserve_raise,
     total_liquidity: in_datum_total_liquidity,
     ..
@@ -803,10 +807,6 @@ pub fn validate_apply_order(
     total_liquidity: out_datum_total_liquidity,
     ..
   } = treasury_out_datum
-  let DiscoveryPhase {
-    start_time: discovery_phase_start,
-    end_time: discovery_phase_end,
-  } = discovery_phase
   let (asset_a, asset_b) = utils.sort_two_assets(base_asset, raise_asset)
   let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
     asset_a
@@ -882,8 +882,8 @@ pub fn validate_apply_order(
     )
   and {
     validate_order_time(
-      start_time: discovery_phase_start,
-      end_time: discovery_phase_end,
+      start_time: discovery_start_time,
+      end_time: discovery_end_time,
       validity_range: validity_range,
       order_datums: order_datums,
     ),

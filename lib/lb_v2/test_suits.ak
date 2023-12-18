@@ -10,8 +10,8 @@ use aiken/transaction/credential.{
 }
 use aiken/transaction/value.{AssetName, PolicyId, ada_asset_name, ada_policy_id}
 use lb_v2/types.{
-  Asset, Deposit, DiscoveryPhase, EncouterPhase, FactoryDatum, OrderDatum,
-  ProjectFee, RedeemLP, RedeemRaiseAsset, TreasuryDatum, ValidatorHash,
+  Asset, Deposit, FactoryDatum, OrderDatum, RedeemLP, RedeemRaiseAsset,
+  TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils
 use lb_v2/validation.{validate_order_time}
@@ -201,17 +201,12 @@ pub fn gen_dummy_treasury_out() -> Output {
     TreasuryDatum {
       base_asset,
       raise_asset,
-      project_fee: ProjectFee {
-        owner: @"h'6508d97458392cbc453922493dacb743c405c7a7c254ee8b85fa6af5'"
-          |> bytearray.from_string
-          |> credential.from_verification_key,
-        percent: 30,
-      },
-      discovery_phase: DiscoveryPhase {
-        start_time: 1701405708,
-        end_time: 1702615308,
-      },
-      encounter_phase: EncouterPhase { start_time: 1702701708, end_time: None },
+      owner: @"h'6508d97458392cbc453922493dacb743c405c7a7c254ee8b85fa6af5'"
+        |> bytearray.from_string
+        |> credential.from_verification_key,
+      discovery_start_time: 1701405708,
+      discovery_end_time: 1702615308,
+      encounter_start_time: 1702701708,
       minimum_raise: None,
       maximum_raise: None,
       order_hash: gen_order_hash(),
