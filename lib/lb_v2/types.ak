@@ -27,8 +27,8 @@ pub type TreasuryDatum {
   reserve_base: Int,
   reserve_raise: Int,
   total_liquidity: Int,
-  is_cancel: Bool,
-  is_created_pool: Bool,
+  is_cancel: Int,
+  is_created_pool: Int,
 }
 
 pub type TreasuryRedeemer {

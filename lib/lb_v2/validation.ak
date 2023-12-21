@@ -93,12 +93,12 @@ pub fn validate_cancel_lbe(
       _ -> utils.must_find_script_datum(datums, treasury_out_datum_raw)
     }
   expect and {
-      is_cancel == False,
-      is_created_pool == False,
+      is_cancel == 0,
+      is_created_pool == 0,
       treasury_in_value == treasury_out_value,
       treasury_out_datum == TreasuryDatum {
         ..treasury_in_datum,
-        is_cancel: True,
+        is_cancel: 1,
       },
     }
   let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
@@ -188,7 +188,7 @@ pub fn validate_creating_treasury_out(
     t_order_hash == order_hash,
     total_liquidity == 0,
     reserve_raise == 0,
-    is_cancel == False,
+    is_cancel == 0,
   }
 }
 
@@ -324,8 +324,8 @@ pub fn validate_create_dex_pool(
     maximum_raise,
     reserve_base,
     reserve_raise,
-    is_cancel: False,
-    is_created_pool: False,
+    is_cancel: 0,
+    is_created_pool: 0,
     ..
   } = treasury_in_datum
   expect and {
@@ -372,7 +372,7 @@ pub fn validate_create_dex_pool(
     }
   expect TreasuryDatum {
     total_liquidity: out_datum_total_liquidity,
-    is_created_pool: True,
+    is_created_pool: 0,
     ..
   } = treasury_out_datum
   expect [Output { value: owner_output_value, .. }] =

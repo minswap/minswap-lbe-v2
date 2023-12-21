@@ -213,8 +213,8 @@ pub fn gen_dummy_treasury_out() -> Output {
       reserve_base: 100000000,
       reserve_raise: 0,
       total_liquidity: 0,
-      is_cancel: False,
-      is_created_pool: False,
+      is_cancel: 0,
+      is_created_pool: 0,
     }
   Output {
     address,
