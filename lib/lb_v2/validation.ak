@@ -96,10 +96,7 @@ pub fn validate_cancel_lbe(
       is_cancel == 0,
       is_created_pool == 0,
       treasury_in_value == treasury_out_value,
-      treasury_out_datum == TreasuryDatum {
-        ..treasury_in_datum,
-        is_cancel: 1,
-      },
+      treasury_out_datum == TreasuryDatum { ..treasury_in_datum, is_cancel: 1 },
     }
   let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
     base_asset
@@ -437,55 +434,6 @@ pub fn validate_order_time(
            } })
 }
 
-fn apply_deposit_orders(
-  order_in_values: List<Value>,
-  order_in_datums: List<OrderDatum>,
-  order_outputs: List<Output>,
-  raise_asset_policy_id: PolicyId,
-  raise_asset_name: AssetName,
-) -> Int {
-  if order_in_values |> builtin.null_list {
-    0
-  } else {
-    let OrderDatum { step, expect_output_asset, owner, minimum_receive, .. } =
-      order_in_datums |> builtin.head_list
-    if step == Deposit {
-      let in_value = order_in_values |> builtin.head_list
-      let amount_in =
-        quantity_of(in_value, raise_asset_policy_id, raise_asset_name)
-      let estimate_in =
-        if utils.is_ada_asset(raise_asset_policy_id, raise_asset_name) {
-          amount_in - 2000000
-        } else {
-          amount_in
-        }
-      let Output { value: out_value, address: out_address, .. } =
-        order_outputs |> builtin.head_list
-      let estimate_out = utils.quantity_of_asset(out_value, expect_output_asset)
-      expect and {
-          estimate_in == estimate_out,
-          minimum_receive == estimate_out,
-          out_address == owner,
-        }
-      estimate_out + apply_deposit_orders(
-        order_in_values |> builtin.tail_list,
-        order_in_datums |> builtin.tail_list,
-        order_outputs |> builtin.tail_list,
-        raise_asset_policy_id,
-        raise_asset_name,
-      )
-    } else {
-      apply_deposit_orders(
-        order_in_values |> builtin.tail_list,
-        order_in_datums |> builtin.tail_list,
-        order_outputs |> builtin.tail_list,
-        raise_asset_policy_id,
-        raise_asset_name,
-      )
-    }
-  }
-}
-
 fn apply_redeem_raise_asset_orders(
   order_in_values: List<Value>,
   order_in_datums: List<OrderDatum>,
@@ -604,7 +552,7 @@ pub fn get_order_datums(
   )
 }
 
-pub fn apply_deposit_order(params: ApplyOrderParams) {
+pub fn apply_deposit_order(params: ApplyOrderParams) -> TreasuryState {
   let ApplyOrderParams {
     in_value,
     out_value,
