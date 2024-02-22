@@ -13,15 +13,8 @@ use lb_v2/types.{
   Asset, Deposit, FactoryDatum, OrderDatum, RedeemLP, RedeemRaiseAsset,
   TreasuryDatum, ValidatorHash,
 }
-use lb_v2/utils
+use lb_v2/utils.{compute_lp_asset_name, factory_auth_an, treasury_auth_an}
 use lb_v2/validation.{validate_order_time}
-
-// AUTHEN_MINTING_POLICY_ID = @"h'ceee94bdc6c54c1d7361b3dd1a0d586188082f8a8ab55f1fa0e90352'"
-pub type AuthenValidatorParams {
-  out_ref: OutputReference,
-  factory_auth_an: AssetName,
-  treasury_auth_an: AssetName,
-}
 
 pub fn gen_authen_minting_policy_id() -> PolicyId {
   @"h'ceee94bdc6c54c1d7361b3dd1a0d586188082f8a8ab55f1fa0e90352'"
@@ -87,20 +80,9 @@ pub fn gen_dummy_ouput() -> Output {
   }
 }
 
-pub fn gen_authen_validator_params() -> AuthenValidatorParams {
-  let factory_auth_an: AssetName = @"FA" |> bytearray.from_string
-  let treasury_auth_an: AssetName = @"TA" |> bytearray.from_string
-  AuthenValidatorParams {
-    out_ref: gen_authen_out_ref(),
-    factory_auth_an,
-    treasury_auth_an,
-  }
-}
-
 // has FA token
 pub fn gen_factory_input() -> Input {
   let authen_policy_id = gen_authen_minting_policy_id()
-  let factory_auth_an: AssetName = @"FA" |> bytearray.from_string
   let output_value =
     value.zero()
       |> value.add(ada_policy_id, ada_asset_name, 10000000)
@@ -139,7 +121,7 @@ pub fn gen_lbe_assets() -> List<Asset> {
     }
   let raise_asset = Asset { policy_id: #"", asset_name: #"" }
   let lp_asset_name =
-    utils.compute_lp_asset_name(
+    compute_lp_asset_name(
       raise_asset.policy_id,
       raise_asset.asset_name,
       base_asset.policy_id,
@@ -179,7 +161,7 @@ pub fn gen_dummy_treasury_out() -> Output {
     }
   let raise_asset = Asset { policy_id: #"", asset_name: #"" }
   let lp_asset_name =
-    utils.compute_lp_asset_name(
+    compute_lp_asset_name(
       raise_asset.policy_id,
       raise_asset.asset_name,
       base_asset.policy_id,
@@ -194,7 +176,7 @@ pub fn gen_dummy_treasury_out() -> Output {
   let value =
     value.zero()
       |> value.add(ada_policy_id, ada_asset_name, 10000000)
-      |> value.add(lp_asset.policy_id, @"TA" |> bytearray.from_string, 1)
+      |> value.add(lp_asset.policy_id, treasury_auth_an, 1)
       |> value.add(base_asset.policy_id, base_asset.asset_name, 100000000) // 100 * 1e6
       |> value.add(lp_asset.policy_id, lp_asset.asset_name, 9223372036854775807)
   let treasury_datum: TreasuryDatum =
@@ -258,7 +240,7 @@ pub fn gen_dummy_amm_params() -> (PolicyId, (AssetName, ValidatorHash)) {
   (amm_auth_policy_id, (amm_pool_auth_an, amm_pool_validation_hash))
 }
 
-fn gen_authen_out_ref() -> OutputReference {
+pub fn gen_authen_out_ref() -> OutputReference {
   let tx_id =
     @"h'f0e3bc6e7540b0597f69c5f007c644f07ddea2724feb91e6c0a64ebae3f00422'"
   OutputReference {

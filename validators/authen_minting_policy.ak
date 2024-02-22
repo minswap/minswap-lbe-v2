@@ -6,44 +6,46 @@ use aiken/transaction.{
   ScriptContext, ScriptPurpose, Spend, Transaction,
 }
 use aiken/transaction/credential
-use aiken/transaction/value.{AssetName, PolicyId}
-use lb_v2/test_suits.{AuthenValidatorParams}
+use aiken/transaction/value.{PolicyId}
+use lb_v2/test_suits
 use lb_v2/types.{
   Asset, AuthenRedeemer, CreateTreasury, FactoryDatum, FactoryRedeemer,
   MintFactoryAuthen,
 }
-use lb_v2/utils
+use lb_v2/utils.{
+  compute_lp_asset_name, factory_auth_an, sort_two_assets, treasury_auth_an,
+}
 use lb_v2/validation.{get_treasury_creation_expected_mint}
 
-validator(
-  out_ref: OutputReference,
-  factory_auth_an: AssetName,
-  treasury_auth_an: AssetName,
-) {
+validator(out_ref: OutputReference) {
   fn validate_authen(redeemer: AuthenRedeemer, context: ScriptContext) {
     let ScriptContext { transaction, purpose } = context
     expect Mint(authen_policy_id) = purpose
     when redeemer is {
+      // The redeemer can be called once to initialize the whole LBE system
       MintFactoryAuthen -> {
-        let Transaction { inputs, mint, outputs, datums, .. } = transaction
-        // Transaction must has @out_ref in the input to make sure that this redeemer can only be executed once
-        expect
-          list.any(
+        let Transaction { inputs, mint, outputs, .. } = transaction
+
+        // validate that `out_ref` must be presented in the Transaction Inputs
+        expect [_] =
+          list.filter(
             inputs,
             fn(input) {
               let Input { output_reference, .. } = input
               output_reference == out_ref
             },
           )
+        // Transaction must mint only 1 Factory Auth Asset
         let mint_value = value.from_minted_value(mint)
         expect [(minted_pid, minted_an, minted_amount)] =
           value.flatten(mint_value)
-        // Transaction must mint only 1 Factory Auth Asset
         expect and {
             minted_pid == authen_policy_id,
             minted_an == factory_auth_an,
             minted_amount == 1,
           }
+        // validate that there's only 1 Factory UTxO in the Transaction Outputs
+        // The Factory UTxO must contain Factory Token in the value
         expect [factory_output] =
           list.filter(
             outputs,
@@ -52,13 +54,8 @@ validator(
               value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1
             },
           )
-        let Output { datum: factory_raw_datum, .. } = factory_output
-        expect factory_datum: FactoryDatum =
-          when factory_raw_datum is {
-            InlineDatum(d) -> d
-            _ -> utils.must_find_script_datum(datums, factory_raw_datum)
-          }
-        let FactoryDatum { head, tail } = factory_datum
+        expect Output { datum: InlineDatum(factory_datum), .. } = factory_output
+        expect FactoryDatum { head, tail }: FactoryDatum = factory_datum
         and {
           head == #"00",
           tail == #"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
@@ -92,7 +89,7 @@ validator(
           )
         expect factory_redeemer: FactoryRedeemer = raw_factory_redeemer
         let FactoryRedeemer { base_asset, raise_asset } = factory_redeemer
-        let (asset_a, asset_b) = utils.sort_two_assets(base_asset, raise_asset)
+        let (asset_a, asset_b) = sort_two_assets(base_asset, raise_asset)
         let Asset {
           policy_id: asset_a_policy_id,
           asset_name: asset_a_asset_name,
@@ -102,7 +99,7 @@ validator(
           asset_name: asset_b_asset_name,
         } = asset_b
         let lp_asset_name =
-          utils.compute_lp_asset_name(
+          compute_lp_asset_name(
             asset_a_policy_id,
             asset_a_asset_name,
             asset_b_policy_id,
@@ -110,8 +107,6 @@ validator(
           )
         value.from_minted_value(mint) == get_treasury_creation_expected_mint(
           authen_policy_id: authen_policy_id,
-          factory_auth_an: factory_auth_an,
-          treasury_auth_an: treasury_auth_an,
           lp_asset_name: lp_asset_name,
         )
       }
@@ -120,8 +115,7 @@ validator(
 }
 
 test test_validate_authen_create_factory() {
-  let AuthenValidatorParams { out_ref, factory_auth_an, treasury_auth_an } =
-    test_suits.gen_authen_validator_params()
+  let out_ref = test_suits.gen_authen_out_ref()
   let redeemer = MintFactoryAuthen
   let policy_id: PolicyId = test_suits.gen_authen_minting_policy_id()
   let purpose = Mint(policy_id)
@@ -171,12 +165,11 @@ test test_validate_authen_create_factory() {
       },
       purpose,
     }
-  validate_authen(out_ref, factory_auth_an, treasury_auth_an, redeemer, sc)
+  validate_authen(out_ref, redeemer, sc)
 }
 
 test test_validate_authen_create_treasury() {
-  let AuthenValidatorParams { out_ref, factory_auth_an, treasury_auth_an } =
-    test_suits.gen_authen_validator_params()
+  let out_ref = test_suits.gen_authen_out_ref()
   let redeemer = CreateTreasury
   let policy_id: PolicyId = test_suits.gen_authen_minting_policy_id()
   let purpose = Mint(policy_id)
@@ -211,5 +204,5 @@ test test_validate_authen_create_treasury() {
       },
       purpose,
     }
-  validate_authen(out_ref, factory_auth_an, treasury_auth_an, redeemer, sc)
+  validate_authen(out_ref, redeemer, sc)
 }

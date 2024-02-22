@@ -4,12 +4,14 @@ use aiken/transaction.{
   InlineDatum, Input, Output, ScriptContext, Spend, Transaction,
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
-use aiken/transaction/value.{AssetName, PolicyId}
-use lb_v2/test_suits.{AuthenValidatorParams}
+use aiken/transaction/value.{PolicyId}
+use lb_v2/test_suits
 use lb_v2/types.{
   Asset, FactoryDatum, FactoryRedeemer, TreasuryDatum, ValidatorHash,
 }
-use lb_v2/utils
+use lb_v2/utils.{
+  compute_lp_asset_name, factory_auth_an, sort_two_assets, treasury_auth_an,
+}
 use lb_v2/validation
 
 validator(
@@ -19,10 +21,6 @@ validator(
   treasury_hash: ValidatorHash,
   // ValidatorHash of Order Contract
   order_hash: ValidatorHash,
-  // the legitimate Factory TokenName
-  factory_auth_an: AssetName,
-  // the legitimate Treasury TokenName     
-  treasury_auth_an: AssetName,
 ) {
   fn validate_factory(
     datum: FactoryDatum,
@@ -31,16 +29,16 @@ validator(
   ) {
     let ScriptContext { transaction, purpose } = context
     expect Spend(factory_ref) = purpose
-    let Transaction { inputs, mint, outputs, datums, .. } = transaction
+    let Transaction { inputs, mint, outputs, .. } = transaction
     let FactoryRedeemer { base_asset, raise_asset } = redeemer
     let FactoryDatum { head: current_head, tail: current_tail } = datum
-    let (asset_a, asset_b) = utils.sort_two_assets(base_asset, raise_asset)
+    let (asset_a, asset_b) = sort_two_assets(base_asset, raise_asset)
     let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
       asset_a
     let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
       asset_b
     let lp_asset_name =
-      utils.compute_lp_asset_name(
+      compute_lp_asset_name(
         asset_a_policy_id,
         asset_a_asset_name,
         asset_b_policy_id,
@@ -87,18 +85,10 @@ validator(
           }
         },
       )
-    let Output { datum: f_out_head_raw_datum, .. } = f_out_head
-    let Output { datum: f_out_tail_raw_datum, .. } = f_out_tail
-    expect f_out_head_datum: FactoryDatum =
-      when f_out_head_raw_datum is {
-        InlineDatum(d) -> d
-        _ -> utils.must_find_script_datum(datums, f_out_head_raw_datum)
-      }
-    expect f_out_tai_datum: FactoryDatum =
-      when f_out_tail_raw_datum is {
-        InlineDatum(d) -> d
-        _ -> utils.must_find_script_datum(datums, f_out_tail_raw_datum)
-      }
+    expect Output { datum: InlineDatum(f_out_head_raw_datum), .. } = f_out_head
+    expect Output { datum: InlineDatum(f_out_tail_raw_datum), .. } = f_out_tail
+    expect f_out_head_datum: FactoryDatum = f_out_head_raw_datum
+    expect f_out_tai_datum: FactoryDatum = f_out_tail_raw_datum
     expect [treasury_out] =
       list.filter(
         outputs,
@@ -115,13 +105,12 @@ validator(
           }
         },
       )
-    let Output { value: treasury_out_value, datum: treasury_out_raw_datum, .. } =
-      treasury_out
-    expect treasury_out_datum: TreasuryDatum =
-      when treasury_out_raw_datum is {
-        InlineDatum(d) -> d
-        _ -> utils.must_find_script_datum(datums, treasury_out_raw_datum)
-      }
+    expect Output {
+      value: treasury_out_value,
+      datum: InlineDatum(treasury_out_raw_datum),
+      ..
+    } = treasury_out
+    expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
     and {
       // validate that new Factory UTxO datum must be followed by Linked List rule
       // (old head, old tail) -> (old head, Pool LP Token Name) and (Pool LP Token Name, old tail)
@@ -138,8 +127,6 @@ validator(
       },
       value.from_minted_value(mint) == validation.get_treasury_creation_expected_mint(
         authen_policy_id: authen_policy_id,
-        factory_auth_an: factory_auth_an,
-        treasury_auth_an: treasury_auth_an,
         lp_asset_name: lp_asset_name,
       ),
       validation.validate_creating_treasury_out(
@@ -158,8 +145,6 @@ validator(
 
 test test_001_create_treasury_passed() {
   let authen_policy_id = test_suits.gen_authen_minting_policy_id()
-  let AuthenValidatorParams { factory_auth_an, treasury_auth_an, .. } =
-    test_suits.gen_authen_validator_params()
   let treasury_hash = test_suits.gen_treasury_hash()
   let order_hash = test_suits.gen_order_hash()
   let factory_input = test_suits.gen_factory_input()
@@ -171,8 +156,6 @@ test test_001_create_treasury_passed() {
   let mint =
     validation.get_treasury_creation_expected_mint(
       authen_policy_id: authen_policy_id,
-      factory_auth_an: factory_auth_an,
-      treasury_auth_an: treasury_auth_an,
       lp_asset_name: lp_asset.asset_name,
     )
       |> value.to_minted_value
@@ -222,8 +205,6 @@ test test_001_create_treasury_passed() {
     authen_policy_id,
     treasury_hash,
     order_hash,
-    factory_auth_an,
-    treasury_auth_an,
     datum: factory_datum,
     redeemer: factory_redeemer,
     context: ScriptContext { transaction, purpose },

@@ -8,6 +8,12 @@ use aiken/transaction/value.{
 }
 use lb_v2/types.{Asset, DatumMap}
 
+// the legitimate Pool TokenName
+pub const treasury_auth_an = #"4d5350"
+
+// the legitimate Factory TokenName
+pub const factory_auth_an = #"4d53"
+
 pub fn list_at_index(outputs: List<a>, payout_outputs_offset: Int) -> a {
   if payout_outputs_offset >= 10 {
     outputs

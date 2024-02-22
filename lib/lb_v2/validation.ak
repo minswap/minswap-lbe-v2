@@ -14,7 +14,7 @@ use lb_v2/types.{
   PoolDatum, RedeemLP, RedeemRaiseAsset, TreasuryDatum, TreasuryState,
   ValidatorHash,
 }
-use lb_v2/utils
+use lb_v2/utils.{factory_auth_an, treasury_auth_an}
 
 pub fn validate_update_lbe(
   treasury_in_datum: TreasuryDatum,
@@ -191,8 +191,6 @@ pub fn validate_creating_treasury_out(
 
 pub fn get_treasury_creation_expected_mint(
   authen_policy_id: PolicyId,
-  factory_auth_an: AssetName,
-  treasury_auth_an: AssetName,
   lp_asset_name: AssetName,
 ) -> Value {
   value.zero()
