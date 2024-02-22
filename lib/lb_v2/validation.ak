@@ -14,7 +14,9 @@ use lb_v2/types.{
   PoolDatum, RedeemLP, RedeemRaiseAsset, TreasuryDatum, TreasuryState,
   ValidatorHash,
 }
-use lb_v2/utils.{factory_auth_an, treasury_auth_an}
+use lb_v2/utils.{
+  compute_lp_asset_name, factory_auth_an, sort_two_assets, treasury_auth_an,
+}
 
 pub fn validate_update_lbe(
   treasury_in_datum: TreasuryDatum,
@@ -66,7 +68,6 @@ pub fn validate_cancel_lbe(
   treasury_in_datum: TreasuryDatum,
   treasury_input: Input,
   treasury_output: Output,
-  datums: DatumMap,
   validity_range: ValidityRange,
   reference_inputs: List<Input>,
   amm_pool_validation_hash: ValidatorHash,
@@ -85,25 +86,32 @@ pub fn validate_cancel_lbe(
   } = treasury_in_datum
   let Input { output: Output { value: treasury_in_value, .. }, .. } =
     treasury_input
-  let Output { value: treasury_out_value, datum: treasury_out_datum_raw, .. } =
-    treasury_output
-  expect treasury_out_datum: TreasuryDatum =
-    when treasury_out_datum_raw is {
-      InlineDatum(d) -> d
-      _ -> utils.must_find_script_datum(datums, treasury_out_datum_raw)
-    }
+  expect Output {
+    value: treasury_out_value,
+    datum: InlineDatum(treasury_out_datum_raw),
+    ..
+  } = treasury_output
+  expect treasury_out_datum: TreasuryDatum = treasury_out_datum_raw
   expect and {
       is_cancel == 0,
       is_created_pool == 0,
       treasury_in_value == treasury_out_value,
       treasury_out_datum == TreasuryDatum { ..treasury_in_datum, is_cancel: 1 },
     }
-  let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
-    base_asset
-  let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
-    raise_asset
-  let dex_pool_input =
-    list.find(
+  let (asset_a, asset_b) = sort_two_assets(base_asset, raise_asset)
+  let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
+    asset_a
+  let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
+    asset_b
+  let lp_asset_name =
+    compute_lp_asset_name(
+      asset_a_policy_id,
+      asset_a_asset_name,
+      asset_b_policy_id,
+      asset_b_asset_name,
+    )
+  let dex_pool_inputs =
+    list.filter(
       reference_inputs,
       fn(ref_input) {
         let Input {
@@ -122,16 +130,15 @@ pub fn validate_cancel_lbe(
                 amm_authen_policy_id,
                 amm_pool_auth_asset_name,
               ) == 1,
-              value.quantity_of(value, base_asset_pid, base_asset_an) > 0,
-              value.quantity_of(value, raise_asset_pid, raise_asset_an) > 0,
+              value.quantity_of(value, amm_authen_policy_id, lp_asset_name) > 0,
             }
           _ -> False
         }
       },
     )
-  when dex_pool_input is {
-    Some(_) -> True
-    None -> {
+  when dex_pool_inputs is {
+    [_] -> True
+    _ -> {
       expect Some(min_raise) = minimum_raise
       expect Interval {
         lower_bound: IntervalBound {

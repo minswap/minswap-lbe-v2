@@ -112,7 +112,6 @@ validator(
           treasury_in_datum: datum,
           treasury_input: treasury_input,
           treasury_output: treasury_output,
-          datums: datums,
           validity_range: validity_range,
           reference_inputs: reference_inputs,
           amm_pool_validation_hash: amm_pool_validation_hash,
