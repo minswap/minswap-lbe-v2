@@ -12,9 +12,12 @@ use lb_v2/types.{
   ApplyOrder, Asset, CancelOrder, Deposit, OrderBatchingRedeemer, OrderDatum,
   OrderRedeemer, ValidatorHash,
 }
-use lb_v2/utils
+use lb_v2/utils.{list_at_index}
 
-validator(stake_credential: StakeCredential) {
+validator(
+  // the Stake Credential of Order Batching Validator
+  stake_credential: StakeCredential,
+) {
   fn validate_order(raw_datum: Data, raw_redeemer: Data, context: ScriptContext) {
     expect ScriptContext { transaction, purpose: Spend(_) } = context
     expect redeemer: OrderRedeemer = raw_redeemer
@@ -39,8 +42,11 @@ validator(stake_credential: StakeCredential) {
   }
 }
 
-validator(treasury_hash: ValidatorHash) {
-  fn validate_order_spending_in_batching(
+validator(
+  // the hash of Liquidity Pool Script
+  treasury_hash: ValidatorHash,
+) {
+  fn validate_order_spending(
     redeemer: OrderBatchingRedeemer,
     context: ScriptContext,
   ) -> Bool {
@@ -51,7 +57,7 @@ validator(treasury_hash: ValidatorHash) {
     let Input {
       output: Output { address: Address { payment_credential, .. }, .. },
       ..
-    } = utils.list_at_index(inputs, treasury_input_index)
+    } = list_at_index(inputs, treasury_input_index)
     expect ScriptCredential(hash) = payment_credential
     treasury_hash == hash
   }
@@ -77,7 +83,7 @@ test test_validate_batching_order() {
       purpose,
     }
   let redeemer = OrderBatchingRedeemer { treasury_input_index: 0 }
-  validate_order_spending_in_batching(treasury_hash, redeemer, sc)
+  validate_order_spending(treasury_hash, redeemer, sc)
 }
 
 test test_validate_order() {

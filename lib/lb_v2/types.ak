@@ -58,6 +58,7 @@ pub type OrderRedeemer {
 }
 
 pub type OrderBatchingRedeemer {
+  // it's used for finding Pool Input faster
   treasury_input_index: Int,
 }
 

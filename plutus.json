@@ -93,7 +93,7 @@
       "hash": "8b6cbe229a03f2a980a53dcf664fafebba513bcf35c58e6871a7de5f"
     },
     {
-      "title": "order_validator.validate_order_spending_in_batching",
+      "title": "order_validator.validate_order_spending",
       "redeemer": {
         "title": "redeemer",
         "schema": {
