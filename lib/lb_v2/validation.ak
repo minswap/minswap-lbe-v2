@@ -235,12 +235,13 @@ pub fn get_treasury_output(
     list.filter(
       outputs,
       fn(output) {
-        let Output { address, .. } = output
-        address == treasury_address
+        let Output { address, value, .. } = output
+        and {
+          address == treasury_address,
+          value.quantity_of(value, authen_policy_id, treasury_auth_an) == 1,
+        }
       },
     )
-  let Output { value, .. } = treasury_output
-  expect value.quantity_of(value, authen_policy_id, treasury_auth_an) == 1
   treasury_output
 }
 
