@@ -8,6 +8,7 @@ use lb_v2/types.{
   Batching, CancelLBE, CreatePool, PoolDatum, TreasuryDatum, TreasuryRedeemer,
   UpdateLBE, ValidatorHash,
 }
+use lb_v2/utils.{treasury_auth_an}
 use lb_v2/validation.{
   get_amm_pool_datum, get_treasury_input, get_treasury_output,
   validate_apply_order, validate_cancel_lbe, validate_create_dex_pool,
@@ -16,7 +17,6 @@ use lb_v2/validation.{
 
 validator(
   authen_policy_id: PolicyId,
-  treasury_auth_asset_name: AssetName,
   amm_authen_policy_id: PolicyId,
   amm_pool_auth_asset_name: AssetName,
   amm_pool_validation_hash: ValidatorHash,
@@ -44,7 +44,7 @@ validator(
         inputs,
         self_out_ref,
         authen_policy_id,
-        treasury_auth_asset_name,
+        treasury_auth_an,
       )
     let Input { output: Output { address: treasury_address, .. }, .. } =
       treasury_input
@@ -53,7 +53,7 @@ validator(
         outputs,
         treasury_address,
         authen_policy_id,
-        treasury_auth_asset_name,
+        treasury_auth_an,
       )
     let mint_value = from_minted_value(mint)
     when redeemer is {
@@ -66,6 +66,7 @@ validator(
             amm_pool_validation_hash,
           )
         let TreasuryDatum { order_hash, .. } = datum
+        //* Should not spend any UTxOs associated with AMM Order Script, as it could lead to unexpected behavior or loss of funds.
         expect [] =
           list.filter(
             inputs,
@@ -79,13 +80,6 @@ validator(
               }
             },
           )
-        let Output { value: treasury_out_value, .. } = treasury_output
-        expect
-          value.quantity_of(
-            treasury_out_value,
-            authen_policy_id,
-            treasury_auth_asset_name,
-          ) == 1
         validate_create_dex_pool(
           treasury_in_datum: datum,
           treasury_output: treasury_output,
