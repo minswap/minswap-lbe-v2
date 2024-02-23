@@ -8,7 +8,11 @@ use lb_v2/types.{
   Batching, CancelLBE, CreatePool, PoolDatum, TreasuryDatum, TreasuryRedeemer,
   UpdateLBE, ValidatorHash,
 }
-use lb_v2/validation
+use lb_v2/validation.{
+  get_amm_pool_datum, get_treasury_input, get_treasury_output,
+  validate_apply_order, validate_cancel_lbe, validate_create_dex_pool,
+  validate_update_lbe,
+}
 
 validator(
   authen_policy_id: PolicyId,
@@ -36,7 +40,7 @@ validator(
       purpose: Spend(self_out_ref),
     } = context
     let treasury_input =
-      validation.get_treasury_input(
+      get_treasury_input(
         inputs,
         self_out_ref,
         authen_policy_id,
@@ -45,7 +49,7 @@ validator(
     let Input { output: Output { address: treasury_address, .. }, .. } =
       treasury_input
     let treasury_output =
-      validation.get_treasury_output(
+      get_treasury_output(
         outputs,
         treasury_address,
         authen_policy_id,
@@ -55,7 +59,7 @@ validator(
     when redeemer is {
       CreatePool -> {
         expect amm_pool_datum: PoolDatum =
-          validation.get_amm_pool_datum(
+          get_amm_pool_datum(
             outputs,
             datums,
             amm_authen_policy_id,
@@ -83,7 +87,7 @@ validator(
             authen_policy_id,
             treasury_auth_asset_name,
           ) == 1
-        validation.validate_create_dex_pool(
+        validate_create_dex_pool(
           treasury_in_datum: datum,
           treasury_output: treasury_output,
           all_outputs: outputs,
@@ -96,7 +100,7 @@ validator(
         )
       }
       Batching ->
-        validation.validate_apply_order(
+        validate_apply_order(
           treasury_input: treasury_input,
           treasury_output: treasury_output,
           all_inputs: inputs,
@@ -108,7 +112,7 @@ validator(
           mint_value: mint_value,
         )
       CancelLBE ->
-        validation.validate_cancel_lbe(
+        validate_cancel_lbe(
           treasury_in_datum: datum,
           treasury_input: treasury_input,
           treasury_output: treasury_output,
@@ -126,7 +130,7 @@ validator(
         } = owner
         and {
           list.has(extra_signatories, owner_pkh),
-          validation.validate_update_lbe(
+          validate_update_lbe(
             treasury_in_datum: datum,
             treasury_input: treasury_input,
             treasury_output: treasury_output,

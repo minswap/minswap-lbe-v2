@@ -212,41 +212,16 @@ pub fn get_treasury_input(
   authen_policy_id: PolicyId,
   treasury_auth_an: AssetName,
 ) -> Input {
-  // for sure Authen Token appear
-  expect Some(treasury_input) =
-    list.find(
-      inputs,
-      fn(input) {
-        let Input { output_reference: out_ref, output: Output { value, .. } } =
-          input
-        and {
-          out_ref == self_out_ref,
-          quantity_of(value, authen_policy_id, treasury_auth_an) == 1,
-        }
-      },
-    )
-  let Input {
-    output: Output {
-      address: Address { payment_credential: treasury_payment_credential, .. },
-      ..
-    },
-    ..
-  } = treasury_input
-  // For sure spend only 1 Treasury Input
-  expect [_] =
+  expect [treasury_input] =
     list.filter(
       inputs,
       fn(input) {
-        let Input {
-          output: Output {
-            address: Address { payment_credential: payment_cred, .. },
-            ..
-          },
-          ..
-        } = input
-        treasury_payment_credential == payment_cred
+        let Input { output: Output { value, .. }, .. } = input
+        quantity_of(value, authen_policy_id, treasury_auth_an) == 1
       },
     )
+  let Input { output_reference: out_ref, .. } = treasury_input
+  expect out_ref == self_out_ref
   treasury_input
 }
 
