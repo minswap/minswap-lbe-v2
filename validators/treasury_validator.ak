@@ -61,7 +61,6 @@ validator(
         expect amm_pool_datum: PoolDatum =
           get_amm_pool_datum(
             outputs,
-            datums,
             amm_authen_policy_id,
             amm_pool_auth_asset_name,
             amm_pool_validation_hash,

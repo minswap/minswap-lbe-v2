@@ -247,12 +247,11 @@ pub fn get_treasury_output(
 
 pub fn get_amm_pool_datum(
   outputs: List<Output>,
-  datums: DatumMap,
   amm_authen_policy_id: PolicyId,
   amm_pool_auth_asset_name: AssetName,
   amm_pool_validation_hash: ValidatorHash,
 ) -> Data {
-  expect [amm_pool_output] =
+  expect [Output { datum: InlineDatum(raw_datum), .. }] =
     list.filter(
       outputs,
       fn(output) {
@@ -271,8 +270,7 @@ pub fn get_amm_pool_datum(
         }
       },
     )
-  let Output { datum, .. } = amm_pool_output
-  utils.must_find_script_datum(datums, datum)
+  raw_datum
 }
 
 pub fn validate_create_dex_pool(
