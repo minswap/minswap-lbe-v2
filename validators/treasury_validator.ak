@@ -3,24 +3,22 @@ use aiken/transaction.{Input, Output, ScriptContext, Spend, Transaction}
 use aiken/transaction/credential.{
   Address, ScriptCredential, VerificationKeyCredential,
 }
-use aiken/transaction/value.{AssetName, PolicyId, from_minted_value}
+use aiken/transaction/value.{PolicyId, from_minted_value}
 use lb_v2/types.{
   Batching, CancelLBE, CreatePool, PoolDatum, TreasuryDatum, TreasuryRedeemer,
-  UpdateLBE, ValidatorHash,
+  UpdateLBE,
 }
-use lb_v2/utils.{treasury_auth_an}
+use lb_v2/utils.{
+  amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
+  treasury_auth_an,
+}
 use lb_v2/validation.{
   get_amm_pool_datum, get_treasury_input, get_treasury_output,
   validate_apply_order, validate_cancel_lbe, validate_create_dex_pool,
   validate_update_lbe,
 }
 
-validator(
-  authen_policy_id: PolicyId,
-  amm_authen_policy_id: PolicyId,
-  amm_pool_auth_asset_name: AssetName,
-  amm_pool_validation_hash: ValidatorHash,
-) {
+validator(authen_policy_id: PolicyId) {
   fn validate_treasury(
     datum: TreasuryDatum,
     redeemer: TreasuryRedeemer,

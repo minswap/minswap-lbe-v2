@@ -43,7 +43,7 @@ validator(
 }
 
 validator(
-  // the hash of Liquidity Pool Script
+  // the hash of Treasury Script
   treasury_hash: ValidatorHash,
 ) {
   fn validate_order_spending(

@@ -8,6 +8,17 @@ use aiken/transaction/value.{
 }
 use lb_v2/types.{Asset, DatumMap}
 
+// the legitimate AMM Pool TokenName
+pub const amm_pool_auth_asset_name = #"4d5350"
+
+// the legitimate AMM Authen Validator PolicyId
+pub const amm_authen_policy_id =
+  #"627fc44f022bf1df8b90c0585b09960ddb8c0864c563063f30033d76"
+
+// the legitimate AMM Pool Validator Hash
+pub const amm_pool_validation_hash =
+  #"d630fa2cbca1714024e98af6b51fce34c72d826409372688e664bd02"
+
 // the legitimate Pool TokenName
 pub const treasury_auth_an = #"4d5350"
 
