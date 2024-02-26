@@ -1,5 +1,0 @@
-{
-  "tasks": {
-    "apply": "deno run --allow-all apply.ts"
-  }
-}
