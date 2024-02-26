@@ -291,7 +291,7 @@ pub fn validate_create_dex_pool(
     },
     ..
   } = validity_range
-  expect TreasuryDatum {
+  let TreasuryDatum {
     base_asset,
     raise_asset,
     encounter_start_time,
@@ -300,11 +300,13 @@ pub fn validate_create_dex_pool(
     maximum_raise,
     reserve_base,
     reserve_raise,
-    is_cancel: 0,
-    is_created_pool: 0,
+    is_cancel,
+    is_created_pool,
     ..
   } = treasury_in_datum
   expect and {
+      is_cancel == 0,
+      is_created_pool == 0,
       when minimum_raise is {
         Some(m) -> reserve_raise >= m
         None -> True
