@@ -1,11 +1,27 @@
 import { expect, beforeEach, test } from "bun:test";
-import { generateAccount, quickSubmitBuilder, type GeneratedAccount } from "./utils";
-import { Constr, Data, Emulator, Translucent, type UTxO } from "translucent-cardano";
+import {
+  generateAccount,
+  quickSubmitBuilder,
+  type GeneratedAccount,
+} from "./utils";
+import {
+  Constr,
+  Data,
+  Emulator,
+  Translucent,
+  type UTxO,
+} from "translucent-cardano";
 import { deployValidators } from "../deploy_validators";
-import { collectValidators, utxo2ORef, type DeployedValidators, type Validators } from "../utils";
+import {
+  collectValidators,
+  utxo2ORef,
+  type DeployedValidators,
+  type Validators,
+} from "../utils";
 import { initFactory } from "../build-tx";
 
-let ACCOUNT_0: GeneratedAccount
+let ACCOUNT_0: GeneratedAccount;
+let ACCOUNT_1: GeneratedAccount;
 let emulator: Emulator;
 let lucid: Translucent;
 let validators: Validators;
@@ -16,11 +32,14 @@ beforeEach(async () => {
   ACCOUNT_0 = await generateAccount({
     lovelace: 2000000000000000000n,
   });
-  emulator = new Emulator([ACCOUNT_0]);
+  ACCOUNT_1 = await generateAccount({
+    lovelace: 2000000000000000000n,
+  });
+  emulator = new Emulator([ACCOUNT_0, ACCOUNT_1]);
   lucid = await Translucent.new(emulator);
   emulator.awaitBlock(10_000); // For validity ranges to be valid
   lucid.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
-  const utxos = await lucid.wallet.getUtxos();
+  const utxos = await emulator.getUtxos(ACCOUNT_1.address);
   seedUtxo = utxos[utxos.length - 1];
   const seedTxIn = utxo2ORef(seedUtxo);
   validators = collectValidators(lucid, seedTxIn);
@@ -28,14 +47,22 @@ beforeEach(async () => {
   emulator.awaitBlock(1);
 });
 
-test("happy case - full flow", () => {
+test("happy case - full flow", async () => {
   /** Steps:
    * 1. Create Factory
    * 2. Create Treasury
    */
-  const initFactoryTx = initFactory({ lucid, tx: lucid.newTx(), validatorRefs: { validators, deployedValidators }, seedUtxo, });
+  const initFactoryBuilder = initFactory({
+    lucid,
+    tx: lucid.newTx(),
+    validatorRefs: { validators, deployedValidators },
+    seedUtxo,
+  });
+  const initFactoryTx = await quickSubmitBuilder(emulator)({
+    txBuilder: initFactoryBuilder.txBuilder,
+    extraSignatures: [ACCOUNT_1.privateKey],
+  });
   expect(initFactoryTx).toBeTruthy();
-  emulator.awaitBlock(1);
 });
 
 // test("pay->spend always success contract", async () => {

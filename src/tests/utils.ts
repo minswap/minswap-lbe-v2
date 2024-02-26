@@ -1,4 +1,11 @@
-import { Translucent, generatePrivateKey, type Assets, Emulator, Tx } from "translucent-cardano";
+import {
+  Translucent,
+  generatePrivateKey,
+  type Assets,
+  Emulator,
+  Tx,
+  type PrivateKey,
+} from "translucent-cardano";
 
 export type GeneratedAccount = Awaited<ReturnType<typeof generateAccount>>;
 
@@ -13,14 +20,26 @@ export async function generateAccount(assets: Assets) {
   };
 }
 
-export function quickSubmitBuilder(emulator: Emulator, debug?: boolean) {
-  return async function ({ txBuilder }: { txBuilder: Tx }) {
+export function quickSubmitBuilder(emulator: Emulator) {
+  return async function ({
+    txBuilder,
+    extraSignatures,
+    debug,
+  }: {
+    txBuilder: Tx;
+    extraSignatures?: PrivateKey[];
+    debug?: boolean;
+  }) {
     const completedTx = await txBuilder.complete();
     if (debug) {
       console.log("debug", completedTx.txComplete.body().to_json());
     }
-    const signedTx = await completedTx.sign().complete();
-    const txHash = signedTx.submit();
+    const signedTx = completedTx.sign();
+    for (const privateKey of extraSignatures || []) {
+      signedTx.signWithPrivateKey(privateKey);
+    }
+    const txSigned = await signedTx.complete();
+    const txHash = txSigned.submit();
     emulator.awaitBlock(1);
     return txHash;
   };

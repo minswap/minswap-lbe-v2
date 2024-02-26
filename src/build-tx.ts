@@ -17,7 +17,7 @@ export type BaseBuildOptions = {
 
 export type BuildInitFactoryOptions = {
   seedUtxo: UTxO;
-}
+};
 
 export function initFactory({
   validatorRefs: { validators, deployedValidators },
