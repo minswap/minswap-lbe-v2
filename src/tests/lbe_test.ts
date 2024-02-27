@@ -1,9 +1,9 @@
 import { beforeEach, expect, test } from "bun:test";
 import { Emulator, Translucent, toUnit, type UTxO } from "translucent-cardano";
 import type { TreasuryValidatorValidateTreasury } from "../../plutus";
-import { createTreasury, initFactory } from "../build-tx";
+import { buildCreateTreasury, buildDeposit, buildInitFactory } from "../build-tx";
 import { deployValidators } from "../deploy_validators";
-import { collectValidators, utxo2ORef, type DeployedValidators, type Validators } from "../utils";
+import { collectValidators, utxo2ORef, type DeployedValidators, type Validators, address2PlutusAddress } from "../utils";
 import { generateAccount, quickSubmitBuilder, type GeneratedAccount } from "./utils";
 
 let ACCOUNT_0: GeneratedAccount;
@@ -43,9 +43,11 @@ test("happy case - full flow", async () => {
   /** Steps:
    * 1. Init Factory
    * 2. Create Treasury
+   * 3. Deposit Order
    */
+
   // Step 1: Init Factory
-  const initFactoryBuilder = initFactory({
+  const initFactoryBuilder = buildInitFactory({
     lucid,
     tx: lucid.newTx(),
     validatorRefs: { validators, deployedValidators },
@@ -67,12 +69,7 @@ test("happy case - full flow", async () => {
     discoveryStartTime: BigInt(new Date().getDate()),
     discoveryEndTime: BigInt(new Date().getDate()),
     encounterStartTime: BigInt(new Date().getDate()),
-    owner: {
-      paymentCredential: {
-        VerificationKeyCredential: [lucid.utils.paymentCredentialOf(ACCOUNT_0.address).hash],
-      },
-      stakeCredential: null,
-    },
+    owner: address2PlutusAddress(ACCOUNT_0.address),
     minimumRaise: null,
     maximumRaise: null,
     orderHash: lucid.utils.validatorToScriptHash(validators!.orderValidator),
@@ -82,7 +79,7 @@ test("happy case - full flow", async () => {
     isCancel: 0n,
     isCreatedPool: 0n,
   };
-  const createFactoryBuilder = createTreasury({
+  const createFactoryBuilder = buildCreateTreasury({
     lucid,
     tx: lucid.newTx(),
     validatorRefs: { validators, deployedValidators },
@@ -95,6 +92,21 @@ test("happy case - full flow", async () => {
     txBuilder: createFactoryBuilder.txBuilder,
   });
   expect(createTreasuryTx).toBeTruthy();
+
+  // Step 3: Deposit Order
+  const depositBuilder = buildDeposit({
+    lucid,
+    tx: lucid.newTx(),
+    validatorRefs: { validators, deployedValidators },
+    owner: ACCOUNT_0.address,
+    baseAsset: treasuryDatum.baseAsset,
+    raiseAsset: treasuryDatum.raiseAsset,
+    amount: 1_000_000_000n,
+  });
+  const depositTx = await quickSubmitBuilder(emulator)({
+    txBuilder: depositBuilder.txBuilder,
+  });
+  expect(depositTx).toBeTruthy();
 });
 
 // test("pay->spend always success contract", async () => {

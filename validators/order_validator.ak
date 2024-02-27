@@ -119,3 +119,14 @@ test test_validate_order() {
   let redeemer = ApplyOrder
   validate_order(order_batching_stake_credential, datum, redeemer, sc)
 }
+
+// this is unused, only used to access the type in blueprints
+validator {
+  fn feed_type(
+    _datum: OrderDatum,
+    _redeemer: OrderRedeemer,
+    _ctx: ScriptContext,
+  ) -> Bool {
+    False
+  }
+}

@@ -68,6 +68,23 @@
       "hash": "89b1b657a7029cbdcaa93d892fe47d6b7c4a8020bcd76922467c2623"
     },
     {
+      "title": "order_validator.feed_type",
+      "datum": {
+        "title": "_datum",
+        "schema": {
+          "$ref": "#/definitions/lb_v2~1types~1OrderDatum"
+        }
+      },
+      "redeemer": {
+        "title": "_redeemer",
+        "schema": {
+          "$ref": "#/definitions/lb_v2~1types~1OrderRedeemer"
+        }
+      },
+      "compiledCode": "510100003222253330044a029309b2b2b9a1",
+      "hash": "66a67769edd0c54d5f6ec8ba3925394bf0e4fc1f8bfbe3a131eb523c"
+    },
+    {
       "title": "order_validator.validate_order",
       "datum": {
         "title": "raw_datum",
@@ -404,6 +421,78 @@
               "$ref": "#/definitions/Int"
             }
           ]
+        }
+      ]
+    },
+    "lb_v2/types/OrderDatum": {
+      "title": "OrderDatum",
+      "anyOf": [
+        {
+          "title": "OrderDatum",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "owner",
+              "$ref": "#/definitions/aiken~1transaction~1credential~1Address"
+            },
+            {
+              "title": "lp_asset_name",
+              "$ref": "#/definitions/ByteArray"
+            },
+            {
+              "title": "expect_output_asset",
+              "$ref": "#/definitions/lb_v2~1types~1Asset"
+            },
+            {
+              "title": "minimum_receive",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "step",
+              "$ref": "#/definitions/lb_v2~1types~1OrderStep"
+            }
+          ]
+        }
+      ]
+    },
+    "lb_v2/types/OrderRedeemer": {
+      "title": "OrderRedeemer",
+      "anyOf": [
+        {
+          "title": "ApplyOrder",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        },
+        {
+          "title": "CancelOrder",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        }
+      ]
+    },
+    "lb_v2/types/OrderStep": {
+      "title": "OrderStep",
+      "anyOf": [
+        {
+          "title": "Deposit",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        },
+        {
+          "title": "RedeemRaiseAsset",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        },
+        {
+          "title": "RedeemLP",
+          "dataType": "constructor",
+          "index": 2,
+          "fields": []
         }
       ]
     },

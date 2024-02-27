@@ -32,7 +32,7 @@ export function quickSubmitBuilder(emulator: Emulator) {
   }) {
     const completedTx = await txBuilder.complete();
     if (debug) {
-      console.log("debug", completedTx.txComplete.body().to_json());
+      console.log("debug", completedTx.txComplete.to_json());
     }
     const signedTx = completedTx.sign();
     for (const privateKey of extraSignatures || []) {

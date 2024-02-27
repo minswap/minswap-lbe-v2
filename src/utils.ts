@@ -1,4 +1,11 @@
-import { C, Translucent, type Script, type UTxO } from "translucent-cardano";
+import {
+  C,
+  Translucent,
+  type Script,
+  type UTxO,
+  type Address,
+  getAddressDetails,
+} from "translucent-cardano";
 import { SHA3 } from "sha3";
 import {
   AuthenMintingPolicyValidateAuthen,
@@ -6,6 +13,7 @@ import {
   FactoryValidatorValidateFactory,
   OrderValidatorValidateOrder,
   OrderValidatorValidateOrderSpending,
+  OrderValidatorFeedType,
 } from "../plutus";
 
 type OutputReference = {
@@ -15,10 +23,7 @@ type OutputReference = {
 
 type StakeCredential =
   | {
-    Inline: [
-      | { VerificationKeyCredential: [string] }
-      | { ScriptCredential: [string] },
-    ];
+    Inline: [{ VerificationKeyCredential: [string] } | { ScriptCredential: [string] }];
   }
   | {
     Pointer: {
@@ -39,24 +44,13 @@ function validatorHash2StakeCredential(scriptHash: string): StakeCredential {
   return { Inline: [{ ScriptCredential: [scriptHash] }] };
 }
 
-export function collectValidators(
-  lucid: Translucent,
-  seedTxIn: OutputReference,
-) {
+export function collectValidators(lucid: Translucent, seedTxIn: OutputReference) {
   const authenValidator = new AuthenMintingPolicyValidateAuthen(seedTxIn);
-  const authenValidatorHash =
-    lucid.utils.validatorToScriptHash(authenValidator);
-  const treasuryValidator = new TreasuryValidatorValidateTreasury(
-    authenValidatorHash,
-  );
-  const treasuryValidatorHash =
-    lucid.utils.validatorToScriptHash(treasuryValidator);
-  const orderSpendingValidator = new OrderValidatorValidateOrderSpending(
-    treasuryValidatorHash,
-  );
-  const orderSpendingValidatorHash = lucid.utils.validatorToScriptHash(
-    orderSpendingValidator,
-  );
+  const authenValidatorHash = lucid.utils.validatorToScriptHash(authenValidator);
+  const treasuryValidator = new TreasuryValidatorValidateTreasury(authenValidatorHash);
+  const treasuryValidatorHash = lucid.utils.validatorToScriptHash(treasuryValidator);
+  const orderSpendingValidator = new OrderValidatorValidateOrderSpending(treasuryValidatorHash);
+  const orderSpendingValidatorHash = lucid.utils.validatorToScriptHash(orderSpendingValidator);
   const stakeCredential: StakeCredential = validatorHash2StakeCredential(
     orderSpendingValidatorHash,
   );
@@ -67,6 +61,7 @@ export function collectValidators(
     treasuryValidatorHash,
     orderValidatorHash,
   );
+  const orderValidatorFeedType = new OrderValidatorFeedType();
 
   return {
     authenValidator,
@@ -74,6 +69,7 @@ export function collectValidators(
     orderSpendingValidator,
     orderValidator,
     factoryValidator,
+    orderValidatorFeedType,
   };
 }
 
@@ -94,17 +90,13 @@ export function toScriptRef(script: Script): C.ScriptRef {
     case "PlutusV1":
       return C.ScriptRef.new(
         C.Script.new_plutus_v1(
-          C.PlutusV1Script.from_bytes(
-            fromHex(applyDoubleCborEncoding(script.script)),
-          ),
+          C.PlutusV1Script.from_bytes(fromHex(applyDoubleCborEncoding(script.script))),
         ),
       );
     case "PlutusV2":
       return C.ScriptRef.new(
         C.Script.new_plutus_v2(
-          C.PlutusV2Script.from_bytes(
-            fromHex(applyDoubleCborEncoding(script.script)),
-          ),
+          C.PlutusV2Script.from_bytes(fromHex(applyDoubleCborEncoding(script.script))),
         ),
       );
     default:
@@ -114,9 +106,7 @@ export function toScriptRef(script: Script): C.ScriptRef {
 
 export function fromHex(hex: string): Uint8Array {
   const matched = hex.match(/.{1,2}/g);
-  return new Uint8Array(
-    matched ? matched.map((byte) => parseInt(byte, 16)) : [],
-  );
+  return new Uint8Array(matched ? matched.map((byte) => parseInt(byte, 16)) : []);
 }
 
 export function toHex(bytes: Uint8Array): string {
@@ -128,9 +118,7 @@ export function toHex(bytes: Uint8Array): string {
 /** Returns double cbor encoded script. If script is already double cbor encoded it's returned as it is. */
 export function applyDoubleCborEncoding(script: string): string {
   try {
-    C.PlutusV2Script.from_bytes(
-      C.PlutusV2Script.from_bytes(fromHex(script)).bytes(),
-    );
+    C.PlutusV2Script.from_bytes(C.PlutusV2Script.from_bytes(fromHex(script)).bytes());
     return script;
   } catch (_e) {
     return toHex(C.PlutusV2Script.new(fromHex(script)).to_bytes());
@@ -146,4 +134,42 @@ export function sha3(hex: string): string {
 export function computeLPAssetName(a: string, b: string): string {
   const normalizedPair = [a, b].sort();
   return sha3(sha3(normalizedPair[0]) + sha3(normalizedPair[1]));
+}
+
+export type PlutusAddress = {
+  paymentCredential: { VerificationKeyCredential: [string] } | { ScriptCredential: [string] };
+  stakeCredential:
+  | {
+    Inline: [{ VerificationKeyCredential: [string] } | { ScriptCredential: [string] }];
+  }
+  | {
+    Pointer: {
+      slotNumber: bigint;
+      transactionIndex: bigint;
+      certificateIndex: bigint;
+    };
+  }
+  | null;
+};
+
+export function address2PlutusAddress(address: Address): PlutusAddress {
+  const addressDetail = getAddressDetails(address);
+  const paymentCredential = addressDetail.paymentCredential!;
+  const stakeCredential = addressDetail.stakeCredential;
+  return {
+    paymentCredential:
+      paymentCredential.type === "Key"
+        ? { VerificationKeyCredential: [paymentCredential.hash] }
+        : { ScriptCredential: [paymentCredential.hash] },
+    stakeCredential:
+      stakeCredential !== undefined
+        ? {
+          Inline: [
+            stakeCredential.type === "Key"
+              ? { VerificationKeyCredential: [paymentCredential.hash] }
+              : { ScriptCredential: [paymentCredential.hash] },
+          ],
+        }
+        : null,
+  };
 }

@@ -1,8 +1,17 @@
-import { Translucent, Tx, Data, toUnit, type UTxO } from "translucent-cardano";
-import { computeLPAssetName, type ValidatorRefs } from "./utils";
+import {
+  Translucent,
+  Tx,
+  Data,
+  toUnit,
+  type UTxO,
+  type Address,
+  type Assets,
+} from "translucent-cardano";
+import { address2PlutusAddress, computeLPAssetName, type ValidatorRefs } from "./utils";
 import {
   AuthenMintingPolicyValidateAuthen,
   FactoryValidatorValidateFactory,
+  OrderValidatorFeedType,
   TreasuryValidatorValidateTreasury,
 } from "../plutus.ts";
 
@@ -21,7 +30,7 @@ export type BuildInitFactoryOptions = {
   seedUtxo: UTxO;
 };
 
-export function initFactory({
+export function buildInitFactory({
   validatorRefs: { validators, deployedValidators },
   lucid,
   seedUtxo,
@@ -33,7 +42,7 @@ export function initFactory({
     tail: LBE_INIT_FACTORY_TAIL,
   };
   const metadata = {
-    msg: [`Minswap LBE: Init Factory.`],
+    msg: [`Minswap V2: LBE Init Factory.`],
   };
   const factoryAddress = lucid.utils.validatorToAddress(validators.factoryValidator);
   const authenPolicyId = lucid.utils.validatorToScriptHash(validators.authenValidator);
@@ -62,7 +71,7 @@ export type BuildCreateTreasury = {
   treasuryDatum: TreasuryValidatorValidateTreasury["datum"];
 };
 
-export function createTreasury({
+export function buildCreateTreasury({
   validatorRefs: { validators, deployedValidators },
   lucid,
   tx,
@@ -102,7 +111,7 @@ export function createTreasury({
     [toUnit(authenPolicyId, lpAssetName)]: LBE_MAX_PURR_ASSET,
   };
   const metadata = {
-    msg: [`Minswap LBE: Create Treasury.`],
+    msg: [`Minswap V2: LBE Create Treasury.`],
   };
   const txBuilder = tx
     .readFrom([deployedValidators["authenValidator"], deployedValidators["factoryValidator"]])
@@ -136,6 +145,56 @@ export function createTreasury({
         [toUnit(treasuryDatum.baseAsset.policyId, treasuryDatum.baseAsset.assetName)]:
           treasuryDatum.reserveBase,
       },
+    )
+    .attachMetadata(674, metadata);
+  return { txBuilder: txBuilder };
+}
+
+export type BuildDepositOptions = {
+  owner: Address;
+  baseAsset: { policyId: string; assetName: string };
+  raiseAsset: { policyId: string; assetName: string };
+  amount: bigint;
+};
+
+export function buildDeposit({
+  validatorRefs: { validators },
+  lucid,
+  tx,
+  owner,
+  baseAsset,
+  raiseAsset,
+  amount,
+}: BaseBuildOptions & BuildDepositOptions) {
+  const lpAssetName = computeLPAssetName(
+    baseAsset.policyId + baseAsset.assetName,
+    raiseAsset.policyId + raiseAsset.assetName,
+  );
+  const datum: OrderValidatorFeedType["_datum"] = {
+    owner: address2PlutusAddress(owner),
+    lpAssetName,
+    expectOutputAsset: {
+      policyId: lucid.utils.validatorToScriptHash(validators!.authenValidator),
+      assetName: lpAssetName,
+    },
+    minimumReceive: amount,
+    step: "Deposit",
+  };
+  const orderValue: Assets =
+    raiseAsset.policyId === "" && raiseAsset.assetName === ""
+      ? { lovelace: amount + 2000000n }
+      : { lovelace: 2000000n, [toUnit(raiseAsset.policyId, raiseAsset.assetName)]: amount };
+  const metadata = {
+    msg: [`Minswap V2: LBE Deposit.`],
+  };
+  const orderAddress = lucid.utils.validatorToAddress(validators!.orderValidator);
+  const txBuilder = tx
+    .payToAddressWithData(
+      orderAddress,
+      {
+        inline: Data.to(datum, OrderValidatorFeedType._datum),
+      },
+      orderValue,
     )
     .attachMetadata(674, metadata);
   return { txBuilder: txBuilder };
