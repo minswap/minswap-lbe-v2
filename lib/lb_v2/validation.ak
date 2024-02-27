@@ -177,13 +177,16 @@ pub fn validate_creating_treasury_out(
   } = treasury_out_datum
   let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
     base_asset
+  let expected_treasury_out_value =
+    value.zero()
+      |> value.add(authen_policy_id, treasury_auth_an, 1)
+      |> value.add(authen_policy_id, lp_asset_name, 9223372036854775807)
+      |> value.add(base_asset_pid, base_asset_an, t_reserve_base)
   and {
     t_base_asset == base_asset,
     t_raise_asset == raise_asset,
     base_asset != raise_asset,
-    value.quantity_of(treasury_out_value, base_asset_pid, base_asset_an) == t_reserve_base,
-    value.quantity_of(treasury_out_value, authen_policy_id, treasury_auth_an) == 1,
-    value.quantity_of(treasury_out_value, authen_policy_id, lp_asset_name) == 9223372036854775807,
+    value.without_lovelace(treasury_out_value) == expected_treasury_out_value,
     t_reserve_base > 0,
     t_order_hash == order_hash,
     total_liquidity == 0,
