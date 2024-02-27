@@ -1,24 +1,10 @@
-import { expect, beforeEach, test } from "bun:test";
-import {
-  generateAccount,
-  quickSubmitBuilder,
-  type GeneratedAccount,
-} from "./utils";
-import {
-  Constr,
-  Data,
-  Emulator,
-  Translucent,
-  type UTxO,
-} from "translucent-cardano";
+import { beforeEach, expect, test } from "bun:test";
+import { Emulator, Translucent, toUnit, type UTxO } from "translucent-cardano";
+import type { TreasuryValidatorValidateTreasury } from "../../plutus";
+import { createTreasury, initFactory } from "../build-tx";
 import { deployValidators } from "../deploy_validators";
-import {
-  collectValidators,
-  utxo2ORef,
-  type DeployedValidators,
-  type Validators,
-} from "../utils";
-import { initFactory } from "../build-tx";
+import { collectValidators, utxo2ORef, type DeployedValidators, type Validators } from "../utils";
+import { generateAccount, quickSubmitBuilder, type GeneratedAccount } from "./utils";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -27,10 +13,16 @@ let lucid: Translucent;
 let validators: Validators;
 let deployedValidators: DeployedValidators;
 let seedUtxo: UTxO;
+let baseAsset: { policyId: string, assetName: string };
 
 beforeEach(async () => {
+  baseAsset = {
+    policyId: "e16c2dc8ae937e8d3790c7fd7168d7b994621ba14ca11415f39fed72",
+    assetName: "4d494e",
+  };
   ACCOUNT_0 = await generateAccount({
     lovelace: 2000000000000000000n,
+    [toUnit(baseAsset.policyId, baseAsset.assetName)]: 69_000_000_000_000n,
   });
   ACCOUNT_1 = await generateAccount({
     lovelace: 2000000000000000000n,
@@ -49,9 +41,10 @@ beforeEach(async () => {
 
 test("happy case - full flow", async () => {
   /** Steps:
-   * 1. Create Factory
+   * 1. Init Factory
    * 2. Create Treasury
    */
+  // Step 1: Init Factory
   const initFactoryBuilder = initFactory({
     lucid,
     tx: lucid.newTx(),
@@ -63,6 +56,45 @@ test("happy case - full flow", async () => {
     extraSignatures: [ACCOUNT_1.privateKey],
   });
   expect(initFactoryTx).toBeTruthy();
+
+  // Step 2: Create Treasury
+  const treasuryDatum: TreasuryValidatorValidateTreasury["datum"] = {
+    baseAsset: baseAsset,
+    raiseAsset: {
+      policyId: "",
+      assetName: "",
+    },
+    discoveryStartTime: BigInt(new Date().getDate()),
+    discoveryEndTime: BigInt(new Date().getDate()),
+    encounterStartTime: BigInt(new Date().getDate()),
+    owner: {
+      paymentCredential: {
+        VerificationKeyCredential: [lucid.utils.paymentCredentialOf(ACCOUNT_0.address).hash],
+      },
+      stakeCredential: null,
+    },
+    minimumRaise: null,
+    maximumRaise: null,
+    orderHash: lucid.utils.validatorToScriptHash(validators!.orderValidator),
+    reserveBase: 69_000_000_000_000n,
+    reserveRaise: 0n,
+    totalLiquidity: 0n,
+    isCancel: 0n,
+    isCreatedPool: 0n,
+  };
+  const createFactoryBuilder = createTreasury({
+    lucid,
+    tx: lucid.newTx(),
+    validatorRefs: { validators, deployedValidators },
+    treasuryDatum,
+    factoryUtxo: (
+      await emulator.getUtxos(lucid.utils.validatorToAddress(validators?.factoryValidator))
+    ).find((u) => !u.scriptRef) as UTxO,
+  });
+  const createTreasuryTx = await quickSubmitBuilder(emulator)({
+    txBuilder: createFactoryBuilder.txBuilder,
+  });
+  expect(createTreasuryTx).toBeTruthy();
 });
 
 // test("pay->spend always success contract", async () => {

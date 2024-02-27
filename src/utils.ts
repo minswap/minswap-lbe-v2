@@ -1,4 +1,5 @@
 import { C, Translucent, type Script, type UTxO } from "translucent-cardano";
+import { SHA3 } from "sha3";
 import {
   AuthenMintingPolicyValidateAuthen,
   TreasuryValidatorValidateTreasury,
@@ -14,18 +15,18 @@ type OutputReference = {
 
 type StakeCredential =
   | {
-      Inline: [
-        | { VerificationKeyCredential: [string] }
-        | { ScriptCredential: [string] },
-      ];
-    }
+    Inline: [
+      | { VerificationKeyCredential: [string] }
+      | { ScriptCredential: [string] },
+    ];
+  }
   | {
-      Pointer: {
-        slotNumber: bigint;
-        transactionIndex: bigint;
-        certificateIndex: bigint;
-      };
+    Pointer: {
+      slotNumber: bigint;
+      transactionIndex: bigint;
+      certificateIndex: bigint;
     };
+  };
 
 export function utxo2ORef(utxo: UTxO): OutputReference {
   return {
@@ -134,4 +135,15 @@ export function applyDoubleCborEncoding(script: string): string {
   } catch (_e) {
     return toHex(C.PlutusV2Script.new(fromHex(script)).to_bytes());
   }
+}
+
+export function sha3(hex: string): string {
+  const hash = new SHA3(256);
+  hash.update(hex, "hex");
+  return hash.digest("hex");
+}
+
+export function computeLPAssetName(a: string, b: string): string {
+  const normalizedPair = [a, b].sort();
+  return sha3(sha3(normalizedPair[0]) + sha3(normalizedPair[1]));
 }

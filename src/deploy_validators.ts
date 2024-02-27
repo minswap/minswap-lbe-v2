@@ -75,17 +75,10 @@ export async function deployValidators(
 ): Promise<DeployedValidators> {
   const deploymentsChain = [
     () => processElement(lucid, "authenValidator", validators!.authenValidator),
-    () =>
-      processElement(lucid, "treasuryValidator", validators!.treasuryValidator),
-    () =>
-      processElement(
-        lucid,
-        "orderSpendingValidator",
-        validators!.orderSpendingValidator,
-      ),
+    () => processElement(lucid, "treasuryValidator", validators!.treasuryValidator),
+    () => processElement(lucid, "orderSpendingValidator", validators!.orderSpendingValidator),
     () => processElement(lucid, "orderValidator", validators!.orderValidator),
-    () =>
-      processElement(lucid, "factoryValidator", validators!.factoryValidator),
+    () => processElement(lucid, "factoryValidator", validators!.factoryValidator),
   ];
   let res: DeployedValidators = {};
 
