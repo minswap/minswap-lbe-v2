@@ -199,3 +199,20 @@ export function buildDeposit({
     .attachMetadata(674, metadata);
   return { txBuilder: txBuilder };
 }
+
+export type BuildCancelOrderOptions = {
+  owner: Address;
+  utxo: UTxO;
+}
+
+export function buildCancelOrder(options: BaseBuildOptions & BuildCancelOrderOptions) {
+  const { validatorRefs: { deployedValidators }, tx, utxo } = options;
+  const metadata = {
+    msg: [`Minswap V2: LBE Cancel Order.`],
+  };
+  const txBuilder = tx
+    .readFrom([deployedValidators['orderValidator'], deployedValidators['orderValidator']])
+    .collectFrom([utxo],)
+    .attachMetadata(674, metadata);
+  return { txBuilder: txBuilder };
+}

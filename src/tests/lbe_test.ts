@@ -93,20 +93,24 @@ test("happy case - full flow", async () => {
   });
   expect(createTreasuryTx).toBeTruthy();
 
-  // Step 3: Deposit Order
-  const depositBuilder = buildDeposit({
-    lucid,
-    tx: lucid.newTx(),
-    validatorRefs: { validators, deployedValidators },
-    owner: ACCOUNT_0.address,
-    baseAsset: treasuryDatum.baseAsset,
-    raiseAsset: treasuryDatum.raiseAsset,
-    amount: 1_000_000_000n,
-  });
-  const depositTx = await quickSubmitBuilder(emulator)({
-    txBuilder: depositBuilder.txBuilder,
-  });
-  expect(depositTx).toBeTruthy();
+  // Step 3: Deposit 31 Orders
+  for (let i = 0; i < 31; i++) {
+    const depositBuilder = buildDeposit({
+      lucid,
+      tx: lucid.newTx(),
+      validatorRefs: { validators, deployedValidators },
+      owner: ACCOUNT_0.address,
+      baseAsset: treasuryDatum.baseAsset,
+      raiseAsset: treasuryDatum.raiseAsset,
+      amount: 1_000_000_000n,
+    });
+    await quickSubmitBuilder(emulator)({
+      txBuilder: depositBuilder.txBuilder,
+    });
+  }
+
+  // Step 4: Cancel 1 order
+
 });
 
 // test("pay->spend always success contract", async () => {
