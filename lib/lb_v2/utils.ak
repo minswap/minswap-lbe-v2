@@ -17,7 +17,7 @@ pub const amm_authen_policy_id =
 
 // the legitimate AMM Pool Validator Hash
 pub const amm_pool_validation_hash =
-  #"d630fa2cbca1714024e98af6b51fce34c72d826409372688e664bd02"
+  #"672708fe3f48419b67f178da4293bccf26a04c464af871204b552dce"
 
 // the legitimate Pool TokenName
 pub const treasury_auth_an = #"4d5350"
