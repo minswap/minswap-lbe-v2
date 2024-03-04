@@ -7,12 +7,13 @@ import {
   type Address,
   type Assets,
 } from "translucent-cardano";
-import { address2PlutusAddress, computeLPAssetName, type ValidatorRefs } from "./utils";
+import { address2PlutusAddress, computeLPAssetName, findInputIndex, plutusAddress2Address, type ValidatorRefs } from "./utils";
 import {
   AuthenMintingPolicyValidateAuthen,
   FactoryValidatorValidateFactory,
   OrderValidatorFeedType,
   TreasuryValidatorValidateTreasury,
+  OrderValidatorValidateOrderSpending,
 } from "../plutus.ts";
 
 export const LBE_INIT_FACTORY_HEAD = "00";
@@ -206,13 +207,79 @@ export type BuildCancelOrderOptions = {
 }
 
 export function buildCancelOrder(options: BaseBuildOptions & BuildCancelOrderOptions) {
-  const { validatorRefs: { deployedValidators }, tx, utxo } = options;
+  const { validatorRefs: { deployedValidators }, tx, utxo, owner } = options;
   const metadata = {
     msg: [`Minswap V2: LBE Cancel Order.`],
   };
+  const redeemer: OrderValidatorFeedType["_redeemer"] = "CancelOrder";
+
   const txBuilder = tx
-    .readFrom([deployedValidators['orderValidator'], deployedValidators['orderValidator']])
-    .collectFrom([utxo],)
+    .readFrom([deployedValidators['orderValidator']])
+    .collectFrom(
+      [utxo],
+      Data.to(redeemer, OrderValidatorFeedType._redeemer),
+    )
+    .addSigner(owner)
     .attachMetadata(674, metadata);
+  return { txBuilder: txBuilder };
+}
+
+export type BuildApplyOrdersOptions = {
+  orderUTxOs: UTxO[];
+  treasuryUTxO: UTxO;
+}
+
+export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOptions) {
+  const { lucid, tx, validatorRefs: { deployedValidators, validators }, treasuryUTxO, orderUTxOs } = options;
+  const treasuryRedeemer: TreasuryValidatorValidateTreasury['redeemer'] = "Batching";
+  const orderRedeemer: OrderValidatorFeedType['_redeemer'] = "ApplyOrder";
+  const orderRewardAddress = lucid.utils.validatorToRewardAddress(validators!.orderSpendingValidator);
+  const orderBatchingRedeemer: OrderValidatorValidateOrderSpending['redeemer'] = {
+    treasuryInputIndex: BigInt(findInputIndex([...orderUTxOs, treasuryUTxO], treasuryUTxO)!),
+  };
+  const validFrom = new Date().getTime();
+  const validTo = validFrom + 10 * 60 * 1000;
+  const metadata = {
+    msg: [`Minswap V2: LBE Order Executed.`],
+  };
+  const txBuilder = tx
+    .readFrom([
+      deployedValidators['orderValidator'],
+      deployedValidators['orderSpendingValidator'],
+      deployedValidators['treasuryValidator'],
+    ])
+    .collectFrom(
+      [treasuryUTxO],
+      Data.to(treasuryRedeemer, TreasuryValidatorValidateTreasury.redeemer),
+    )
+    .collectFrom(
+      orderUTxOs,
+      Data.to(orderRedeemer, OrderValidatorFeedType._redeemer),
+    )
+    .withdraw(
+      orderRewardAddress,
+      0n,
+      Data.to(orderBatchingRedeemer, OrderValidatorValidateOrderSpending.redeemer),
+    )
+    .validFrom(validFrom)
+    .validTo(validTo)
+    .attachMetadata(674, metadata);
+
+  for (const order of orderUTxOs) {
+    const orderDatum = Data.from(order.datum!, OrderValidatorFeedType._datum);
+    const owner = plutusAddress2Address(lucid.network, orderDatum.owner);
+    const assets = {
+      'lovelace': 1_500_000n,
+      [toUnit(
+        orderDatum.expectOutputAsset.policyId,
+        orderDatum.expectOutputAsset.assetName
+      )]: orderDatum.minimumReceive,
+    }
+    txBuilder.payToAddress(
+      owner,
+      assets,
+    );
+  }
+  // TODO: pays to treasury Output
   return { txBuilder: txBuilder };
 }

@@ -5,6 +5,10 @@ import {
   type UTxO,
   type Address,
   getAddressDetails,
+  Constr,
+  Data,
+  type Network,
+  type Credential,
 } from "translucent-cardano";
 import { SHA3 } from "sha3";
 import {
@@ -172,4 +176,56 @@ export function address2PlutusAddress(address: Address): PlutusAddress {
         }
         : null,
   };
+}
+
+export function plutusAddress2Address(network: Network, data: PlutusAddress): Address {
+  const networkId = network === "Mainnet" ? 1 : 0;
+  let payment: C.StakeCredential;
+  if ('VerificationKeyCredential' in data.paymentCredential) {
+    const keyHash = data.paymentCredential.VerificationKeyCredential[0];
+    payment = C.StakeCredential.from_keyhash(C.Ed25519KeyHash.from_hex(keyHash));
+  } else if ('ScriptCredential' in data.paymentCredential) {
+    const scriptHash = data.paymentCredential.ScriptCredential[0];
+    payment = C.StakeCredential.from_scripthash(C.Ed25519KeyHash.from_hex(scriptHash));
+  }
+  let stake: C.StakeCredential | undefined = undefined;
+  if (data.stakeCredential && 'Inline' in data.stakeCredential) {
+    if ('VerificationKeyCredential' in data.stakeCredential.Inline[0]) {
+      const keyHash = data.stakeCredential.Inline[0].VerificationKeyCredential[0];
+      stake = C.StakeCredential.from_keyhash(C.Ed25519KeyHash.from_hex(keyHash));
+    } else if ('ScriptCredential' in data.stakeCredential.Inline[0]) {
+      const scriptHash = data.stakeCredential.Inline[0].ScriptCredential[0];
+      stake = C.StakeCredential.from_scripthash(C.Ed25519KeyHash.from_hex(scriptHash));
+    }
+  }
+  if (stake) {
+    const baseAddress = C.BaseAddress.new(networkId, payment!, stake);
+    return baseAddress.to_address().to_bech32();
+  } else {
+    const enterpriseAddress = C.EnterpriseAddress.new(networkId, payment!);
+    return enterpriseAddress.to_address().to_bech32();
+  }
+}
+
+function compareInput(a: UTxO, b: UTxO): number {
+  if (a.txHash === b.txHash) {
+    if (a.outputIndex > b.outputIndex) {
+      return 1;
+    }
+    else if (a.outputIndex < b.outputIndex) {
+      return -1;
+    } else {
+      return 0;
+    }
+  } else if (a.txHash > b.txHash) {
+    return 1;
+  } else {
+    return -1;
+  }
+}
+
+export function findInputIndex(inputs: UTxO[], val: UTxO): number | undefined {
+  return [...inputs]
+    .sort(compareInput)
+    .findIndex((u) => u.txHash === val.txHash && u.outputIndex === val.outputIndex);
 }

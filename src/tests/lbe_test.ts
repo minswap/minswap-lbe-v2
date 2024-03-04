@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from "bun:test";
 import { Emulator, Translucent, toUnit, type UTxO } from "translucent-cardano";
 import type { TreasuryValidatorValidateTreasury } from "../../plutus";
-import { buildCreateTreasury, buildDeposit, buildInitFactory } from "../build-tx";
+import { buildCancelOrder, buildCreateTreasury, buildDeposit, buildInitFactory } from "../build-tx";
 import { deployValidators } from "../deploy_validators";
 import { collectValidators, utxo2ORef, type DeployedValidators, type Validators, address2PlutusAddress } from "../utils";
 import { generateAccount, quickSubmitBuilder, type GeneratedAccount } from "./utils";
@@ -94,6 +94,7 @@ test("happy case - full flow", async () => {
   expect(createTreasuryTx).toBeTruthy();
 
   // Step 3: Deposit 31 Orders
+  let shouldCancelOrderTxId: string | undefined = undefined;
   for (let i = 0; i < 31; i++) {
     const depositBuilder = buildDeposit({
       lucid,
@@ -104,13 +105,27 @@ test("happy case - full flow", async () => {
       raiseAsset: treasuryDatum.raiseAsset,
       amount: 1_000_000_000n,
     });
-    await quickSubmitBuilder(emulator)({
+    const txHash = await quickSubmitBuilder(emulator)({
       txBuilder: depositBuilder.txBuilder,
     });
+    if (!shouldCancelOrderTxId) {
+      shouldCancelOrderTxId = txHash;
+    }
   }
 
-  // Step 4: Cancel 1 order
-
+  // Step 4: Cancel first order
+  const cancelUtxo = (await emulator.getUtxosByOutRef([{ txHash: shouldCancelOrderTxId!, outputIndex: 0 }]))[0];
+  const cancelBuilder = buildCancelOrder({
+    lucid,
+    tx: lucid.newTx(),
+    validatorRefs: { validators, deployedValidators },
+    owner: ACCOUNT_0.address,
+    utxo: cancelUtxo,
+  });
+  const cancelTx = await quickSubmitBuilder(emulator)({
+    txBuilder: cancelBuilder.txBuilder,
+  });
+  expect(cancelTx).toBeTruthy();
 });
 
 // test("pay->spend always success contract", async () => {
