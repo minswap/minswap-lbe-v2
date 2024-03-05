@@ -1,9 +1,21 @@
 import { beforeEach, expect, test } from "bun:test";
 import { Emulator, toUnit, Translucent, type UTxO } from "translucent-cardano";
 import type { TreasuryValidatorValidateTreasury } from "../../plutus";
-import { buildApplyOrders, buildCancelOrder, buildCreateTreasury, buildDeposit, buildInitFactory } from "../build-tx";
+import {
+  buildApplyOrders,
+  buildCancelOrder,
+  buildCreateTreasury,
+  buildDeposit,
+  buildInitFactory,
+} from "../build-tx";
 import { deployValidators } from "../deploy_validators";
-import { address2PlutusAddress, collectValidators, type DeployedValidators, utxo2ORef, type Validators } from "../utils";
+import {
+  address2PlutusAddress,
+  collectValidators,
+  type DeployedValidators,
+  utxo2ORef,
+  type Validators,
+} from "../utils";
 import { generateAccount, type GeneratedAccount, quickSubmitBuilder } from "./utils";
 
 let ACCOUNT_0: GeneratedAccount;
@@ -13,7 +25,10 @@ let lucid: Translucent;
 let validators: Validators;
 let deployedValidators: DeployedValidators;
 let seedUtxo: UTxO;
-let baseAsset: { policyId: string, assetName: string };
+let baseAsset: {
+  policyId: string;
+  assetName: string;
+};
 
 beforeEach(async () => {
   baseAsset = {
@@ -42,9 +57,7 @@ beforeEach(async () => {
   await quickSubmitBuilder(emulator)({
     txBuilder: lucid
       .newTx()
-      .registerStake(
-        lucid.utils.validatorToRewardAddress(validators!.orderSpendingValidator)
-      ),
+      .registerStake(lucid.utils.validatorToRewardAddress(validators!.orderSpendingValidator)),
   });
 });
 
@@ -59,7 +72,10 @@ test("happy case - full flow", async () => {
   const initFactoryBuilder = buildInitFactory({
     lucid,
     tx: lucid.newTx(),
-    validatorRefs: { validators, deployedValidators },
+    validatorRefs: {
+      validators,
+      deployedValidators,
+    },
     seedUtxo,
   });
   const initFactoryTx = await quickSubmitBuilder(emulator)({
@@ -91,7 +107,10 @@ test("happy case - full flow", async () => {
   const createFactoryBuilder = buildCreateTreasury({
     lucid,
     tx: lucid.newTx(),
-    validatorRefs: { validators, deployedValidators },
+    validatorRefs: {
+      validators,
+      deployedValidators,
+    },
     treasuryDatum,
     factoryUtxo: (
       await emulator.getUtxos(lucid.utils.validatorToAddress(validators!.factoryValidator))
@@ -108,7 +127,10 @@ test("happy case - full flow", async () => {
     const depositBuilder = buildDeposit({
       lucid,
       tx: lucid.newTx(),
-      validatorRefs: { validators, deployedValidators },
+      validatorRefs: {
+        validators,
+        deployedValidators,
+      },
       owner: ACCOUNT_0.address,
       baseAsset: treasuryDatum.baseAsset,
       raiseAsset: treasuryDatum.raiseAsset,
@@ -122,11 +144,21 @@ test("happy case - full flow", async () => {
 
   // Step 4: Cancel first order
   const shouldCancelOrderTxId = pendingOrderTxIds.splice(0, 1)[0];
-  const cancelUtxo = (await emulator.getUtxosByOutRef([{ txHash: shouldCancelOrderTxId!, outputIndex: 0 }]))[0];
+  const cancelUtxo = (
+    await emulator.getUtxosByOutRef([
+      {
+        txHash: shouldCancelOrderTxId!,
+        outputIndex: 0,
+      },
+    ])
+  )[0];
   const cancelBuilder = buildCancelOrder({
     lucid,
     tx: lucid.newTx(),
-    validatorRefs: { validators, deployedValidators },
+    validatorRefs: {
+      validators,
+      deployedValidators,
+    },
     owner: ACCOUNT_0.address,
     utxo: cancelUtxo,
   });
@@ -136,21 +168,32 @@ test("happy case - full flow", async () => {
   expect(cancelTx).toBeTruthy();
 
   // Step 5: Apply Orders
-  const pendingOrders = await emulator.getUtxosByOutRef(pendingOrderTxIds.map((o) => ({ txHash: o, outputIndex: 0 })));
-  const treasuryUTxO = (await emulator.getUtxos(lucid.utils.validatorToAddress(validators!.treasuryValidator)))
-    .find((u) => u.scriptRef === undefined)!;
+  const pendingOrders = await emulator.getUtxosByOutRef(
+    pendingOrderTxIds.map((o) => ({
+      txHash: o,
+      outputIndex: 0,
+    })),
+  );
+  const treasuryUTxO = (
+    await emulator.getUtxos(lucid.utils.validatorToAddress(validators!.treasuryValidator))
+  ).find((u) => u.scriptRef === undefined)!;
   let validFrom = lucid.utils.slotToUnixTime(emulator.slot);
   let validTo = lucid.utils.slotToUnixTime(emulator.slot + 60 * 10);
   const applyOrderBuilder = buildApplyOrders({
     lucid,
     tx: lucid.newTx(),
-    validatorRefs: { validators, deployedValidators },
+    validatorRefs: {
+      validators,
+      deployedValidators,
+    },
     orderUTxOs: pendingOrders,
     treasuryUTxO,
     validFrom,
     validTo,
   });
-  const applyOrderTx = await quickSubmitBuilder(emulator)({ txBuilder: applyOrderBuilder.txBuilder });
+  const applyOrderTx = await quickSubmitBuilder(emulator)({
+    txBuilder: applyOrderBuilder.txBuilder,
+  });
   expect(applyOrderTx).toBeTruthy();
 });
 

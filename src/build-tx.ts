@@ -8,7 +8,13 @@ import {
   type Assets,
   type UnixTime,
 } from "translucent-cardano";
-import { address2PlutusAddress, computeLPAssetName, findInputIndex, plutusAddress2Address, type ValidatorRefs } from "./utils";
+import {
+  address2PlutusAddress,
+  computeLPAssetName,
+  findInputIndex,
+  plutusAddress2Address,
+  type ValidatorRefs,
+} from "./utils";
 import {
   AuthenMintingPolicyValidateAuthen,
   FactoryValidatorValidateFactory,
@@ -60,12 +66,16 @@ export function buildInitFactory({
     )
     .payToAddressWithData(
       factoryAddress,
-      { inline: Data.to(factoryDatum, FactoryValidatorValidateFactory.datum) },
+      {
+        inline: Data.to(factoryDatum, FactoryValidatorValidateFactory.datum),
+      },
       factoryAuthAssets,
     )
     .attachMetadata(674, metadata);
 
-  return { txBuilder };
+  return {
+    txBuilder,
+  };
 }
 
 export type BuildCreateTreasury = {
@@ -119,7 +129,11 @@ export function buildCreateTreasury({
     .readFrom([deployedValidators["authenValidator"], deployedValidators["factoryValidator"]])
     .collectFrom([factoryUtxo], Data.to(factoryRedeemer, FactoryValidatorValidateFactory.redeemer))
     .mintAssets(
-      { ...treasuryAuthAssets, ...factoryAuthAssets, ...treasuryLpAssets },
+      {
+        ...treasuryAuthAssets,
+        ...factoryAuthAssets,
+        ...treasuryLpAssets,
+      },
       Data.to(authenRedeemer, AuthenMintingPolicyValidateAuthen.redeemer),
     )
     .payToAddressWithData(
@@ -149,13 +163,21 @@ export function buildCreateTreasury({
       },
     )
     .attachMetadata(674, metadata);
-  return { txBuilder: txBuilder };
+  return {
+    txBuilder: txBuilder,
+  };
 }
 
 export type BuildDepositOptions = {
   owner: Address;
-  baseAsset: { policyId: string; assetName: string };
-  raiseAsset: { policyId: string; assetName: string };
+  baseAsset: {
+    policyId: string;
+    assetName: string;
+  };
+  raiseAsset: {
+    policyId: string;
+    assetName: string;
+  };
   amount: bigint;
 };
 
@@ -184,8 +206,13 @@ export function buildDeposit({
   };
   const orderValue: Assets =
     raiseAsset.policyId === "" && raiseAsset.assetName === ""
-      ? { lovelace: amount + 2000000n }
-      : { lovelace: 2000000n, [toUnit(raiseAsset.policyId, raiseAsset.assetName)]: amount };
+      ? {
+          lovelace: amount + 2000000n,
+        }
+      : {
+          lovelace: 2000000n,
+          [toUnit(raiseAsset.policyId, raiseAsset.assetName)]: amount,
+        };
   const metadata = {
     msg: [`Minswap V2: LBE Deposit.`],
   };
@@ -199,30 +226,36 @@ export function buildDeposit({
       orderValue,
     )
     .attachMetadata(674, metadata);
-  return { txBuilder: txBuilder };
+  return {
+    txBuilder: txBuilder,
+  };
 }
 
 export type BuildCancelOrderOptions = {
   owner: Address;
   utxo: UTxO;
-}
+};
 
 export function buildCancelOrder(options: BaseBuildOptions & BuildCancelOrderOptions) {
-  const { validatorRefs: { deployedValidators }, tx, utxo, owner } = options;
+  const {
+    validatorRefs: { deployedValidators },
+    tx,
+    utxo,
+    owner,
+  } = options;
   const metadata = {
     msg: [`Minswap V2: LBE Cancel Order.`],
   };
   const redeemer: OrderValidatorFeedType["_redeemer"] = "CancelOrder";
 
   const txBuilder = tx
-    .readFrom([deployedValidators['orderValidator']])
-    .collectFrom(
-      [utxo],
-      Data.to(redeemer, OrderValidatorFeedType._redeemer),
-    )
+    .readFrom([deployedValidators["orderValidator"]])
+    .collectFrom([utxo], Data.to(redeemer, OrderValidatorFeedType._redeemer))
     .addSigner(owner)
     .attachMetadata(674, metadata);
-  return { txBuilder: txBuilder };
+  return {
+    txBuilder: txBuilder,
+  };
 }
 
 export type BuildApplyOrdersOptions = {
@@ -230,7 +263,7 @@ export type BuildApplyOrdersOptions = {
   treasuryUTxO: UTxO;
   validFrom: UnixTime;
   validTo: UnixTime;
-}
+};
 
 function getPurrAssetName(datum: TreasuryValidatorValidateTreasury["datum"]) {
   const baseAsset = datum.baseAsset;
@@ -243,19 +276,34 @@ function getPurrAssetName(datum: TreasuryValidatorValidateTreasury["datum"]) {
 }
 
 export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOptions) {
-  const { lucid, tx, validatorRefs: { deployedValidators, validators }, treasuryUTxO, orderUTxOs, validFrom, validTo } = options;
-  const treasuryRedeemer: TreasuryValidatorValidateTreasury['redeemer'] = "Batching";
-  const orderRedeemer: OrderValidatorFeedType['_redeemer'] = "ApplyOrder";
-  const orderRewardAddress = lucid.utils.validatorToRewardAddress(validators!.orderSpendingValidator);
-  const orderBatchingRedeemer: OrderValidatorValidateOrderSpending['redeemer'] = {
+  const {
+    lucid,
+    tx,
+    validatorRefs: { deployedValidators, validators },
+    treasuryUTxO,
+    orderUTxOs,
+    validFrom,
+    validTo,
+  } = options;
+  const treasuryRedeemer: TreasuryValidatorValidateTreasury["redeemer"] = "Batching";
+  const orderRedeemer: OrderValidatorFeedType["_redeemer"] = "ApplyOrder";
+  const orderRewardAddress = lucid.utils.validatorToRewardAddress(
+    validators!.orderSpendingValidator,
+  );
+  const orderBatchingRedeemer: OrderValidatorValidateOrderSpending["redeemer"] = {
     treasuryInputIndex: BigInt(findInputIndex([...orderUTxOs, treasuryUTxO], treasuryUTxO)!),
   };
-  const applyTreasury = (): { newTreasuryDatum: string, newTreasuryAssets: Assets } => {
+  const applyTreasury = (): {
+    newTreasuryDatum: string;
+    newTreasuryAssets: Assets;
+  } => {
     const treasuryDatum = Data.from(treasuryUTxO.datum!, TreasuryValidatorValidateTreasury.datum);
-    const treasuryValue = { ...treasuryUTxO.assets };
+    const treasuryValue = {
+      ...treasuryUTxO.assets,
+    };
     let raiseAsset = `${treasuryDatum.raiseAsset.policyId}${treasuryDatum.raiseAsset.assetName}`;
-    if (raiseAsset === '') {
-      raiseAsset = 'lovelace';
+    if (raiseAsset === "") {
+      raiseAsset = "lovelace";
     }
     const purrAsset = toUnit(
       lucid.utils.validatorToScriptHash(validators!.authenValidator),
@@ -265,7 +313,7 @@ export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOpt
       const orderDatum = Data.from(order.datum!, OrderValidatorFeedType._datum);
       if (orderDatum.step === "Deposit") {
         let estimateIn = order.assets[raiseAsset];
-        if (raiseAsset === 'lovelace') {
+        if (raiseAsset === "lovelace") {
           estimateIn -= 2_000_000n;
         }
         treasuryDatum.reserveRaise += estimateIn;
@@ -278,7 +326,7 @@ export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOpt
     return {
       newTreasuryDatum: Data.to(treasuryDatum, TreasuryValidatorValidateTreasury.datum),
       newTreasuryAssets: treasuryValue,
-    }
+    };
   };
   const { newTreasuryDatum, newTreasuryAssets } = applyTreasury();
   const metadata = {
@@ -286,18 +334,15 @@ export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOpt
   };
   const txBuilder = tx
     .readFrom([
-      deployedValidators['orderValidator'],
-      deployedValidators['orderSpendingValidator'],
-      deployedValidators['treasuryValidator'],
+      deployedValidators["orderValidator"],
+      deployedValidators["orderSpendingValidator"],
+      deployedValidators["treasuryValidator"],
     ])
     .collectFrom(
       [treasuryUTxO],
       Data.to(treasuryRedeemer, TreasuryValidatorValidateTreasury.redeemer),
     )
-    .collectFrom(
-      orderUTxOs,
-      Data.to(orderRedeemer, OrderValidatorFeedType._redeemer),
-    )
+    .collectFrom(orderUTxOs, Data.to(orderRedeemer, OrderValidatorFeedType._redeemer))
     .withdraw(
       orderRewardAddress,
       0n,
@@ -305,7 +350,9 @@ export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOpt
     )
     .payToAddressWithData(
       treasuryUTxO.address,
-      { inline: newTreasuryDatum },
+      {
+        inline: newTreasuryDatum,
+      },
       newTreasuryAssets,
     )
     .validFrom(validFrom)
@@ -316,16 +363,13 @@ export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOpt
     const orderDatum = Data.from(order.datum!, OrderValidatorFeedType._datum);
     const owner = plutusAddress2Address(lucid.network, orderDatum.owner);
     const assets = {
-      'lovelace': 1_500_000n,
-      [toUnit(
-        orderDatum.expectOutputAsset.policyId,
-        orderDatum.expectOutputAsset.assetName
-      )]: orderDatum.minimumReceive,
-    }
-    txBuilder.payToAddress(
-      owner,
-      assets,
-    );
+      lovelace: 1_500_000n,
+      [toUnit(orderDatum.expectOutputAsset.policyId, orderDatum.expectOutputAsset.assetName)]:
+        orderDatum.minimumReceive,
+    };
+    txBuilder.payToAddress(owner, assets);
   }
-  return { txBuilder: txBuilder };
+  return {
+    txBuilder: txBuilder,
+  };
 }

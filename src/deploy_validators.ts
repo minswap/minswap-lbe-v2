@@ -1,9 +1,4 @@
-import {
-  type Translucent,
-  type Script,
-  type Tx,
-  type UTxO,
-} from "translucent-cardano";
+import { type Translucent, type Script, type Tx, type UTxO } from "translucent-cardano";
 import { toScriptRef, type DeployedValidators, type Validators } from "./utils";
 
 function buildDeployValidator(lucid: Translucent, validator: Script): Tx {
@@ -32,7 +27,9 @@ async function processElement(
   const completedTx = await validatorTx.complete();
   const finalOutputs = completedTx.txComplete.to_js_value().body.outputs;
   const scriptV2 = (
-    toScriptRef(validator).to_js_value() as { PlutusV2?: string }
+    toScriptRef(validator).to_js_value() as {
+      PlutusV2?: string;
+    }
   ).PlutusV2;
   const newTxOutputIdx = finalOutputs.findIndex((o: any) => {
     if (!o.script_ref) return false;

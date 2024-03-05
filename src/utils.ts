@@ -21,31 +21,48 @@ import {
 } from "../plutus";
 
 type OutputReference = {
-  transactionId: { hash: string };
+  transactionId: {
+    hash: string;
+  };
   outputIndex: bigint;
 };
 
 type StakeCredential =
   | {
-    Inline: [{ VerificationKeyCredential: [string] } | { ScriptCredential: [string] }];
-  }
+      Inline: [
+        | {
+            VerificationKeyCredential: [string];
+          }
+        | {
+            ScriptCredential: [string];
+          },
+      ];
+    }
   | {
-    Pointer: {
-      slotNumber: bigint;
-      transactionIndex: bigint;
-      certificateIndex: bigint;
+      Pointer: {
+        slotNumber: bigint;
+        transactionIndex: bigint;
+        certificateIndex: bigint;
+      };
     };
-  };
 
 export function utxo2ORef(utxo: UTxO): OutputReference {
   return {
-    transactionId: { hash: utxo.txHash },
+    transactionId: {
+      hash: utxo.txHash,
+    },
     outputIndex: BigInt(utxo.outputIndex),
   };
 }
 
 function validatorHash2StakeCredential(scriptHash: string): StakeCredential {
-  return { Inline: [{ ScriptCredential: [scriptHash] }] };
+  return {
+    Inline: [
+      {
+        ScriptCredential: [scriptHash],
+      },
+    ],
+  };
 }
 
 export function collectValidators(lucid: Translucent, seedTxIn: OutputReference) {
@@ -141,19 +158,32 @@ export function computeLPAssetName(a: string, b: string): string {
 }
 
 export type PlutusAddress = {
-  paymentCredential: { VerificationKeyCredential: [string] } | { ScriptCredential: [string] };
+  paymentCredential:
+    | {
+        VerificationKeyCredential: [string];
+      }
+    | {
+        ScriptCredential: [string];
+      };
   stakeCredential:
-  | {
-    Inline: [{ VerificationKeyCredential: [string] } | { ScriptCredential: [string] }];
-  }
-  | {
-    Pointer: {
-      slotNumber: bigint;
-      transactionIndex: bigint;
-      certificateIndex: bigint;
-    };
-  }
-  | null;
+    | {
+        Inline: [
+          | {
+              VerificationKeyCredential: [string];
+            }
+          | {
+              ScriptCredential: [string];
+            },
+        ];
+      }
+    | {
+        Pointer: {
+          slotNumber: bigint;
+          transactionIndex: bigint;
+          certificateIndex: bigint;
+        };
+      }
+    | null;
 };
 
 export function address2PlutusAddress(address: Address): PlutusAddress {
@@ -163,17 +193,25 @@ export function address2PlutusAddress(address: Address): PlutusAddress {
   return {
     paymentCredential:
       paymentCredential.type === "Key"
-        ? { VerificationKeyCredential: [paymentCredential.hash] }
-        : { ScriptCredential: [paymentCredential.hash] },
+        ? {
+            VerificationKeyCredential: [paymentCredential.hash],
+          }
+        : {
+            ScriptCredential: [paymentCredential.hash],
+          },
     stakeCredential:
       stakeCredential !== undefined
         ? {
-          Inline: [
-            stakeCredential.type === "Key"
-              ? { VerificationKeyCredential: [paymentCredential.hash] }
-              : { ScriptCredential: [paymentCredential.hash] },
-          ],
-        }
+            Inline: [
+              stakeCredential.type === "Key"
+                ? {
+                    VerificationKeyCredential: [paymentCredential.hash],
+                  }
+                : {
+                    ScriptCredential: [paymentCredential.hash],
+                  },
+            ],
+          }
         : null,
   };
 }
@@ -181,19 +219,19 @@ export function address2PlutusAddress(address: Address): PlutusAddress {
 export function plutusAddress2Address(network: Network, data: PlutusAddress): Address {
   const networkId = network === "Mainnet" ? 1 : 0;
   let payment: C.StakeCredential;
-  if ('VerificationKeyCredential' in data.paymentCredential) {
+  if ("VerificationKeyCredential" in data.paymentCredential) {
     const keyHash = data.paymentCredential.VerificationKeyCredential[0];
     payment = C.StakeCredential.from_keyhash(C.Ed25519KeyHash.from_hex(keyHash));
-  } else if ('ScriptCredential' in data.paymentCredential) {
+  } else if ("ScriptCredential" in data.paymentCredential) {
     const scriptHash = data.paymentCredential.ScriptCredential[0];
     payment = C.StakeCredential.from_scripthash(C.Ed25519KeyHash.from_hex(scriptHash));
   }
   let stake: C.StakeCredential | undefined = undefined;
-  if (data.stakeCredential && 'Inline' in data.stakeCredential) {
-    if ('VerificationKeyCredential' in data.stakeCredential.Inline[0]) {
+  if (data.stakeCredential && "Inline" in data.stakeCredential) {
+    if ("VerificationKeyCredential" in data.stakeCredential.Inline[0]) {
       const keyHash = data.stakeCredential.Inline[0].VerificationKeyCredential[0];
       stake = C.StakeCredential.from_keyhash(C.Ed25519KeyHash.from_hex(keyHash));
-    } else if ('ScriptCredential' in data.stakeCredential.Inline[0]) {
+    } else if ("ScriptCredential" in data.stakeCredential.Inline[0]) {
       const scriptHash = data.stakeCredential.Inline[0].ScriptCredential[0];
       stake = C.StakeCredential.from_scripthash(C.Ed25519KeyHash.from_hex(scriptHash));
     }
@@ -211,8 +249,7 @@ function compareInput(a: UTxO, b: UTxO): number {
   if (a.txHash === b.txHash) {
     if (a.outputIndex > b.outputIndex) {
       return 1;
-    }
-    else if (a.outputIndex < b.outputIndex) {
+    } else if (a.outputIndex < b.outputIndex) {
       return -1;
     } else {
       return 0;
