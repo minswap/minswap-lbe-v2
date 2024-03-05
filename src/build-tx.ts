@@ -6,6 +6,7 @@ import {
   type UTxO,
   type Address,
   type Assets,
+  type UnixTime,
 } from "translucent-cardano";
 import { address2PlutusAddress, computeLPAssetName, findInputIndex, plutusAddress2Address, type ValidatorRefs } from "./utils";
 import {
@@ -227,18 +228,59 @@ export function buildCancelOrder(options: BaseBuildOptions & BuildCancelOrderOpt
 export type BuildApplyOrdersOptions = {
   orderUTxOs: UTxO[];
   treasuryUTxO: UTxO;
+  validFrom: UnixTime;
+  validTo: UnixTime;
+}
+
+function getPurrAssetName(datum: TreasuryValidatorValidateTreasury["datum"]) {
+  const baseAsset = datum.baseAsset;
+  const raiseAsset = datum.raiseAsset;
+  const lpAssetName = computeLPAssetName(
+    baseAsset.policyId + baseAsset.assetName,
+    raiseAsset.policyId + raiseAsset.assetName,
+  );
+  return lpAssetName;
 }
 
 export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOptions) {
-  const { lucid, tx, validatorRefs: { deployedValidators, validators }, treasuryUTxO, orderUTxOs } = options;
+  const { lucid, tx, validatorRefs: { deployedValidators, validators }, treasuryUTxO, orderUTxOs, validFrom, validTo } = options;
   const treasuryRedeemer: TreasuryValidatorValidateTreasury['redeemer'] = "Batching";
   const orderRedeemer: OrderValidatorFeedType['_redeemer'] = "ApplyOrder";
   const orderRewardAddress = lucid.utils.validatorToRewardAddress(validators!.orderSpendingValidator);
   const orderBatchingRedeemer: OrderValidatorValidateOrderSpending['redeemer'] = {
     treasuryInputIndex: BigInt(findInputIndex([...orderUTxOs, treasuryUTxO], treasuryUTxO)!),
   };
-  const validFrom = new Date().getTime();
-  const validTo = validFrom + 10 * 60 * 1000;
+  const applyTreasury = (): { newTreasuryDatum: string, newTreasuryAssets: Assets } => {
+    const treasuryDatum = Data.from(treasuryUTxO.datum!, TreasuryValidatorValidateTreasury.datum);
+    const treasuryValue = { ...treasuryUTxO.assets };
+    let raiseAsset = `${treasuryDatum.raiseAsset.policyId}${treasuryDatum.raiseAsset.assetName}`;
+    if (raiseAsset === '') {
+      raiseAsset = 'lovelace';
+    }
+    const purrAsset = toUnit(
+      lucid.utils.validatorToScriptHash(validators!.authenValidator),
+      getPurrAssetName(treasuryDatum),
+    );
+    for (const order of orderUTxOs) {
+      const orderDatum = Data.from(order.datum!, OrderValidatorFeedType._datum);
+      if (orderDatum.step === "Deposit") {
+        let estimateIn = order.assets[raiseAsset];
+        if (raiseAsset === 'lovelace') {
+          estimateIn -= 2_000_000n;
+        }
+        treasuryDatum.reserveRaise += estimateIn;
+        treasuryValue[raiseAsset] += estimateIn;
+        treasuryValue[purrAsset] -= estimateIn;
+      } else {
+        throw Error("Not support yet");
+      }
+    }
+    return {
+      newTreasuryDatum: Data.to(treasuryDatum, TreasuryValidatorValidateTreasury.datum),
+      newTreasuryAssets: treasuryValue,
+    }
+  };
+  const { newTreasuryDatum, newTreasuryAssets } = applyTreasury();
   const metadata = {
     msg: [`Minswap V2: LBE Order Executed.`],
   };
@@ -261,6 +303,11 @@ export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOpt
       0n,
       Data.to(orderBatchingRedeemer, OrderValidatorValidateOrderSpending.redeemer),
     )
+    .payToAddressWithData(
+      treasuryUTxO.address,
+      { inline: newTreasuryDatum },
+      newTreasuryAssets,
+    )
     .validFrom(validFrom)
     .validTo(validTo)
     .attachMetadata(674, metadata);
@@ -280,6 +327,5 @@ export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOpt
       assets,
     );
   }
-  // TODO: pays to treasury Output
   return { txBuilder: txBuilder };
 }
