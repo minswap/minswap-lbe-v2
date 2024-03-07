@@ -2,10 +2,7 @@
 import { applyParamsToScript, Data, Validator } from "translucent-cardano";
 
 export interface AuthenMintingPolicyValidateAuthen {
-  new (outRef: {
-    transactionId: { hash: string };
-    outputIndex: bigint;
-  }): Validator;
+  new (outRef: { transactionId: { hash: string }; outputIndex: bigint }): Validator;
   redeemer: "MintFactoryAuthen" | "CreatePool";
 }
 
@@ -75,10 +72,7 @@ export interface FactoryValidatorValidateFactory {
     poolHash: string,
     poolBatchingStakeCredential:
       | {
-          Inline: [
-            | { VerificationKeyCredential: [string] }
-            | { ScriptCredential: [string] },
-          ];
+          Inline: [{ VerificationKeyCredential: [string] } | { ScriptCredential: [string] }];
         }
       | {
           Pointer: {
@@ -101,10 +95,7 @@ export const FactoryValidatorValidateFactory = Object.assign(
     poolHash: string,
     poolBatchingStakeCredential:
       | {
-          Inline: [
-            | { VerificationKeyCredential: [string] }
-            | { ScriptCredential: [string] },
-          ];
+          Inline: [{ VerificationKeyCredential: [string] } | { ScriptCredential: [string] }];
         }
       | {
           Pointer: {
@@ -252,10 +243,7 @@ export interface OrderValidatorValidateOrder {
   new (
     poolBatchingCredential:
       | {
-          Inline: [
-            | { VerificationKeyCredential: [string] }
-            | { ScriptCredential: [string] },
-          ];
+          Inline: [{ VerificationKeyCredential: [string] } | { ScriptCredential: [string] }];
         }
       | {
           Pointer: {
@@ -266,10 +254,7 @@ export interface OrderValidatorValidateOrder {
         },
     expiredOrderCancelCredential:
       | {
-          Inline: [
-            | { VerificationKeyCredential: [string] }
-            | { ScriptCredential: [string] },
-          ];
+          Inline: [{ VerificationKeyCredential: [string] } | { ScriptCredential: [string] }];
         }
       | {
           Pointer: {
@@ -287,10 +272,7 @@ export const OrderValidatorValidateOrder = Object.assign(
   function (
     poolBatchingCredential:
       | {
-          Inline: [
-            | { VerificationKeyCredential: [string] }
-            | { ScriptCredential: [string] },
-          ];
+          Inline: [{ VerificationKeyCredential: [string] } | { ScriptCredential: [string] }];
         }
       | {
           Pointer: {
@@ -301,10 +283,7 @@ export const OrderValidatorValidateOrder = Object.assign(
         },
     expiredOrderCancelCredential:
       | {
-          Inline: [
-            | { VerificationKeyCredential: [string] }
-            | { ScriptCredential: [string] },
-          ];
+          Inline: [{ VerificationKeyCredential: [string] } | { ScriptCredential: [string] }];
         }
       | {
           Pointer: {
@@ -420,10 +399,7 @@ export interface PoolValidatorValidatePool {
   datum: {
     poolBatchingStakeCredential:
       | {
-          Inline: [
-            | { VerificationKeyCredential: [string] }
-            | { ScriptCredential: [string] },
-          ];
+          Inline: [{ VerificationKeyCredential: [string] } | { ScriptCredential: [string] }];
         }
       | {
           Pointer: {
@@ -631,9 +607,7 @@ export const PoolValidatorValidatePool = Object.assign(
 export interface PoolValidatorValidatePoolBatching {
   new (
     authenPolicyId: string,
-    poolPaymentCred:
-      | { VerificationKeyCredential: [string] }
-      | { ScriptCredential: [string] },
+    poolPaymentCred: { VerificationKeyCredential: [string] } | { ScriptCredential: [string] },
   ): Validator;
   redeemer: {
     licenseIndex: bigint;
@@ -647,9 +621,7 @@ export interface PoolValidatorValidatePoolBatching {
 export const PoolValidatorValidatePoolBatching = Object.assign(
   function (
     authenPolicyId: string,
-    poolPaymentCred:
-      | { VerificationKeyCredential: [string] }
-      | { ScriptCredential: [string] },
+    poolPaymentCred: { VerificationKeyCredential: [string] } | { ScriptCredential: [string] },
   ) {
     return {
       type: "PlutusV2",
@@ -713,9 +685,7 @@ export const PoolValidatorValidatePoolBatching = Object.assign(
                   description: "An optional value.",
                   dataType: "constructor",
                   index: 0,
-                  fields: [
-                    { dataType: "list", items: { dataType: "integer" } },
-                  ],
+                  fields: [{ dataType: "list", items: { dataType: "integer" } }],
                 },
                 {
                   title: "None",

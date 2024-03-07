@@ -18,8 +18,7 @@ export function collectMinswapValidators() {
   const authenValidator: Script = data!.references!.lpRef.scriptRef;
   const factoryValidator: Script = data!.references!.factoryRef.scriptRef;
   const poolValidator: Script = data!.references!.poolRef.scriptRef;
-  const poolBatchingValidator: Script =
-    data!.references!.poolBatchingRef.scriptRef;
+  const poolBatchingValidator: Script = data!.references!.poolBatchingRef.scriptRef;
 
   return {
     authenValidator,
