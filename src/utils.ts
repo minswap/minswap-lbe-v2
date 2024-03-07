@@ -52,7 +52,7 @@ export function utxo2ORef(utxo: UTxO): OutputReference {
   };
 }
 
-function validatorHash2StakeCredential(scriptHash: string): StakeCredential {
+export function validatorHash2StakeCredential(scriptHash: string): StakeCredential {
   return {
     Inline: [
       {
