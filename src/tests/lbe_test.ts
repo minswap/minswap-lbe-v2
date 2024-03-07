@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from "bun:test";
-import { Emulator, toUnit, Translucent, type UTxO } from "translucent-cardano";
+import { coreToUtxo, Emulator, toUnit, Translucent, type Address, type UTxO, type OutputData, type Assets, Data } from "translucent-cardano";
 import type { TreasuryValidatorValidateTreasury } from "../../plutus";
 import {
   buildApplyOrders,
@@ -8,7 +8,7 @@ import {
   buildDeposit,
   buildInitFactory,
 } from "../build-tx";
-import { deployValidators } from "../deploy_validators";
+import { deployMinswapValidators, deployValidators } from "../deploy_validators";
 import {
   address2PlutusAddress,
   collectValidators,
@@ -17,6 +17,8 @@ import {
   type Validators,
 } from "../utils";
 import { generateAccount, type GeneratedAccount, quickSubmitBuilder } from "./utils";
+import { generateMinswapParams, type GenerateMinswapParams, type MinswapValidators, collectMinswapValidators } from "../minswap-amm";
+import { FactoryValidatorValidateFactory } from "../minswap-amm/plutus";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -29,6 +31,9 @@ let baseAsset: {
   policyId: string;
   assetName: string;
 };
+let minswapData: GenerateMinswapParams;
+let minswapValidators: MinswapValidators;
+let minswapDeployedValidators: DeployedValidators;
 
 beforeEach(async () => {
   baseAsset = {
@@ -42,7 +47,22 @@ beforeEach(async () => {
   ACCOUNT_1 = await generateAccount({
     lovelace: 2000000000000000000n,
   });
-  emulator = new Emulator([ACCOUNT_0, ACCOUNT_1]);
+  minswapData = generateMinswapParams();
+  const factoryAccount: { address: Address; outputData: OutputData; assets: Assets } = {
+    address: minswapData!.factoryAddress,
+    outputData: {
+      inline: Data.to({
+        head: "00",
+        tail: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
+      }, FactoryValidatorValidateFactory.datum)
+    },
+    assets: {
+      lovelace: 10_000_000n,
+      [toUnit(minswapData!.factoryAuthAsset.policyId, minswapData!.factoryAuthAsset.tokenName)]:
+        1n,
+    }
+  };
+  emulator = new Emulator([ACCOUNT_0, ACCOUNT_1, factoryAccount]);
   lucid = await Translucent.new(emulator);
   emulator.awaitBlock(10_000); // For validity ranges to be valid
   lucid.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
@@ -59,6 +79,9 @@ beforeEach(async () => {
       .newTx()
       .registerStake(lucid.utils.validatorToRewardAddress(validators!.orderSpendingValidator)),
   });
+
+  minswapValidators = collectMinswapValidators();
+  minswapDeployedValidators = await deployMinswapValidators(lucid, minswapValidators);
 });
 
 test("happy case - full flow", async () => {
@@ -66,6 +89,9 @@ test("happy case - full flow", async () => {
    * 1. Init Factory
    * 2. Create Treasury
    * 3. Deposit Order
+   * 4. Apply Orders
+   * 5. Create Pool
+   * 6. Redeem for LPs
    */
 
   // Step 1: Init Factory
@@ -85,15 +111,19 @@ test("happy case - full flow", async () => {
   expect(initFactoryTx).toBeTruthy();
 
   // Step 2: Create Treasury
+  const discoveryStartSlot = emulator.slot;
+  const discoveryEndSlot = discoveryStartSlot + 60 * 60 * 24 * 2; // 2 days
+  const encounterStartSlot = discoveryEndSlot + 60 * 60; // 1 hour
+
   const treasuryDatum: TreasuryValidatorValidateTreasury["datum"] = {
     baseAsset: baseAsset,
     raiseAsset: {
       policyId: "",
       assetName: "",
     },
-    discoveryStartTime: BigInt(new Date().getDate()),
-    discoveryEndTime: BigInt(new Date().getDate()),
-    encounterStartTime: BigInt(new Date().getDate()),
+    discoveryStartTime: BigInt(lucid.utils.slotToUnixTime(discoveryStartSlot)),
+    discoveryEndTime: BigInt(lucid.utils.slotToUnixTime(discoveryEndSlot)),
+    encounterStartTime: BigInt(lucid.utils.slotToUnixTime(encounterStartSlot)),
     owner: address2PlutusAddress(ACCOUNT_0.address),
     minimumRaise: null,
     maximumRaise: null,
@@ -121,9 +151,9 @@ test("happy case - full flow", async () => {
   });
   expect(createTreasuryTx).toBeTruthy();
 
-  // Step 3: Deposit 2 Orders
+  // Step 3: Deposit 81 Orders
   const pendingOrderTxIds: string[] = [];
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 81; i++) {
     const depositBuilder = buildDeposit({
       lucid,
       tx: lucid.newTx(),
@@ -195,6 +225,10 @@ test("happy case - full flow", async () => {
     txBuilder: applyOrderBuilder.txBuilder,
   });
   expect(applyOrderTx).toBeTruthy();
+
+  // Step 6: Create Pool
+  const waitSlots = encounterStartSlot - emulator.slot + 1;
+  emulator.awaitSlot(waitSlots);
 });
 
 // test("pay->spend always success contract", async () => {

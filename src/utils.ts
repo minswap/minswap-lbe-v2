@@ -5,10 +5,7 @@ import {
   type UTxO,
   type Address,
   getAddressDetails,
-  Constr,
-  Data,
   type Network,
-  type Credential,
 } from "translucent-cardano";
 import { SHA3 } from "sha3";
 import {

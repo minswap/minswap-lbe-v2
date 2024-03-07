@@ -207,12 +207,12 @@ export function buildDeposit({
   const orderValue: Assets =
     raiseAsset.policyId === "" && raiseAsset.assetName === ""
       ? {
-          lovelace: amount + 2000000n,
-        }
+        lovelace: amount + 2000000n,
+      }
       : {
-          lovelace: 2000000n,
-          [toUnit(raiseAsset.policyId, raiseAsset.assetName)]: amount,
-        };
+        lovelace: 2000000n,
+        [toUnit(raiseAsset.policyId, raiseAsset.assetName)]: amount,
+      };
   const metadata = {
     msg: [`Minswap V2: LBE Deposit.`],
   };
@@ -371,5 +371,33 @@ export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOpt
   }
   return {
     txBuilder: txBuilder,
+  };
+}
+
+export type BuildCreateAmmPoolOptions = {
+  treasuryUTxO: UTxO;
+};
+
+export function buildCreateAmmPool(options: BaseBuildOptions & BuildCreateAmmPoolOptions) {
+  const {
+    tx,
+    validatorRefs: { validators, deployedValidators },
+    treasuryUTxO,
+  } = options;
+  const treasuryRedeemer: TreasuryValidatorValidateTreasury["redeemer"] = "CreatePool";
+  const metadata = {
+    msg: [`Minswap V2: LBE Create AMM Pool.`],
+  };
+  const txBuilder = tx
+    .readFrom([deployedValidators["treasuryValidator"]])
+    .collectFrom(
+      [treasuryUTxO],
+      Data.to(treasuryRedeemer, TreasuryValidatorValidateTreasury.redeemer),
+    )
+    .payToAddressWithData(treasuryUTxO.address, { inline: "" }, {})
+    .attachMetadata(674, metadata);
+
+  return {
+    txBuilder,
   };
 }
