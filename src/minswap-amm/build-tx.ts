@@ -1,4 +1,10 @@
-import { Data, Translucent, toUnit, type Tx, type UTxO } from "translucent-cardano";
+import {
+  Data,
+  Translucent,
+  toUnit,
+  type Tx,
+  type UTxO,
+} from "translucent-cardano";
 import type { MinswapValidators } from ".";
 import {
   computeLPAssetName,
@@ -34,7 +40,14 @@ export type BuildCreatePoolOptions = {
 };
 
 export function buildCreatePool(options: BuildCreatePoolOptions) {
-  const { lucid, pool, tx, factoryUTxO, minswapValidators, minswapDeployedValidators } = options;
+  const {
+    lucid,
+    pool,
+    tx,
+    factoryUTxO,
+    minswapValidators,
+    minswapDeployedValidators,
+  } = options;
   const factoryRedeemer: FactoryValidatorValidateFactory["redeemer"] = {
     assetA: pool.assetA,
     assetB: pool.assetB,
@@ -72,22 +85,29 @@ export function buildCreatePool(options: BuildCreatePoolOptions) {
     [factoryAuthAsset]: 1n,
     [poolLpAsset]: 9_223_372_036_854_775_807n,
   };
-  const initialLiquidity = calculateInitialLiquidity(pool.amountA, pool.amountB);
-  const remainingLiquidity = DEX_V2_MAX_LIQUIDITY - (initialLiquidity - MINIMUM_LIQUIDITY);
+  const initialLiquidity = calculateInitialLiquidity(
+    pool.amountA,
+    pool.amountB,
+  );
+  const remainingLiquidity =
+    DEX_V2_MAX_LIQUIDITY - (initialLiquidity - MINIMUM_LIQUIDITY);
   const poolAssets = {
     lovelace: DEX_V2_DEFAULT_POOL_ADA,
     [toUnit(pool.assetB.policyId, pool.assetB.assetName)]: pool.amountB,
     [poolAuthAsset]: 1n,
     [poolLpAsset]: remainingLiquidity,
   };
-  if (pool.assetA.policyId === "" && pool.assetB.assetName === "") {
+  if (pool.assetA.policyId === "" && pool.assetA.assetName === "") {
     poolAssets["lovelace"] += pool.amountA;
   } else {
-    poolAssets[toUnit(pool.assetA.policyId, pool.assetA.assetName)] = pool.amountA;
+    poolAssets[toUnit(pool.assetA.policyId, pool.assetA.assetName)] =
+      pool.amountA;
   }
   const poolDatum: PoolValidatorValidatePool["datum"] = {
     poolBatchingStakeCredential: validatorHash2StakeCredential(
-      lucid.utils.validatorToScriptHash(minswapValidators!.poolBatchingValidator),
+      lucid.utils.validatorToScriptHash(
+        minswapValidators!.poolBatchingValidator,
+      ),
     ),
     assetA: pool.assetA,
     assetB: pool.assetB,
@@ -105,19 +125,31 @@ export function buildCreatePool(options: BuildCreatePoolOptions) {
       minswapDeployedValidators["poolValidator"],
       minswapDeployedValidators["factoryValidator"],
     ])
-    .collectFrom([factoryUTxO], Data.to(factoryRedeemer, FactoryValidatorValidateFactory.redeemer))
-    .mintAssets(mintAssets, Data.to("CreatePool", AuthenMintingPolicyValidateAuthen.redeemer))
+    .collectFrom(
+      [factoryUTxO],
+      Data.to(factoryRedeemer, FactoryValidatorValidateFactory.redeemer),
+    )
+    .mintAssets(
+      mintAssets,
+      Data.to("CreatePool", AuthenMintingPolicyValidateAuthen.redeemer),
+    )
     .payToAddressWithData(
       factoryUTxO.address,
       {
-        inline: Data.to(headFactoryDatum, FactoryValidatorValidateFactory.datum),
+        inline: Data.to(
+          headFactoryDatum,
+          FactoryValidatorValidateFactory.datum,
+        ),
       },
       { ...factoryUTxO.assets },
     )
     .payToAddressWithData(
       factoryUTxO.address,
       {
-        inline: Data.to(tailFactoryDatum, FactoryValidatorValidateFactory.datum),
+        inline: Data.to(
+          tailFactoryDatum,
+          FactoryValidatorValidateFactory.datum,
+        ),
       },
       { ...factoryUTxO.assets },
     )

@@ -5,6 +5,7 @@ import {
   Emulator,
   Tx,
   type PrivateKey,
+  TxComplete,
 } from "translucent-cardano";
 
 export type GeneratedAccount = Awaited<ReturnType<typeof generateAccount>>;
@@ -30,7 +31,13 @@ export function quickSubmitBuilder(emulator: Emulator) {
     extraSignatures?: PrivateKey[];
     debug?: boolean;
   }) {
-    const completedTx = await txBuilder.complete();
+    let completedTx: TxComplete;
+    try {
+      completedTx = await txBuilder.complete();
+    } catch(err) {
+      console.error(err);
+      throw err;
+    }
     if (debug) {
       console.log("debug", completedTx.txComplete.to_json());
     }

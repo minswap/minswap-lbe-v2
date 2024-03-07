@@ -1,24 +1,47 @@
 import { beforeEach, expect, test } from "bun:test";
-import { coreToUtxo, Emulator, toUnit, Translucent, type Address, type UTxO, type OutputData, type Assets, Data } from "translucent-cardano";
+import {
+  Data,
+  Emulator,
+  Translucent,
+  toUnit,
+  type Address,
+  type Assets,
+  type OutputData,
+  type UTxO,
+} from "translucent-cardano";
 import type { TreasuryValidatorValidateTreasury } from "../../plutus";
 import {
   buildApplyOrders,
   buildCancelOrder,
+  buildCreateAmmPool,
   buildCreateTreasury,
   buildDeposit,
   buildInitFactory,
 } from "../build-tx";
-import { deployMinswapValidators, deployValidators } from "../deploy_validators";
+import {
+  deployMinswapValidators,
+  deployValidators,
+} from "../deploy_validators";
+import {
+  buildCreatePool,
+  collectMinswapValidators,
+  generateMinswapParams,
+  type GenerateMinswapParams,
+  type MinswapValidators,
+} from "../minswap-amm";
+import { FactoryValidatorValidateFactory } from "../minswap-amm/plutus";
 import {
   address2PlutusAddress,
   collectValidators,
-  type DeployedValidators,
   utxo2ORef,
+  type DeployedValidators,
   type Validators,
 } from "../utils";
-import { generateAccount, type GeneratedAccount, quickSubmitBuilder } from "./utils";
-import { generateMinswapParams, type GenerateMinswapParams, type MinswapValidators, collectMinswapValidators } from "../minswap-amm";
-import { FactoryValidatorValidateFactory } from "../minswap-amm/plutus";
+import {
+  generateAccount,
+  quickSubmitBuilder,
+  type GeneratedAccount,
+} from "./utils";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -48,19 +71,28 @@ beforeEach(async () => {
     lovelace: 2000000000000000000n,
   });
   minswapData = generateMinswapParams();
-  const factoryAccount: { address: Address; outputData: OutputData; assets: Assets } = {
+  const factoryAccount: {
+    address: Address;
+    outputData: OutputData;
+    assets: Assets;
+  } = {
     address: minswapData!.factoryAddress,
     outputData: {
-      inline: Data.to({
-        head: "00",
-        tail: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
-      }, FactoryValidatorValidateFactory.datum)
+      inline: Data.to(
+        {
+          head: "00",
+          tail: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
+        },
+        FactoryValidatorValidateFactory.datum,
+      ),
     },
     assets: {
       lovelace: 10_000_000n,
-      [toUnit(minswapData!.factoryAuthAsset.policyId, minswapData!.factoryAuthAsset.tokenName)]:
-        1n,
-    }
+      [toUnit(
+        minswapData!.factoryAuthAsset.policyId,
+        minswapData!.factoryAuthAsset.tokenName,
+      )]: 1n,
+    },
   };
   emulator = new Emulator([ACCOUNT_0, ACCOUNT_1, factoryAccount]);
   lucid = await Translucent.new(emulator);
@@ -77,11 +109,18 @@ beforeEach(async () => {
   await quickSubmitBuilder(emulator)({
     txBuilder: lucid
       .newTx()
-      .registerStake(lucid.utils.validatorToRewardAddress(validators!.orderSpendingValidator)),
+      .registerStake(
+        lucid.utils.validatorToRewardAddress(
+          validators!.orderSpendingValidator,
+        ),
+      ),
   });
 
   minswapValidators = collectMinswapValidators();
-  minswapDeployedValidators = await deployMinswapValidators(lucid, minswapValidators);
+  minswapDeployedValidators = await deployMinswapValidators(
+    lucid,
+    minswapValidators,
+  );
 });
 
 test("happy case - full flow", async () => {
@@ -143,7 +182,9 @@ test("happy case - full flow", async () => {
     },
     treasuryDatum,
     factoryUtxo: (
-      await emulator.getUtxos(lucid.utils.validatorToAddress(validators!.factoryValidator))
+      await emulator.getUtxos(
+        lucid.utils.validatorToAddress(validators!.factoryValidator),
+      )
     ).find((u) => !u.scriptRef) as UTxO,
   });
   const createTreasuryTx = await quickSubmitBuilder(emulator)({
@@ -204,8 +245,10 @@ test("happy case - full flow", async () => {
       outputIndex: 0,
     })),
   );
-  const treasuryUTxO = (
-    await emulator.getUtxos(lucid.utils.validatorToAddress(validators!.treasuryValidator))
+  let treasuryUTxO = (
+    await emulator.getUtxos(
+      lucid.utils.validatorToAddress(validators!.treasuryValidator),
+    )
   ).find((u) => u.scriptRef === undefined)!;
   let validFrom = lucid.utils.slotToUnixTime(emulator.slot);
   let validTo = lucid.utils.slotToUnixTime(emulator.slot + 60 * 10);
@@ -229,6 +272,45 @@ test("happy case - full flow", async () => {
   // Step 6: Create Pool
   const waitSlots = encounterStartSlot - emulator.slot + 1;
   emulator.awaitSlot(waitSlots);
+  treasuryUTxO = treasuryUTxO = (
+    await emulator.getUtxos(
+      lucid.utils.validatorToAddress(validators!.treasuryValidator),
+    )
+  ).find((u) => u.scriptRef === undefined)!;
+  const ammFactoryUTxO = await emulator.getUtxoByUnit(
+    toUnit(
+      minswapData!.factoryAuthAsset.policyId,
+      minswapData!.factoryAuthAsset.tokenName,
+    ),
+  );
+  const buildCreatePoolResult = buildCreateAmmPool({
+    lucid,
+    tx: lucid.newTx(),
+    validatorRefs: {
+      validators,
+      deployedValidators,
+    },
+    treasuryUTxO,
+    ammPolicyId: minswapData["poolHash"],
+  });
+  const buildAmmPoolResult = buildCreatePool({
+    lucid,
+    tx: buildCreatePoolResult.txBuilder,
+    minswapValidators,
+    minswapDeployedValidators,
+    factoryUTxO: ammFactoryUTxO,
+    pool: {
+      assetA: buildCreatePoolResult.assetA,
+      assetB: buildCreatePoolResult.assetB,
+      amountA: buildCreatePoolResult.amountA,
+      amountB: buildCreatePoolResult.amountB,
+      tradingFeeNumerator: 30n,
+    },
+  });
+  const buildAmmPoolTx = await quickSubmitBuilder(emulator)({
+    txBuilder: buildAmmPoolResult.txBuilder,
+  });
+  expect(buildAmmPoolTx).toBeTruthy();
 });
 
 // test("pay->spend always success contract", async () => {

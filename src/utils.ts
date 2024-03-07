@@ -52,7 +52,9 @@ export function utxo2ORef(utxo: UTxO): OutputReference {
   };
 }
 
-export function validatorHash2StakeCredential(scriptHash: string): StakeCredential {
+export function validatorHash2StakeCredential(
+  scriptHash: string,
+): StakeCredential {
   return {
     Inline: [
       {
@@ -62,13 +64,24 @@ export function validatorHash2StakeCredential(scriptHash: string): StakeCredenti
   };
 }
 
-export function collectValidators(lucid: Translucent, seedTxIn: OutputReference) {
+export function collectValidators(
+  lucid: Translucent,
+  seedTxIn: OutputReference,
+) {
   const authenValidator = new AuthenMintingPolicyValidateAuthen(seedTxIn);
-  const authenValidatorHash = lucid.utils.validatorToScriptHash(authenValidator);
-  const treasuryValidator = new TreasuryValidatorValidateTreasury(authenValidatorHash);
-  const treasuryValidatorHash = lucid.utils.validatorToScriptHash(treasuryValidator);
-  const orderSpendingValidator = new OrderValidatorValidateOrderSpending(treasuryValidatorHash);
-  const orderSpendingValidatorHash = lucid.utils.validatorToScriptHash(orderSpendingValidator);
+  const authenValidatorHash =
+    lucid.utils.validatorToScriptHash(authenValidator);
+  const treasuryValidator = new TreasuryValidatorValidateTreasury(
+    authenValidatorHash,
+  );
+  const treasuryValidatorHash =
+    lucid.utils.validatorToScriptHash(treasuryValidator);
+  const orderSpendingValidator = new OrderValidatorValidateOrderSpending(
+    treasuryValidatorHash,
+  );
+  const orderSpendingValidatorHash = lucid.utils.validatorToScriptHash(
+    orderSpendingValidator,
+  );
   const stakeCredential: StakeCredential = validatorHash2StakeCredential(
     orderSpendingValidatorHash,
   );
@@ -108,13 +121,17 @@ export function toScriptRef(script: Script): C.ScriptRef {
     case "PlutusV1":
       return C.ScriptRef.new(
         C.Script.new_plutus_v1(
-          C.PlutusV1Script.from_bytes(fromHex(applyDoubleCborEncoding(script.script))),
+          C.PlutusV1Script.from_bytes(
+            fromHex(applyDoubleCborEncoding(script.script)),
+          ),
         ),
       );
     case "PlutusV2":
       return C.ScriptRef.new(
         C.Script.new_plutus_v2(
-          C.PlutusV2Script.from_bytes(fromHex(applyDoubleCborEncoding(script.script))),
+          C.PlutusV2Script.from_bytes(
+            fromHex(applyDoubleCborEncoding(script.script)),
+          ),
         ),
       );
     default:
@@ -124,7 +141,9 @@ export function toScriptRef(script: Script): C.ScriptRef {
 
 export function fromHex(hex: string): Uint8Array {
   const matched = hex.match(/.{1,2}/g);
-  return new Uint8Array(matched ? matched.map((byte) => parseInt(byte, 16)) : []);
+  return new Uint8Array(
+    matched ? matched.map((byte) => parseInt(byte, 16)) : [],
+  );
 }
 
 export function toHex(bytes: Uint8Array): string {
@@ -136,7 +155,9 @@ export function toHex(bytes: Uint8Array): string {
 /** Returns double cbor encoded script. If script is already double cbor encoded it's returned as it is. */
 export function applyDoubleCborEncoding(script: string): string {
   try {
-    C.PlutusV2Script.from_bytes(C.PlutusV2Script.from_bytes(fromHex(script)).bytes());
+    C.PlutusV2Script.from_bytes(
+      C.PlutusV2Script.from_bytes(fromHex(script)).bytes(),
+    );
     return script;
   } catch (_e) {
     return toHex(C.PlutusV2Script.new(fromHex(script)).to_bytes());
@@ -213,24 +234,36 @@ export function address2PlutusAddress(address: Address): PlutusAddress {
   };
 }
 
-export function plutusAddress2Address(network: Network, data: PlutusAddress): Address {
+export function plutusAddress2Address(
+  network: Network,
+  data: PlutusAddress,
+): Address {
   const networkId = network === "Mainnet" ? 1 : 0;
   let payment: C.StakeCredential;
   if ("VerificationKeyCredential" in data.paymentCredential) {
     const keyHash = data.paymentCredential.VerificationKeyCredential[0];
-    payment = C.StakeCredential.from_keyhash(C.Ed25519KeyHash.from_hex(keyHash));
+    payment = C.StakeCredential.from_keyhash(
+      C.Ed25519KeyHash.from_hex(keyHash),
+    );
   } else if ("ScriptCredential" in data.paymentCredential) {
     const scriptHash = data.paymentCredential.ScriptCredential[0];
-    payment = C.StakeCredential.from_scripthash(C.Ed25519KeyHash.from_hex(scriptHash));
+    payment = C.StakeCredential.from_scripthash(
+      C.Ed25519KeyHash.from_hex(scriptHash),
+    );
   }
   let stake: C.StakeCredential | undefined = undefined;
   if (data.stakeCredential && "Inline" in data.stakeCredential) {
     if ("VerificationKeyCredential" in data.stakeCredential.Inline[0]) {
-      const keyHash = data.stakeCredential.Inline[0].VerificationKeyCredential[0];
-      stake = C.StakeCredential.from_keyhash(C.Ed25519KeyHash.from_hex(keyHash));
+      const keyHash =
+        data.stakeCredential.Inline[0].VerificationKeyCredential[0];
+      stake = C.StakeCredential.from_keyhash(
+        C.Ed25519KeyHash.from_hex(keyHash),
+      );
     } else if ("ScriptCredential" in data.stakeCredential.Inline[0]) {
       const scriptHash = data.stakeCredential.Inline[0].ScriptCredential[0];
-      stake = C.StakeCredential.from_scripthash(C.Ed25519KeyHash.from_hex(scriptHash));
+      stake = C.StakeCredential.from_scripthash(
+        C.Ed25519KeyHash.from_hex(scriptHash),
+      );
     }
   }
   if (stake) {
@@ -261,5 +294,7 @@ function compareInput(a: UTxO, b: UTxO): number {
 export function findInputIndex(inputs: UTxO[], val: UTxO): number | undefined {
   return [...inputs]
     .sort(compareInput)
-    .findIndex((u) => u.txHash === val.txHash && u.outputIndex === val.outputIndex);
+    .findIndex(
+      (u) => u.txHash === val.txHash && u.outputIndex === val.outputIndex,
+    );
 }

@@ -22,6 +22,6 @@
   "dependencies": {
     "@deno/shim-deno": "~0.16.1",
     "sha3": "^2.1.4",
-    "translucent-cardano": "0.0.6"
+    "translucent-cardano": "^0.0.6"
   }
 }

@@ -1,4 +1,9 @@
-import { type Translucent, type Script, type Tx, type UTxO } from "translucent-cardano";
+import {
+  type Translucent,
+  type Script,
+  type Tx,
+  type UTxO,
+} from "translucent-cardano";
 import { toScriptRef, type DeployedValidators, type Validators } from "./utils";
 import type { MinswapValidators } from "./minswap-amm";
 
@@ -73,10 +78,17 @@ export async function deployValidators(
 ): Promise<DeployedValidators> {
   const deploymentsChain = [
     () => processElement(lucid, "authenValidator", validators!.authenValidator),
-    () => processElement(lucid, "treasuryValidator", validators!.treasuryValidator),
-    () => processElement(lucid, "orderSpendingValidator", validators!.orderSpendingValidator),
+    () =>
+      processElement(lucid, "treasuryValidator", validators!.treasuryValidator),
+    () =>
+      processElement(
+        lucid,
+        "orderSpendingValidator",
+        validators!.orderSpendingValidator,
+      ),
     () => processElement(lucid, "orderValidator", validators!.orderValidator),
-    () => processElement(lucid, "factoryValidator", validators!.factoryValidator),
+    () =>
+      processElement(lucid, "factoryValidator", validators!.factoryValidator),
   ];
   let res: DeployedValidators = {};
 
@@ -98,7 +110,8 @@ export async function deployMinswapValidators(
   const deploymentsChain = [
     () => processElement(lucid, "authenValidator", validators!.authenValidator),
     () => processElement(lucid, "poolValidator", validators!.poolValidator),
-    () => processElement(lucid, "factoryValidator", validators!.factoryValidator),
+    () =>
+      processElement(lucid, "factoryValidator", validators!.factoryValidator),
   ];
   let res: DeployedValidators = {};
 

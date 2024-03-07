@@ -22,6 +22,7 @@ import {
   TreasuryValidatorValidateTreasury,
   OrderValidatorValidateOrderSpending,
 } from "../plutus.ts";
+import { calculateInitialLiquidity } from "./minswap-amm/utils.ts";
 
 export const LBE_INIT_FACTORY_HEAD = "00";
 export const LBE_INIT_FACTORY_TAIL =
@@ -44,7 +45,8 @@ export function buildInitFactory({
   seedUtxo,
   tx,
 }: BaseBuildOptions & BuildInitFactoryOptions) {
-  const authenRedeemer: AuthenMintingPolicyValidateAuthen["redeemer"] = "MintFactoryAuthen";
+  const authenRedeemer: AuthenMintingPolicyValidateAuthen["redeemer"] =
+    "MintFactoryAuthen";
   const factoryDatum: FactoryValidatorValidateFactory["datum"] = {
     head: LBE_INIT_FACTORY_HEAD,
     tail: LBE_INIT_FACTORY_TAIL,
@@ -52,8 +54,12 @@ export function buildInitFactory({
   const metadata = {
     msg: [`Minswap V2: LBE Init Factory.`],
   };
-  const factoryAddress = lucid.utils.validatorToAddress(validators.factoryValidator);
-  const authenPolicyId = lucid.utils.validatorToScriptHash(validators.authenValidator);
+  const factoryAddress = lucid.utils.validatorToAddress(
+    validators.factoryValidator,
+  );
+  const authenPolicyId = lucid.utils.validatorToScriptHash(
+    validators.authenValidator,
+  );
   const factoryAuthAssets = {
     [toUnit(authenPolicyId, "4d53")]: 1n,
   };
@@ -90,9 +96,14 @@ export function buildCreateTreasury({
   factoryUtxo,
   treasuryDatum,
 }: BaseBuildOptions & BuildCreateTreasury) {
-  const authenRedeemer: AuthenMintingPolicyValidateAuthen["redeemer"] = "CreateTreasury";
-  const authenPolicyId = lucid.utils.validatorToScriptHash(validators.authenValidator);
-  const treasuryAddress = lucid.utils.validatorToAddress(validators!.treasuryValidator);
+  const authenRedeemer: AuthenMintingPolicyValidateAuthen["redeemer"] =
+    "CreateTreasury";
+  const authenPolicyId = lucid.utils.validatorToScriptHash(
+    validators.authenValidator,
+  );
+  const treasuryAddress = lucid.utils.validatorToAddress(
+    validators!.treasuryValidator,
+  );
   const factoryRedeemer: FactoryValidatorValidateFactory["redeemer"] = {
     baseAsset: treasuryDatum.baseAsset,
     raiseAsset: treasuryDatum.raiseAsset,
@@ -126,8 +137,14 @@ export function buildCreateTreasury({
     msg: [`Minswap V2: LBE Create Treasury.`],
   };
   const txBuilder = tx
-    .readFrom([deployedValidators["authenValidator"], deployedValidators["factoryValidator"]])
-    .collectFrom([factoryUtxo], Data.to(factoryRedeemer, FactoryValidatorValidateFactory.redeemer))
+    .readFrom([
+      deployedValidators["authenValidator"],
+      deployedValidators["factoryValidator"],
+    ])
+    .collectFrom(
+      [factoryUtxo],
+      Data.to(factoryRedeemer, FactoryValidatorValidateFactory.redeemer),
+    )
     .mintAssets(
       {
         ...treasuryAuthAssets,
@@ -139,14 +156,20 @@ export function buildCreateTreasury({
     .payToAddressWithData(
       factoryUtxo.address,
       {
-        inline: Data.to(newFactoryHeadDatum, FactoryValidatorValidateFactory.datum),
+        inline: Data.to(
+          newFactoryHeadDatum,
+          FactoryValidatorValidateFactory.datum,
+        ),
       },
       factoryAuthAssets,
     )
     .payToAddressWithData(
       factoryUtxo.address,
       {
-        inline: Data.to(newFactoryTailDatum, FactoryValidatorValidateFactory.datum),
+        inline: Data.to(
+          newFactoryTailDatum,
+          FactoryValidatorValidateFactory.datum,
+        ),
       },
       factoryAuthAssets,
     )
@@ -158,8 +181,10 @@ export function buildCreateTreasury({
       {
         ...treasuryAuthAssets,
         ...treasuryLpAssets,
-        [toUnit(treasuryDatum.baseAsset.policyId, treasuryDatum.baseAsset.assetName)]:
-          treasuryDatum.reserveBase,
+        [toUnit(
+          treasuryDatum.baseAsset.policyId,
+          treasuryDatum.baseAsset.assetName,
+        )]: treasuryDatum.reserveBase,
       },
     )
     .attachMetadata(674, metadata);
@@ -207,16 +232,18 @@ export function buildDeposit({
   const orderValue: Assets =
     raiseAsset.policyId === "" && raiseAsset.assetName === ""
       ? {
-        lovelace: amount + 2000000n,
-      }
+          lovelace: amount + 2000000n,
+        }
       : {
-        lovelace: 2000000n,
-        [toUnit(raiseAsset.policyId, raiseAsset.assetName)]: amount,
-      };
+          lovelace: 2000000n,
+          [toUnit(raiseAsset.policyId, raiseAsset.assetName)]: amount,
+        };
   const metadata = {
     msg: [`Minswap V2: LBE Deposit.`],
   };
-  const orderAddress = lucid.utils.validatorToAddress(validators!.orderValidator);
+  const orderAddress = lucid.utils.validatorToAddress(
+    validators!.orderValidator,
+  );
   const txBuilder = tx
     .payToAddressWithData(
       orderAddress,
@@ -236,7 +263,9 @@ export type BuildCancelOrderOptions = {
   utxo: UTxO;
 };
 
-export function buildCancelOrder(options: BaseBuildOptions & BuildCancelOrderOptions) {
+export function buildCancelOrder(
+  options: BaseBuildOptions & BuildCancelOrderOptions,
+) {
   const {
     validatorRefs: { deployedValidators },
     tx,
@@ -275,7 +304,9 @@ function getPurrAssetName(datum: TreasuryValidatorValidateTreasury["datum"]) {
   return lpAssetName;
 }
 
-export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOptions) {
+export function buildApplyOrders(
+  options: BaseBuildOptions & BuildApplyOrdersOptions,
+) {
   const {
     lucid,
     tx,
@@ -285,19 +316,26 @@ export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOpt
     validFrom,
     validTo,
   } = options;
-  const treasuryRedeemer: TreasuryValidatorValidateTreasury["redeemer"] = "Batching";
+  const treasuryRedeemer: TreasuryValidatorValidateTreasury["redeemer"] =
+    "Batching";
   const orderRedeemer: OrderValidatorFeedType["_redeemer"] = "ApplyOrder";
   const orderRewardAddress = lucid.utils.validatorToRewardAddress(
     validators!.orderSpendingValidator,
   );
-  const orderBatchingRedeemer: OrderValidatorValidateOrderSpending["redeemer"] = {
-    treasuryInputIndex: BigInt(findInputIndex([...orderUTxOs, treasuryUTxO], treasuryUTxO)!),
-  };
+  const orderBatchingRedeemer: OrderValidatorValidateOrderSpending["redeemer"] =
+    {
+      treasuryInputIndex: BigInt(
+        findInputIndex([...orderUTxOs, treasuryUTxO], treasuryUTxO)!,
+      ),
+    };
   const applyTreasury = (): {
     newTreasuryDatum: string;
     newTreasuryAssets: Assets;
   } => {
-    const treasuryDatum = Data.from(treasuryUTxO.datum!, TreasuryValidatorValidateTreasury.datum);
+    const treasuryDatum = Data.from(
+      treasuryUTxO.datum!,
+      TreasuryValidatorValidateTreasury.datum,
+    );
     const treasuryValue = {
       ...treasuryUTxO.assets,
     };
@@ -324,7 +362,10 @@ export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOpt
       }
     }
     return {
-      newTreasuryDatum: Data.to(treasuryDatum, TreasuryValidatorValidateTreasury.datum),
+      newTreasuryDatum: Data.to(
+        treasuryDatum,
+        TreasuryValidatorValidateTreasury.datum,
+      ),
       newTreasuryAssets: treasuryValue,
     };
   };
@@ -342,11 +383,17 @@ export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOpt
       [treasuryUTxO],
       Data.to(treasuryRedeemer, TreasuryValidatorValidateTreasury.redeemer),
     )
-    .collectFrom(orderUTxOs, Data.to(orderRedeemer, OrderValidatorFeedType._redeemer))
+    .collectFrom(
+      orderUTxOs,
+      Data.to(orderRedeemer, OrderValidatorFeedType._redeemer),
+    )
     .withdraw(
       orderRewardAddress,
       0n,
-      Data.to(orderBatchingRedeemer, OrderValidatorValidateOrderSpending.redeemer),
+      Data.to(
+        orderBatchingRedeemer,
+        OrderValidatorValidateOrderSpending.redeemer,
+      ),
     )
     .payToAddressWithData(
       treasuryUTxO.address,
@@ -364,8 +411,10 @@ export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOpt
     const owner = plutusAddress2Address(lucid.network, orderDatum.owner);
     const assets = {
       lovelace: 1_500_000n,
-      [toUnit(orderDatum.expectOutputAsset.policyId, orderDatum.expectOutputAsset.assetName)]:
-        orderDatum.minimumReceive,
+      [toUnit(
+        orderDatum.expectOutputAsset.policyId,
+        orderDatum.expectOutputAsset.assetName,
+      )]: orderDatum.minimumReceive,
     };
     txBuilder.payToAddress(owner, assets);
   }
@@ -376,28 +425,85 @@ export function buildApplyOrders(options: BaseBuildOptions & BuildApplyOrdersOpt
 
 export type BuildCreateAmmPoolOptions = {
   treasuryUTxO: UTxO;
+  ammPolicyId: string;
 };
 
-export function buildCreateAmmPool(options: BaseBuildOptions & BuildCreateAmmPoolOptions) {
+export function buildCreateAmmPool(
+  options: BaseBuildOptions & BuildCreateAmmPoolOptions,
+) {
   const {
     tx,
-    validatorRefs: { validators, deployedValidators },
+    validatorRefs: { deployedValidators },
     treasuryUTxO,
+    ammPolicyId,
   } = options;
-  const treasuryRedeemer: TreasuryValidatorValidateTreasury["redeemer"] = "CreatePool";
+  const treasuryRedeemer: TreasuryValidatorValidateTreasury["redeemer"] =
+    "CreatePool";
   const metadata = {
     msg: [`Minswap V2: LBE Create AMM Pool.`],
   };
+  const treasuryDatum: TreasuryValidatorValidateTreasury["datum"] = Data.from(
+    treasuryUTxO.datum!,
+    TreasuryValidatorValidateTreasury.datum,
+  );
+  const totalLiquidity = calculateInitialLiquidity(
+    treasuryDatum.reserveBase,
+    treasuryDatum.reserveRaise,
+  );
+  const newTreasuryDatum: TreasuryValidatorValidateTreasury["datum"] = {
+    ...treasuryDatum,
+    isCreatedPool: 1n,
+    totalLiquidity,
+  };
+  const convertUnit = (a: { policyId: string; assetName: string }): string => {
+    const unit = a.policyId + a.assetName;
+    return unit === "" ? "lovelace" : unit;
+  };
+  const baseAssetUnit = convertUnit(treasuryDatum.baseAsset);
+  const raiseAssetUnit = convertUnit(treasuryDatum.raiseAsset);
+  const lpAssetName = computeLPAssetName(baseAssetUnit, raiseAssetUnit);
+  const treasuryAssets: Assets = {
+    ...treasuryUTxO.assets,
+    [ammPolicyId + lpAssetName]: totalLiquidity,
+    [baseAssetUnit]:
+      treasuryUTxO.assets[baseAssetUnit] - treasuryDatum.reserveBase,
+    [raiseAssetUnit]:
+      treasuryUTxO.assets[raiseAssetUnit] - treasuryDatum.reserveBase,
+  };
+  let assetA = treasuryDatum.baseAsset;
+  let assetB = treasuryDatum.raiseAsset;
+  let amountA = treasuryDatum.reserveBase;
+  let amountB = treasuryDatum.reserveRaise;
+  if (
+    assetA.policyId > assetB.policyId ||
+    (assetA.policyId === assetB.policyId && assetA.assetName > assetB.assetName)
+  ) {
+    [assetA, assetB] = [assetB, assetA];
+    [amountA, amountB] = [amountB, amountA];
+  }
   const txBuilder = tx
     .readFrom([deployedValidators["treasuryValidator"]])
     .collectFrom(
       [treasuryUTxO],
       Data.to(treasuryRedeemer, TreasuryValidatorValidateTreasury.redeemer),
     )
-    .payToAddressWithData(treasuryUTxO.address, { inline: "" }, {})
+    .payToAddressWithData(
+      treasuryUTxO.address,
+      {
+        inline: Data.to(
+          newTreasuryDatum,
+          TreasuryValidatorValidateTreasury.datum,
+        ),
+      },
+      treasuryAssets,
+    )
     .attachMetadata(674, metadata);
 
   return {
     txBuilder,
+    assetA,
+    assetB,
+    amountA,
+    amountB,
   };
 }
