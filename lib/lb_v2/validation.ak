@@ -1,8 +1,6 @@
 use aiken/builtin
-use aiken/cbor
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
-use aiken/math
 use aiken/transaction.{
   InlineDatum, Input, Output, OutputReference, ValidityRange,
 }
@@ -16,6 +14,7 @@ use lb_v2/types.{
   ValidatorHash,
 }
 use lb_v2/utils.{
+  amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
   compute_lp_asset_name, factory_auth_an, sort_two_assets, treasury_auth_an,
 }
 
@@ -245,12 +244,7 @@ pub fn get_treasury_output(
   treasury_output
 }
 
-pub fn get_amm_pool_datum(
-  outputs: List<Output>,
-  amm_authen_policy_id: PolicyId,
-  amm_pool_auth_asset_name: AssetName,
-  amm_pool_validation_hash: ValidatorHash,
-) -> Data {
+pub fn get_amm_pool_datum(outputs: List<Output>) -> Data {
   expect [Output { datum: InlineDatum(raw_datum), .. }] =
     list.filter(
       outputs,
@@ -276,12 +270,9 @@ pub fn get_amm_pool_datum(
 pub fn validate_create_dex_pool(
   treasury_in_datum: TreasuryDatum,
   treasury_output: Output,
-  all_outputs: List<Output>,
   datums: DatumMap,
   validity_range: ValidityRange,
   mint_value: Value,
-  amm_authen_policy_id: PolicyId,
-  amm_pool_auth_asset_name: AssetName,
   amm_pool_datum: PoolDatum,
 ) -> Bool {
   expect Interval {
@@ -295,7 +286,6 @@ pub fn validate_create_dex_pool(
     base_asset,
     raise_asset,
     encounter_start_time,
-    owner,
     minimum_raise,
     maximum_raise,
     reserve_base,
@@ -338,7 +328,6 @@ pub fn validate_create_dex_pool(
     asset_b: pool_asset_b,
     reserve_a: pool_reserve_a,
     reserve_b: pool_reserve_b,
-    total_liquidity: pool_total_liquidity,
     ..
   } = amm_pool_datum
   let Output { value: treasury_out_value, datum: treasury_out_datum_raw, .. } =
@@ -350,19 +339,9 @@ pub fn validate_create_dex_pool(
     }
   expect TreasuryDatum {
     total_liquidity: out_datum_total_liquidity,
-    is_created_pool: 0,
+    is_created_pool: 1,
     ..
   } = treasury_out_datum
-  expect [Output { value: owner_output_value, .. }] =
-    list.filter(
-      all_outputs,
-      fn(output) {
-        let Output { address, .. } = output
-        address == owner
-      },
-    )
-  let owner_total_liquidity =
-    value.quantity_of(owner_output_value, amm_authen_policy_id, lp_asset_name)
   let treasury_total_liquidity =
     value.quantity_of(treasury_out_value, amm_authen_policy_id, lp_asset_name)
   and {
@@ -376,11 +355,8 @@ pub fn validate_create_dex_pool(
     datum_in_reserve_a == pool_reserve_a,
     datum_in_reserve_b == pool_reserve_b,
     out_datum_total_liquidity == treasury_total_liquidity,
-    math.abs(
-      treasury_total_liquidity + treasury_total_liquidity - pool_total_liquidity,
-    ) <= 1,
-    owner_total_liquidity == pool_total_liquidity - treasury_total_liquidity,
   }
+  // TODO: check owner lp
 }
 
 pub fn validate_order_time(
@@ -662,8 +638,6 @@ pub fn apply_orders(
     let in_value = order_in_values |> builtin.head_list
     let Output { value: out_value, address: out_address, .. } =
       order_outputs |> builtin.head_list
-    trace cbor.diagnostic(out_address)
-    trace cbor.diagnostic(owner)
     expect out_address == owner
     let params =
       ApplyOrderParams {

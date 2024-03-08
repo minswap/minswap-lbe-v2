@@ -288,6 +288,7 @@ test("happy case - full flow", async () => {
       minswapData!.factoryAuthAsset.tokenName,
     ),
   );
+  const createPoolValidFrom = lucid.utils.slotToUnixTime(emulator.slot);
   const buildCreatePoolResult = buildCreateAmmPool({
     lucid,
     tx: lucid.newTx(),
@@ -297,6 +298,7 @@ test("happy case - full flow", async () => {
     },
     treasuryUTxO,
     ammAuthenPolicyId: minswapData["authenPolicyId"],
+    validFrom: createPoolValidFrom,
   });
   const buildAmmPoolResult = buildCreatePool({
     lucid,
@@ -314,11 +316,9 @@ test("happy case - full flow", async () => {
   });
   const buildAmmPoolTx = await quickSubmitBuilder(emulator)({
     txBuilder: buildAmmPoolResult.txBuilder,
-    debug: true,
   });
   expect(buildAmmPoolTx).toBeTruthy();
-  const debugUTxOs = await emulator.getUtxos(treasuryUTxO.address);
-  console.log(debugUTxOs);
+  console.info("build AMM Pool done");
 });
 
 test("test only create AMM Pool", async () => {
@@ -345,7 +345,6 @@ test("test only create AMM Pool", async () => {
   const result = buildCreatePool(options);
   const tx = await quickSubmitBuilder(emulator)({
     txBuilder: result.txBuilder,
-    debug: false,
   });
   expect(tx).toBeTruthy();
 });

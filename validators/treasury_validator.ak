@@ -56,13 +56,7 @@ validator(authen_policy_id: PolicyId) {
     let mint_value = from_minted_value(mint)
     when redeemer is {
       CreatePool -> {
-        expect amm_pool_datum: PoolDatum =
-          get_amm_pool_datum(
-            outputs,
-            amm_authen_policy_id,
-            amm_pool_auth_asset_name,
-            amm_pool_validation_hash,
-          )
+        expect amm_pool_datum: PoolDatum = get_amm_pool_datum(outputs)
         let TreasuryDatum { order_hash, .. } = datum
         //* Should not spend any UTxOs associated with AMM Order Script, as it could lead to unexpected behavior or loss of funds.
         expect [] =
@@ -81,12 +75,9 @@ validator(authen_policy_id: PolicyId) {
         validate_create_dex_pool(
           treasury_in_datum: datum,
           treasury_output: treasury_output,
-          all_outputs: outputs,
           datums: datums,
           validity_range: validity_range,
           mint_value: mint_value,
-          amm_authen_policy_id: amm_authen_policy_id,
-          amm_pool_auth_asset_name: amm_pool_auth_asset_name,
           amm_pool_datum: amm_pool_datum,
         )
       }

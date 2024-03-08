@@ -428,6 +428,7 @@ export function buildApplyOrders(
 export type BuildCreateAmmPoolOptions = {
   treasuryUTxO: UTxO;
   ammAuthenPolicyId: string;
+  validFrom: UnixTime;
 };
 
 export function buildCreateAmmPool(
@@ -438,8 +439,8 @@ export function buildCreateAmmPool(
     validatorRefs: { deployedValidators },
     treasuryUTxO,
     ammAuthenPolicyId,
+    validFrom,
   } = options;
-  console.log(treasuryUTxO);
   const treasuryRedeemer: TreasuryValidatorValidateTreasury["redeemer"] =
     "CreatePool";
   const metadata = {
@@ -456,25 +457,20 @@ export function buildCreateAmmPool(
   const newTreasuryDatum: TreasuryValidatorValidateTreasury["datum"] = {
     ...treasuryDatum,
     isCreatedPool: 1n,
-    totalLiquidity,
+    totalLiquidity: totalLiquidity - 10n,
   };
-  const convertUnit = (a: { policyId: string; assetName: string }): string => {
-    const unit = a.policyId + a.assetName;
-    return unit === "" ? "lovelace" : unit;
-  };
-  const baseAssetUnit = convertUnit(treasuryDatum.baseAsset);
-  const raiseAssetUnit = convertUnit(treasuryDatum.raiseAsset);
-  const lpAssetName = computeLPAssetName(baseAssetUnit, raiseAssetUnit);
+  // const convertUnit = (a: { policyId: string; assetName: string }): string => {
+  //   const unit = a.policyId + a.assetName;
+  //   return unit === "" ? "lovelace" : unit;
+  // };
+  // const baseAssetUnit = convertUnit(treasuryDatum.baseAsset);
+  // const raiseAssetUnit = convertUnit(treasuryDatum.raiseAsset);
+  const lpAssetName = computeLPAssetName(
+    treasuryDatum.baseAsset.policyId + treasuryDatum.baseAsset.assetName,
+    treasuryDatum.raiseAsset.policyId + treasuryDatum.raiseAsset.assetName,
+  );
   const lpAssetUnit = toUnit(ammAuthenPolicyId, lpAssetName);
-  const treasuryAssets: Assets = {
-    ...treasuryUTxO.assets,
-    [baseAssetUnit]:
-      treasuryUTxO.assets[baseAssetUnit] - treasuryDatum.reserveBase,
-    [raiseAssetUnit]:
-      treasuryUTxO.assets[raiseAssetUnit] - treasuryDatum.reserveRaise,
-    [lpAssetUnit]: totalLiquidity,
-  };
-  console.log("treasuryAssets", treasuryAssets);
+
   let assetA = treasuryDatum.baseAsset;
   let assetB = treasuryDatum.raiseAsset;
   let amountA = treasuryDatum.reserveBase;
@@ -500,8 +496,14 @@ export function buildCreateAmmPool(
           TreasuryValidatorValidateTreasury.datum,
         ),
       },
-      treasuryAssets,
+      {
+        lovelace: 2_000_000n,
+        d477745afecb70aa3c754c2b6d987e92a7b73337508b3c36358ec08b4d5350: 1n,
+        [lpAssetUnit]: 262678510722n,
+      },
+      // treasuryAssets,
     )
+    .validFrom(validFrom)
     .attachMetadata(674, metadata);
 
   return {
