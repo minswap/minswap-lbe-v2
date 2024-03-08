@@ -270,7 +270,6 @@ pub fn get_amm_pool_datum(outputs: List<Output>) -> Data {
 pub fn validate_create_dex_pool(
   treasury_in_datum: TreasuryDatum,
   treasury_output: Output,
-  datums: DatumMap,
   validity_range: ValidityRange,
   mint_value: Value,
   amm_pool_datum: PoolDatum,
@@ -330,13 +329,12 @@ pub fn validate_create_dex_pool(
     reserve_b: pool_reserve_b,
     ..
   } = amm_pool_datum
-  let Output { value: treasury_out_value, datum: treasury_out_datum_raw, .. } =
-    treasury_output
-  expect treasury_out_datum: TreasuryDatum =
-    when treasury_out_datum_raw is {
-      InlineDatum(d) -> d
-      _ -> utils.must_find_script_datum(datums, treasury_out_datum_raw)
-    }
+  expect Output {
+    value: treasury_out_value,
+    datum: InlineDatum(treasury_out_datum_raw),
+    ..
+  } = treasury_output
+  expect treasury_out_datum: TreasuryDatum = treasury_out_datum_raw
   expect TreasuryDatum {
     total_liquidity: out_datum_total_liquidity,
     is_created_pool: 1,
