@@ -34,7 +34,7 @@ export function quickSubmitBuilder(emulator: Emulator) {
     let completedTx: TxComplete;
     try {
       completedTx = await txBuilder.complete();
-    } catch(err) {
+    } catch (err) {
       console.error(err);
       throw err;
     }

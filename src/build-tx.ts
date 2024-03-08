@@ -425,7 +425,7 @@ export function buildApplyOrders(
 
 export type BuildCreateAmmPoolOptions = {
   treasuryUTxO: UTxO;
-  ammPolicyId: string;
+  ammAuthenPolicyId: string;
 };
 
 export function buildCreateAmmPool(
@@ -435,7 +435,7 @@ export function buildCreateAmmPool(
     tx,
     validatorRefs: { deployedValidators },
     treasuryUTxO,
-    ammPolicyId,
+    ammAuthenPolicyId,
   } = options;
   const treasuryRedeemer: TreasuryValidatorValidateTreasury["redeemer"] =
     "CreatePool";
@@ -464,7 +464,7 @@ export function buildCreateAmmPool(
   const lpAssetName = computeLPAssetName(baseAssetUnit, raiseAssetUnit);
   const treasuryAssets: Assets = {
     ...treasuryUTxO.assets,
-    [ammPolicyId + lpAssetName]: totalLiquidity,
+    [ammAuthenPolicyId + lpAssetName]: totalLiquidity,
     [baseAssetUnit]:
       treasuryUTxO.assets[baseAssetUnit] - treasuryDatum.reserveBase,
     [raiseAssetUnit]:
@@ -487,16 +487,16 @@ export function buildCreateAmmPool(
       [treasuryUTxO],
       Data.to(treasuryRedeemer, TreasuryValidatorValidateTreasury.redeemer),
     )
-    .payToAddressWithData(
-      treasuryUTxO.address,
-      {
-        inline: Data.to(
-          newTreasuryDatum,
-          TreasuryValidatorValidateTreasury.datum,
-        ),
-      },
-      treasuryAssets,
-    )
+    // .payToAddressWithData(
+    //   treasuryUTxO.address,
+    //   {
+    //     inline: Data.to(
+    //       newTreasuryDatum,
+    //       TreasuryValidatorValidateTreasury.datum,
+    //     ),
+    //   },
+    //   treasuryAssets,
+    // )
     .attachMetadata(674, metadata);
 
   return {

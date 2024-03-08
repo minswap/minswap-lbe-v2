@@ -272,6 +272,7 @@ test("happy case - full flow", async () => {
   // Step 6: Create Pool
   const waitSlots = encounterStartSlot - emulator.slot + 1;
   emulator.awaitSlot(waitSlots);
+  console.log("doing step 6");
   treasuryUTxO = treasuryUTxO = (
     await emulator.getUtxos(
       lucid.utils.validatorToAddress(validators!.treasuryValidator),
@@ -291,7 +292,7 @@ test("happy case - full flow", async () => {
       deployedValidators,
     },
     treasuryUTxO,
-    ammPolicyId: minswapData["poolHash"],
+    ammAuthenPolicyId: minswapData["authenPolicyId"],
   });
   const buildAmmPoolResult = buildCreatePool({
     lucid,
@@ -309,8 +310,40 @@ test("happy case - full flow", async () => {
   });
   const buildAmmPoolTx = await quickSubmitBuilder(emulator)({
     txBuilder: buildAmmPoolResult.txBuilder,
+    debug: true,
   });
   expect(buildAmmPoolTx).toBeTruthy();
+  const debugUTxOs = await emulator.getUtxos(treasuryUTxO.address);
+  console.log(debugUTxOs);
+});
+
+test("test only create AMM Pool", async () => {
+  const ammFactoryUTxO = await emulator.getUtxoByUnit(
+    toUnit(
+      minswapData!.factoryAuthAsset.policyId,
+      minswapData!.factoryAuthAsset.tokenName,
+    ),
+  );
+  const options = {
+    lucid,
+    tx: lucid.newTx(),
+    minswapValidators,
+    minswapDeployedValidators,
+    factoryUTxO: ammFactoryUTxO,
+    pool: {
+      assetA: { policyId: "", assetName: "" },
+      assetB: baseAsset,
+      amountA: 100_000_000n,
+      amountB: 100_000_000n,
+      tradingFeeNumerator: 30n,
+    },
+  };
+  const result = buildCreatePool(options);
+  const tx = await quickSubmitBuilder(emulator)({
+    txBuilder: result.txBuilder,
+    debug: false,
+  });
+  expect(tx).toBeTruthy();
 });
 
 // test("pay->spend always success contract", async () => {
