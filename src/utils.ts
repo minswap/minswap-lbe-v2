@@ -298,3 +298,17 @@ export function findInputIndex(inputs: UTxO[], val: UTxO): number | undefined {
       (u) => u.txHash === val.txHash && u.outputIndex === val.outputIndex,
     );
 }
+
+export function sortUTxOs(utxos: UTxO[]) {
+  const sortedUTxOs = [...utxos];
+  sortedUTxOs.sort((a, b) => {
+    if (a.txHash < b.txHash) {
+      return -1;
+    } else if (a.txHash > b.txHash) {
+      return 1;
+    } else {
+      return a.outputIndex - b.outputIndex;
+    }
+  });
+  return sortedUTxOs;
+}

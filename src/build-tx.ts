@@ -13,6 +13,7 @@ import {
   computeLPAssetName,
   findInputIndex,
   plutusAddress2Address,
+  sortUTxOs,
   type ValidatorRefs,
 } from "./utils";
 import {
@@ -395,18 +396,12 @@ export function buildApplyOrders(
         OrderValidatorValidateOrderSpending.redeemer,
       ),
     )
-    .payToAddressWithData(
-      treasuryUTxO.address,
-      {
-        inline: newTreasuryDatum,
-      },
-      newTreasuryAssets,
-    )
     .validFrom(validFrom)
     .validTo(validTo)
     .attachMetadata(674, metadata);
 
-  for (const order of orderUTxOs) {
+  const sortedOrderUTxos = sortUTxOs(orderUTxOs);
+  for (const order of sortedOrderUTxos) {
     const orderDatum = Data.from(order.datum!, OrderValidatorFeedType._datum);
     const owner = plutusAddress2Address(lucid.network, orderDatum.owner);
     const assets = {
@@ -418,6 +413,13 @@ export function buildApplyOrders(
     };
     txBuilder.payToAddress(owner, assets);
   }
+  txBuilder.payToAddressWithData(
+    treasuryUTxO.address,
+    {
+      inline: newTreasuryDatum,
+    },
+    newTreasuryAssets,
+  );
   return {
     txBuilder: txBuilder,
   };
@@ -437,6 +439,7 @@ export function buildCreateAmmPool(
     treasuryUTxO,
     ammAuthenPolicyId,
   } = options;
+  console.log(treasuryUTxO);
   const treasuryRedeemer: TreasuryValidatorValidateTreasury["redeemer"] =
     "CreatePool";
   const metadata = {
@@ -462,14 +465,16 @@ export function buildCreateAmmPool(
   const baseAssetUnit = convertUnit(treasuryDatum.baseAsset);
   const raiseAssetUnit = convertUnit(treasuryDatum.raiseAsset);
   const lpAssetName = computeLPAssetName(baseAssetUnit, raiseAssetUnit);
+  const lpAssetUnit = toUnit(ammAuthenPolicyId, lpAssetName);
   const treasuryAssets: Assets = {
     ...treasuryUTxO.assets,
-    [ammAuthenPolicyId + lpAssetName]: totalLiquidity,
     [baseAssetUnit]:
       treasuryUTxO.assets[baseAssetUnit] - treasuryDatum.reserveBase,
     [raiseAssetUnit]:
-      treasuryUTxO.assets[raiseAssetUnit] - treasuryDatum.reserveBase,
+      treasuryUTxO.assets[raiseAssetUnit] - treasuryDatum.reserveRaise,
+    [lpAssetUnit]: totalLiquidity,
   };
+  console.log("treasuryAssets", treasuryAssets);
   let assetA = treasuryDatum.baseAsset;
   let assetB = treasuryDatum.raiseAsset;
   let amountA = treasuryDatum.reserveBase;
@@ -487,16 +492,16 @@ export function buildCreateAmmPool(
       [treasuryUTxO],
       Data.to(treasuryRedeemer, TreasuryValidatorValidateTreasury.redeemer),
     )
-    // .payToAddressWithData(
-    //   treasuryUTxO.address,
-    //   {
-    //     inline: Data.to(
-    //       newTreasuryDatum,
-    //       TreasuryValidatorValidateTreasury.datum,
-    //     ),
-    //   },
-    //   treasuryAssets,
-    // )
+    .payToAddressWithData(
+      treasuryUTxO.address,
+      {
+        inline: Data.to(
+          newTreasuryDatum,
+          TreasuryValidatorValidateTreasury.datum,
+        ),
+      },
+      treasuryAssets,
+    )
     .attachMetadata(674, metadata);
 
   return {

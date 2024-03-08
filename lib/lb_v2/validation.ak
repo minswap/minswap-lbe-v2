@@ -1,4 +1,5 @@
 use aiken/builtin
+use aiken/cbor
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/math
@@ -661,6 +662,8 @@ pub fn apply_orders(
     let in_value = order_in_values |> builtin.head_list
     let Output { value: out_value, address: out_address, .. } =
       order_outputs |> builtin.head_list
+    trace cbor.diagnostic(out_address)
+    trace cbor.diagnostic(owner)
     expect out_address == owner
     let params =
       ApplyOrderParams {

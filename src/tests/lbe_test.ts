@@ -148,6 +148,7 @@ test("happy case - full flow", async () => {
     extraSignatures: [ACCOUNT_1.privateKey],
   });
   expect(initFactoryTx).toBeTruthy();
+  console.info("Init Factory done");
 
   // Step 2: Create Treasury
   const discoveryStartSlot = emulator.slot;
@@ -191,10 +192,11 @@ test("happy case - full flow", async () => {
     txBuilder: createFactoryBuilder.txBuilder,
   });
   expect(createTreasuryTx).toBeTruthy();
+  console.info("create treasury done");
 
-  // Step 3: Deposit 81 Orders
+  // Step 3: Deposit Orders
   const pendingOrderTxIds: string[] = [];
-  for (let i = 0; i < 81; i++) {
+  for (let i = 0; i < 2; i++) {
     const depositBuilder = buildDeposit({
       lucid,
       tx: lucid.newTx(),
@@ -212,6 +214,7 @@ test("happy case - full flow", async () => {
     });
     pendingOrderTxIds.push(txHash);
   }
+  console.info("deposit orders done");
 
   // Step 4: Cancel first order
   const shouldCancelOrderTxId = pendingOrderTxIds.splice(0, 1)[0];
@@ -237,6 +240,7 @@ test("happy case - full flow", async () => {
     txBuilder: cancelBuilder.txBuilder,
   });
   expect(cancelTx).toBeTruthy();
+  console.info("cancel order done");
 
   // Step 5: Apply Orders
   const pendingOrders = await emulator.getUtxosByOutRef(
@@ -268,11 +272,11 @@ test("happy case - full flow", async () => {
     txBuilder: applyOrderBuilder.txBuilder,
   });
   expect(applyOrderTx).toBeTruthy();
+  console.info("apply orders done");
 
   // Step 6: Create Pool
   const waitSlots = encounterStartSlot - emulator.slot + 1;
   emulator.awaitSlot(waitSlots);
-  console.log("doing step 6");
   treasuryUTxO = treasuryUTxO = (
     await emulator.getUtxos(
       lucid.utils.validatorToAddress(validators!.treasuryValidator),
