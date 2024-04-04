@@ -6,6 +6,8 @@ import {
   type Address,
   getAddressDetails,
   type Network,
+  Tx,
+  type PrivateKey,
 } from "translucent-cardano";
 import { SHA3 } from "sha3";
 import {
@@ -311,4 +313,29 @@ export function sortUTxOs(utxos: UTxO[]) {
     }
   });
   return sortedUTxOs;
+}
+
+export function quickSubmit(lucid: Translucent) {
+  return async function ({
+    txBuilder,
+    extraSignatures,
+    debug,
+  }: {
+    txBuilder: Tx;
+    extraSignatures?: PrivateKey[];
+    debug?: boolean;
+  }) {
+    const completedTx = await txBuilder.complete();
+    if (debug) {
+      console.log("debug", completedTx.txComplete.to_json());
+    }
+    const signedTx = completedTx.sign();
+    for (const privateKey of extraSignatures || []) {
+      signedTx.signWithPrivateKey(privateKey);
+    }
+    const txSigned = await signedTx.complete();
+    const txHash = await txSigned.submit();
+    await lucid.awaitTx(txHash);
+    return txHash;
+  };
 }
