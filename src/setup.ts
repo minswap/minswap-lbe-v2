@@ -3,6 +3,7 @@ import { generateMinswapParams, type GenerateMinswapParams } from "./minswap-amm
 import { buildInitFactory } from "./build-tx";
 import { collectValidators, utxo2ORef, type DeployedValidators, type Validators, quickSubmit } from "./utils";
 import { deployValidators } from "./deploy_validators";
+import * as fs from "fs";
 
 let lucid: Translucent;
 let validators: Validators;
@@ -55,11 +56,29 @@ async function main() {
     },
     seedUtxo,
   });
-  await quickSubmit(lucid)({
+  const initFactoryTxHash = await quickSubmit(lucid)({
     txBuilder: initFactoryBuilder.txBuilder,
   });
   console.info("Init Factory done");
 
+  const data = {
+    authenValidator: validators.authenValidator,
+    treasuryValidator: validators.treasuryValidator,
+    orderSpendingValidator: validators.orderSpendingValidator,
+    orderValidator: validators.orderValidator,
+    factoryValidator: validators.factoryValidator,
+    orderValidatorFeedType: validators.orderValidatorFeedType,
+    initFactoryTxHash,
+  };
+
+  const jsonData = JSON.stringify(data, null, 2);
+  fs.writeFile('lbe.json', jsonData, 'utf8', (err) => {
+    if (err) {
+      console.error('Error writing JSON file:', err);
+      return;
+    }
+    console.log('JSON file has been saved.');
+  });
 }
 
 main();
