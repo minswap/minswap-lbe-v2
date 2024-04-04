@@ -1,0 +1,4 @@
+[submodule "minswap-dex-v2"]
+	path = minswap-dex-v2
+	url = git@github.com:minswap/minswap-dex-v2.git
+	branch = develop
