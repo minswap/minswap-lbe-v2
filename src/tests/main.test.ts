@@ -33,7 +33,6 @@ import { FactoryValidatorValidateFactory } from "../minswap-amm/plutus";
 import {
   address2PlutusAddress,
   collectValidators,
-  utxo2ORef,
   type DeployedValidators,
   type Validators,
 } from "../utils";
@@ -100,8 +99,10 @@ beforeEach(async () => {
   lucid.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
   const utxos = await emulator.getUtxos(ACCOUNT_1.address);
   seedUtxo = utxos[utxos.length - 1];
-  const seedTxIn = utxo2ORef(seedUtxo);
-  validators = collectValidators(lucid, seedTxIn);
+  validators = collectValidators(lucid, {
+    txHash: seedUtxo.txHash,
+    outputIndex: seedUtxo.outputIndex,
+  });
   deployedValidators = await deployValidators(lucid, validators);
   emulator.awaitBlock(1);
 

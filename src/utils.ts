@@ -1,13 +1,14 @@
 import {
   C,
+  getAddressDetails,
   Translucent,
+  Tx,
+  type Address,
+  type Network,
+  type OutRef,
+  type PrivateKey,
   type Script,
   type UTxO,
-  type Address,
-  getAddressDetails,
-  type Network,
-  Tx,
-  type PrivateKey,
 } from "translucent-cardano";
 import { SHA3 } from "sha3";
 import {
@@ -18,13 +19,6 @@ import {
   OrderValidatorValidateOrderSpending,
   OrderValidatorFeedType,
 } from "../plutus";
-
-type OutputReference = {
-  transactionId: {
-    hash: string;
-  };
-  outputIndex: bigint;
-};
 
 type StakeCredential =
   | {
@@ -45,15 +39,6 @@ type StakeCredential =
       };
     };
 
-export function utxo2ORef(utxo: UTxO): OutputReference {
-  return {
-    transactionId: {
-      hash: utxo.txHash,
-    },
-    outputIndex: BigInt(utxo.outputIndex),
-  };
-}
-
 export function validatorHash2StakeCredential(
   scriptHash: string,
 ): StakeCredential {
@@ -66,11 +51,11 @@ export function validatorHash2StakeCredential(
   };
 }
 
-export function collectValidators(
-  lucid: Translucent,
-  seedTxIn: OutputReference,
-) {
-  const authenValidator = new AuthenMintingPolicyValidateAuthen(seedTxIn);
+export function collectValidators(lucid: Translucent, seedTxIn: OutRef) {
+  const authenValidator = new AuthenMintingPolicyValidateAuthen({
+    transactionId: { hash: seedTxIn.txHash },
+    outputIndex: BigInt(seedTxIn.outputIndex),
+  });
   const authenValidatorHash =
     lucid.utils.validatorToScriptHash(authenValidator);
   const treasuryValidator = new TreasuryValidatorValidateTreasury(
