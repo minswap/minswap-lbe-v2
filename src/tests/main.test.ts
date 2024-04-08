@@ -13,7 +13,7 @@ import {
   deployMinswapValidators,
   deployValidators,
   type DeployedValidators,
-} from "../deploy_validators";
+} from "../deploy-validators";
 import {
   buildCreatePool,
   collectMinswapValidators,

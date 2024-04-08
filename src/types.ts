@@ -13,3 +13,4 @@ export type Address = T.Address;
 export type OutputData = T.OutputData;
 export type UnixTime = T.UnixTime;
 export type Network = T.Network;
+export type Provider = T.Provider;
