@@ -3,7 +3,6 @@ import type { MinswapValidators } from ".";
 import {
   computeLPAssetName,
   validatorHash2StakeCredential,
-  type DeployedValidators,
 } from "../utils";
 import {
   AuthenMintingPolicyValidateAuthen,
@@ -11,6 +10,8 @@ import {
   PoolValidatorValidatePool,
 } from "./plutus";
 import { calculateInitialLiquidity } from "./utils";
+import type { Translucent, Tx, UTxO } from "../types";
+import type { DeployedValidators } from "../deploy_validators";
 
 // The amount of liquidity that will be locked in pool when creating pools
 export const DEX_V2_DEFAULT_POOL_ADA = 3_000_000n;
