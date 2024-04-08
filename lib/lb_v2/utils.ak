@@ -8,21 +8,14 @@ use aiken/transaction/value.{
 }
 use lb_v2/types.{Asset, DatumMap}
 
-// the legitimate AMM Pool TokenName
+/// IMPORTANT: This block is code-gen. Please do not edit!
+/// *******************************************
 pub const amm_pool_auth_asset_name = #"4d5350"
+pub const amm_authen_policy_id = #"de7c3d0ebf7e841678ae7d90467f4c12a34ded85cc876a6af5d25337"
+pub const amm_pool_validation_hash = #"672708fe3f48419b67f178da4293bccf26a04c464af871204b552dce"
+/// *******************************************
 
-// the legitimate AMM Authen Validator PolicyId
-pub const amm_authen_policy_id =
-  #"627fc44f022bf1df8b90c0585b09960ddb8c0864c563063f30033d76"
-
-// the legitimate AMM Pool Validator Hash
-pub const amm_pool_validation_hash =
-  #"672708fe3f48419b67f178da4293bccf26a04c464af871204b552dce"
-
-// the legitimate Pool TokenName
 pub const treasury_auth_an = #"4d5350"
-
-// the legitimate Factory TokenName
 pub const factory_auth_an = #"4d53"
 
 pub fn list_at_index(outputs: List<a>, payout_outputs_offset: Int) -> a {

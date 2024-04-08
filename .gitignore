@@ -8,3 +8,4 @@ node_modules/
 .idea/
 src/tests/debug.ts
 monorepo
+minswap-dex-v2

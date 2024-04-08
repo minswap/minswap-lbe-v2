@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import path from "path";
 
 type Blueprint = {
   preamble: {
@@ -42,8 +43,9 @@ type Blueprint = {
   >;
 };
 
+const plutusFile = process.argv[2] ?? "plutus.json";
 const plutusJson: Blueprint = JSON.parse(
-  fs.readFileSync("plutus.json", "utf8"),
+  fs.readFileSync(path.resolve(plutusFile), "utf8"),
 );
 
 const plutusVersion =
@@ -102,17 +104,14 @@ const validators = plutusJson.validators.map((validator) => {
 
 const plutus = imports + "\n\n" + validators.join("\n\n");
 
-fs.writeFile("plutus.ts", plutus, (err) => {
+const outputFile = process.argv[3] ?? "plutus.ts";
+fs.writeFile(outputFile, plutus, (err) => {
   if (err) {
     console.error(err);
   }
 });
 
-console.log(
-  "%cGenerated %cplutus.ts",
-  "color: green; font-weight: bold",
-  "font-weight: bold",
-);
+console.log(`Generated ${outputFile}`);
 
 function resolveSchema(schema: any, definitions: any): any {
   if (schema.items) {

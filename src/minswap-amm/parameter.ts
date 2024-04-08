@@ -19,6 +19,10 @@ export type MinswapValidators = {
 };
 
 export function collectMinswapValidators(): MinswapValidators {
+  const fileContent = fs.readFileSync(path.resolve("dex-v2-parameters-testnet.json"), "utf8");
+  const params = JSON.parse(fileContent);
+  console.log({ params });
+
   const data = generateMinswapParams();
   const authenValidator: Script = data!.references!.lpRef.scriptRef;
   const factoryValidator: Script = data!.references!.factoryRef.scriptRef;
@@ -33,3 +37,5 @@ export function collectMinswapValidators(): MinswapValidators {
     poolBatchingValidator,
   };
 }
+
+collectMinswapValidators();
