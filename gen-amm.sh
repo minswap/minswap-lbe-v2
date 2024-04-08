@@ -27,7 +27,7 @@ fi
 # network=$1
 
 cd minswap-dex-v2
-
+cp ../dex-v2-parameters-testnet.json .
 echo "Install dependency"
 bun install --no-save
 
@@ -63,6 +63,7 @@ echo "Gen minswap-amm.json"
 bun run src/gen-lbe-params.ts
 mv minswap-amm.json ../.
 rm src/gen-lbe-params.ts
+rm dex-v2-parameters-testnet.json
 
 echo "Gen plutus.ts"
 cp ../blueprint.ts .
