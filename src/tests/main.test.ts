@@ -1,14 +1,5 @@
 import { beforeEach, expect, test } from "bun:test";
-import {
-  Data,
-  Emulator,
-  Translucent,
-  toUnit,
-  type Address,
-  type Assets,
-  type OutputData,
-  type UTxO,
-} from "translucent-cardano";
+import * as T from "@minswap/translucent";
 import type { TreasuryValidatorValidateTreasury } from "../../plutus";
 import {
   buildApplyOrders,
@@ -21,6 +12,7 @@ import {
 import {
   deployMinswapValidators,
   deployValidators,
+  type DeployedValidators,
 } from "../deploy_validators";
 import {
   buildCreatePool,
@@ -33,7 +25,6 @@ import { FactoryValidatorValidateFactory } from "../minswap-amm/plutus";
 import {
   address2PlutusAddress,
   collectValidators,
-  type DeployedValidators,
   type Validators,
 } from "../utils";
 import {
@@ -41,6 +32,14 @@ import {
   quickSubmitBuilder,
   type GeneratedAccount,
 } from "./utils";
+import type {
+  Address,
+  Assets,
+  Emulator,
+  OutputData,
+  Translucent,
+  UTxO,
+} from "../types";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -58,13 +57,16 @@ let minswapValidators: MinswapValidators;
 let minswapDeployedValidators: DeployedValidators;
 
 beforeEach(async () => {
+  await T.loadModule();
+  await T.CModuleLoader.load();
+
   baseAsset = {
     policyId: "e16c2dc8ae937e8d3790c7fd7168d7b994621ba14ca11415f39fed72",
     assetName: "4d494e",
   };
   ACCOUNT_0 = await generateAccount({
     lovelace: 2000000000000000000n,
-    [toUnit(baseAsset.policyId, baseAsset.assetName)]: 69_000_000_000_000n,
+    [T.toUnit(baseAsset.policyId, baseAsset.assetName)]: 69_000_000_000_000n,
   });
   ACCOUNT_1 = await generateAccount({
     lovelace: 2000000000000000000n,
@@ -77,7 +79,7 @@ beforeEach(async () => {
   } = {
     address: minswapData!.factoryAddress,
     outputData: {
-      inline: Data.to(
+      inline: T.Data.to(
         {
           head: "00",
           tail: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
@@ -87,14 +89,14 @@ beforeEach(async () => {
     },
     assets: {
       lovelace: 10_000_000n,
-      [toUnit(
+      [T.toUnit(
         minswapData!.factoryAuthAsset.policyId,
         minswapData!.factoryAuthAsset.tokenName,
       )]: 1n,
     },
   };
-  emulator = new Emulator([ACCOUNT_0, ACCOUNT_1, factoryAccount]);
-  lucid = await Translucent.new(emulator);
+  emulator = new T.Emulator([ACCOUNT_0, ACCOUNT_1, factoryAccount]);
+  lucid = await T.Translucent.new(emulator);
   emulator.awaitBlock(10_000); // For validity ranges to be valid
   lucid.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
   const utxos = await emulator.getUtxos(ACCOUNT_1.address);
@@ -284,7 +286,7 @@ test("happy case - full flow", async () => {
     )
   ).find((u) => u.scriptRef === undefined)!;
   const ammFactoryUTxO = await emulator.getUtxoByUnit(
-    toUnit(
+    T.toUnit(
       minswapData!.factoryAuthAsset.policyId,
       minswapData!.factoryAuthAsset.tokenName,
     ),
@@ -324,7 +326,7 @@ test("happy case - full flow", async () => {
 
 test("test only create AMM Pool", async () => {
   const ammFactoryUTxO = await emulator.getUtxoByUnit(
-    toUnit(
+    T.toUnit(
       minswapData!.factoryAuthAsset.policyId,
       minswapData!.factoryAuthAsset.tokenName,
     ),

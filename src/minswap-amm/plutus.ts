@@ -1,5 +1,8 @@
-// deno-lint-ignore-file
-import { applyParamsToScript, Data, Validator } from "translucent-cardano";
+import {
+  applyParamsToScript,
+  Data,
+  type Validator,
+} from "@minswap/translucent";
 
 export interface AlwaysSuccessSpend {
   new (): Validator;

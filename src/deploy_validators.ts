@@ -1,11 +1,7 @@
-import {
-  type Translucent,
-  type Script,
-  type Tx,
-  type UTxO,
-} from "translucent-cardano";
-import { toScriptRef, type DeployedValidators, type Validators } from "./utils";
+import * as T from "@minswap/translucent";
 import type { MinswapValidators } from "./minswap-amm";
+import type { Script, Translucent, Tx, UTxO } from "./types";
+import type { Validators } from "./utils";
 
 function buildDeployValidator(lucid: Translucent, validator: Script): Tx {
   const validatorAddress = lucid.utils.validatorToAddress(validator);
@@ -33,7 +29,7 @@ async function processElement(
   const completedTx = await validatorTx.complete();
   const finalOutputs = completedTx.txComplete.to_js_value().body.outputs;
   const scriptV2 = (
-    toScriptRef(validator).to_js_value() as {
+    T.toScriptRef(validator).to_js_value() as {
       PlutusV2?: string;
     }
   ).PlutusV2;
@@ -71,6 +67,8 @@ async function executePromiseFunctions<T>(
 
   return resultsObject;
 }
+
+export type DeployedValidators = Record<string, UTxO>;
 
 export async function deployValidators(
   lucid: Translucent,

@@ -1,10 +1,4 @@
-import {
-  Data,
-  Translucent,
-  toUnit,
-  type Tx,
-  type UTxO,
-} from "translucent-cardano";
+import * as T from "@minswap/translucent";
 import type { MinswapValidators } from ".";
 import {
   computeLPAssetName,
@@ -40,6 +34,7 @@ export type BuildCreatePoolOptions = {
 };
 
 export function buildCreatePool(options: BuildCreatePoolOptions) {
+  const { Data, toUnit } = T;
   const {
     lucid,
     pool,

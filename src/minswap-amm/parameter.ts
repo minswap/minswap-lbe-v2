@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { type Script } from "translucent-cardano";
+import type { Script } from "../types";
 
 export type GenerateMinswapParams = ReturnType<typeof generateMinswapParams>;
 
@@ -11,9 +11,14 @@ export function generateMinswapParams() {
   return JSON.parse(fileContent);
 }
 
-export type MinswapValidators = ReturnType<typeof collectMinswapValidators>;
+export type MinswapValidators = {
+  authenValidator: Script;
+  factoryValidator: Script;
+  poolValidator: Script;
+  poolBatchingValidator: Script;
+};
 
-export function collectMinswapValidators() {
+export function collectMinswapValidators(): MinswapValidators {
   const data = generateMinswapParams();
   const authenValidator: Script = data!.references!.lpRef.scriptRef;
   const factoryValidator: Script = data!.references!.factoryRef.scriptRef;

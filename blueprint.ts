@@ -51,8 +51,8 @@ const plutusVersion =
 
 const definitions = plutusJson.definitions;
 
-const imports = `// deno-lint-ignore-file
-import { applyParamsToScript, Data, Validator } from "translucent-cardano"`;
+const imports = `
+import { applyParamsToScript, Data, type Validator } from "@minswap/translucent"`;
 
 const validators = plutusJson.validators.map((validator) => {
   const title = validator.title;

@@ -1,20 +1,10 @@
-import {
-  Translucent,
-  Tx,
-  Data,
-  toUnit,
-  type UTxO,
-  type Address,
-  type Assets,
-  type UnixTime,
-} from "translucent-cardano";
+import * as T from "@minswap/translucent";
 import {
   address2PlutusAddress,
   computeLPAssetName,
   findInputIndex,
   plutusAddress2Address,
   sortUTxOs,
-  type ValidatorRefs,
 } from "./utils";
 import {
   AuthenMintingPolicyValidateAuthen,
@@ -24,6 +14,14 @@ import {
   OrderValidatorValidateOrderSpending,
 } from "../plutus.ts";
 import { calculateInitialLiquidity } from "./minswap-amm/utils.ts";
+import type {
+  Address,
+  Assets,
+  Translucent,
+  Tx,
+  UnixTime,
+  UTxO,
+} from "./types.ts";
 
 export const LBE_INIT_FACTORY_HEAD = "00";
 export const LBE_INIT_FACTORY_TAIL =
@@ -33,7 +31,7 @@ export const LBE_MAX_PURR_ASSET = 9_223_372_036_854_775_807n;
 export type BaseBuildOptions = {
   lucid: Translucent;
   tx: Tx;
-  validatorRefs: ValidatorRefs;
+  validatorRefs: any;
 };
 
 export type BuildInitFactoryOptions = {
@@ -46,6 +44,7 @@ export function buildInitFactory({
   seedUtxo,
   tx,
 }: BaseBuildOptions & BuildInitFactoryOptions) {
+  const { toUnit, Data } = T;
   const authenRedeemer: AuthenMintingPolicyValidateAuthen["redeemer"] =
     "MintFactoryAuthen";
   const factoryDatum: FactoryValidatorValidateFactory["datum"] = {
@@ -97,6 +96,7 @@ export function buildCreateTreasury({
   factoryUtxo,
   treasuryDatum,
 }: BaseBuildOptions & BuildCreateTreasury) {
+  const { Data, toUnit } = T;
   const authenRedeemer: AuthenMintingPolicyValidateAuthen["redeemer"] =
     "CreateTreasury";
   const authenPolicyId = lucid.utils.validatorToScriptHash(
@@ -216,6 +216,7 @@ export function buildDeposit({
   raiseAsset,
   amount,
 }: BaseBuildOptions & BuildDepositOptions) {
+  const { toUnit, Data } = T;
   const lpAssetName = computeLPAssetName(
     baseAsset.policyId + baseAsset.assetName,
     raiseAsset.policyId + raiseAsset.assetName,
@@ -267,6 +268,7 @@ export type BuildCancelOrderOptions = {
 export function buildCancelOrder(
   options: BaseBuildOptions & BuildCancelOrderOptions,
 ) {
+  const { Data } = T;
   const {
     validatorRefs: { deployedValidators },
     tx,
@@ -308,6 +310,7 @@ function getPurrAssetName(datum: TreasuryValidatorValidateTreasury["datum"]) {
 export function buildApplyOrders(
   options: BaseBuildOptions & BuildApplyOrdersOptions,
 ) {
+  const { Data, toUnit } = T;
   const {
     lucid,
     tx,
@@ -434,6 +437,7 @@ export type BuildCreateAmmPoolOptions = {
 export function buildCreateAmmPool(
   options: BaseBuildOptions & BuildCreateAmmPoolOptions,
 ) {
+  const { toUnit, Data } = T;
   const {
     tx,
     validatorRefs: { deployedValidators },

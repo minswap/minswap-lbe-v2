@@ -1,7 +1,16 @@
 import { Maestro, Translucent, type UTxO } from "translucent-cardano";
-import { generateMinswapParams, type GenerateMinswapParams } from "./minswap-amm";
+import {
+  generateMinswapParams,
+  type GenerateMinswapParams,
+} from "./minswap-amm";
 import { buildInitFactory } from "./build-tx";
-import { collectValidators, utxo2ORef, type DeployedValidators, type Validators, quickSubmit } from "./utils";
+import {
+  collectValidators,
+  utxo2ORef,
+  type DeployedValidators,
+  type Validators,
+  quickSubmit,
+} from "./utils";
 import { deployValidators } from "./deploy_validators";
 import * as fs from "fs";
 
@@ -20,17 +29,34 @@ async function main() {
   lucid = await Translucent.new(provider, network);
   minswapData = generateMinswapParams();
 
-  lucid.selectWalletFromSeed("corn hollow run team clip abuse grant trick opinion idle egg federal risk cover giant erase recall rude deal survey moon now exhibit regular");
+  lucid.selectWalletFromSeed(
+    "corn hollow run team clip abuse grant trick opinion idle egg federal risk cover giant erase recall rude deal survey moon now exhibit regular",
+  );
   const seedAddress = await lucid.wallet.address();
   console.log("seed Address: ", seedAddress);
   seedUtxo = (await lucid.utxosAt(seedAddress))[0];
   validators = collectValidators(lucid, utxo2ORef(seedUtxo));
 
-  console.log("authenValidator", lucid.utils.validatorToAddress(validators.authenValidator));
-  console.log("treasuryValidator", lucid.utils.validatorToAddress(validators.treasuryValidator));
-  console.log("orderValidator", lucid.utils.validatorToAddress(validators.orderValidator));
-  console.log("orderSpendingValidator", lucid.utils.validatorToAddress(validators.orderSpendingValidator));
-  console.log("factoryValidator", lucid.utils.validatorToAddress(validators.factoryValidator));
+  console.log(
+    "authenValidator",
+    lucid.utils.validatorToAddress(validators.authenValidator),
+  );
+  console.log(
+    "treasuryValidator",
+    lucid.utils.validatorToAddress(validators.treasuryValidator),
+  );
+  console.log(
+    "orderValidator",
+    lucid.utils.validatorToAddress(validators.orderValidator),
+  );
+  console.log(
+    "orderSpendingValidator",
+    lucid.utils.validatorToAddress(validators.orderSpendingValidator),
+  );
+  console.log(
+    "factoryValidator",
+    lucid.utils.validatorToAddress(validators.factoryValidator),
+  );
 
   deployedValidators = await deployValidators(lucid, validators);
   console.log("deploy validators success");
@@ -40,9 +66,7 @@ async function main() {
     txBuilder: lucid
       .newTx()
       .registerStake(
-        lucid.utils.validatorToRewardAddress(
-          validators.orderSpendingValidator,
-        ),
+        lucid.utils.validatorToRewardAddress(validators.orderSpendingValidator),
       ),
   });
   console.info("Register Order Order Spending Validator");
@@ -72,12 +96,12 @@ async function main() {
   };
 
   const jsonData = JSON.stringify(data, null, 2);
-  fs.writeFile('lbe.json', jsonData, 'utf8', (err) => {
+  fs.writeFile("lbe.json", jsonData, "utf8", (err) => {
     if (err) {
-      console.error('Error writing JSON file:', err);
+      console.error("Error writing JSON file:", err);
       return;
     }
-    console.log('JSON file has been saved.');
+    console.log("JSON file has been saved.");
   });
 }
 

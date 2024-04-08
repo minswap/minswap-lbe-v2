@@ -1,19 +1,19 @@
-import {
-  Translucent,
-  generatePrivateKey,
-  type Assets,
-  Emulator,
-  Tx,
-  type PrivateKey,
-} from "translucent-cardano";
+import * as T from "@minswap/translucent";
+import type { Assets, PrivateKey, Emulator, Tx } from "../types";
 
-export type GeneratedAccount = Awaited<ReturnType<typeof generateAccount>>;
+export type GeneratedAccount = {
+  privateKey: string;
+  address: string;
+  assets: Assets;
+};
 
-export async function generateAccount(assets: Assets) {
-  const privateKey = generatePrivateKey();
+export async function generateAccount(
+  assets: Assets,
+): Promise<GeneratedAccount> {
+  const privateKey = T.generatePrivateKey();
   return {
     privateKey,
-    address: await (await Translucent.new(undefined, "Custom"))
+    address: await (await T.Translucent.new(undefined, "Custom"))
       .selectWalletFromPrivateKey(privateKey)
       .wallet.address(),
     assets,
