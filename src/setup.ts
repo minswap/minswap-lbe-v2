@@ -1,24 +1,20 @@
 import * as T from "@minswap/translucent";
 import {
-  generateMinswapParams,
-  type GenerateMinswapParams,
+  generateMinswapValidators,
 } from "./minswap-amm";
-import { buildInitFactory } from "./build-tx";
-import { collectValidators, type Validators, quickSubmit } from "./utils";
-import { deployValidators, type DeployedValidators } from "./deploy-validators";
+import { collectValidators, type Validators } from "./utils";
 import * as fs from "fs";
 import type { Network, OutRef, Provider, Translucent, UTxO } from "./types";
 import path from "path";
 
 let lucid: Translucent;
 let validators: Validators;
-let minswapData: GenerateMinswapParams;
 let seedUtxo: UTxO;
 let deployedValidators: DeployedValidators;
 let provider: Provider;
 let network: Network;
 
-type Action = "init-params" | "collect-validators" | "deploy-scripts";
+type Action = "init-params" | "collect-validators" | "deploy-scripts" | "collect-amm-validators";
 
 const load = async () => {
   await T.loadModule();
@@ -70,6 +66,10 @@ const collect = () => {
   });
 };
 
+const collectAmm = () => {
+  generateMinswapValidators(lucid);
+};
+
 async function main() {
   await load();
 
@@ -79,6 +79,8 @@ async function main() {
   } else if (action === "deploy-scripts") {
   } else if (action === "collect-validators") {
     collect();
+  } else if (action === "collect-amm-validators") {
+    collectAmm();
   } else {
     throw new Error("find correct action bro!");
   }
