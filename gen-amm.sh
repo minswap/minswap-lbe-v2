@@ -9,13 +9,13 @@ if [ -d "minswap-dex-v2" ]; then
   cd minswap-dex-v2
   git fetch origin develop
   git reset --hard origin/develop
-  git show develop:plutus.json > ../src/minswap-amm/amm-plutus.json
+  git show develop:plutus.json > ../amm-plutus.json
   cd ..
 else
   echo "minswap-dex-v2 directory does not exist, cloning..."
   git clone --no-checkout --depth 1 -b develop git@github.com:minswap/minswap-dex-v2.git
   cd minswap-dex-v2
-  git show develop:plutus.json > ../src/minswap-amm/amm-plutus.json
+  git show develop:plutus.json > ../amm-plutus.json
   cd ..
 fi
 
@@ -25,15 +25,17 @@ if [ -d "monorepo" ]; then
   cd monorepo
   git fetch origin minswap-v2
   git reset --hard origin/minswap-v2
-  git show minswap-v2:packages/sdk/scripts/parameters/dex-v2-parameters-testnet.json > ../src/minswap-amm/dex-v2-parameters-testnet.json
+  git show minswap-v2:packages/sdk/scripts/parameters/dex-v2-parameters-testnet.json > ../dex-v2-parameters-testnet.json
   cd ..
 else
   echo "Monorepo directory does not exist, cloning..."
   git clone --no-checkout --depth 1 -b minswap-v2 git@github.com:minswap/monorepo.git
   cd monorepo
-  git show minswap-v2:packages/sdk/scripts/parameters/dex-v2-parameters-testnet.json > ../src/minswap-amm/dex-v2-parameters-testnet.json
+  git show minswap-v2:packages/sdk/scripts/parameters/dex-v2-parameters-testnet.json > ../dex-v2-parameters-testnet.json
   cd ..
 fi
+
+bun gen-amm-plutus
 
 # # network=$1
 

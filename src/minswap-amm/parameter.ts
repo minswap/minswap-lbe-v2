@@ -1,15 +1,12 @@
 import fs from "fs";
 import path from "path";
-import type { Script } from "../types";
-
-export type GenerateMinswapParams = ReturnType<typeof generateMinswapParams>;
-
-export function generateMinswapParams() {
-  const fileContent = fs.readFileSync(path.resolve("minswap-amm.json"), {
-    encoding: "utf-8",
-  });
-  return JSON.parse(fileContent);
-}
+import type { Script, Translucent } from "../types";
+import {
+  AuthenMintingPolicyValidateAuthen,
+  FactoryValidatorValidateFactory,
+  PoolValidatorValidatePool,
+  PoolValidatorValidatePoolBatching,
+} from "./plutus";
 
 export type MinswapValidators = {
   authenValidator: Script;
@@ -19,16 +16,15 @@ export type MinswapValidators = {
 };
 
 export function collectMinswapValidators(): MinswapValidators {
-  const fileContent = fs.readFileSync(path.resolve("dex-v2-parameters-testnet.json"), "utf8");
-  const params = JSON.parse(fileContent);
-  console.log({ params });
-
-  const data = generateMinswapParams();
-  const authenValidator: Script = data!.references!.lpRef.scriptRef;
-  const factoryValidator: Script = data!.references!.factoryRef.scriptRef;
-  const poolValidator: Script = data!.references!.poolRef.scriptRef;
-  const poolBatchingValidator: Script =
-    data!.references!.poolBatchingRef.scriptRef;
+  const fileContent = fs.readFileSync(
+    path.resolve("amm-validators.json"),
+    "utf8",
+  );
+  const data = JSON.parse(fileContent);
+  const authenValidator: Script = data.validators.authenValidator;
+  const factoryValidator: Script = data.validators.factoryValidator;
+  const poolValidator: Script = data.validator.poolValidator;
+  const poolBatchingValidator: Script = data.validator.poolBatchingValidator;
 
   return {
     authenValidator,
@@ -38,4 +34,65 @@ export function collectMinswapValidators(): MinswapValidators {
   };
 }
 
-collectMinswapValidators();
+export function generateMinswapValidators(lucid: Translucent) {
+  const fileContent = fs.readFileSync(
+    path.resolve("dex-v2-parameters-testnet.json"),
+    "utf8",
+  );
+  const params = JSON.parse(fileContent);
+  const [txHash, outputIndex] = params.seedTxIn.split("#");
+
+  const authenValidator = new AuthenMintingPolicyValidateAuthen({
+    transactionId: { hash: txHash },
+    outputIndex: BigInt(outputIndex),
+  });
+  const authenValidatorHash =
+    lucid.utils.validatorToScriptHash(authenValidator);
+  const poolValidator = new PoolValidatorValidatePool(authenValidatorHash);
+  const poolValidatorHash = lucid.utils.validatorToScriptHash(poolValidator);
+  const poolBatchingValidator = new PoolValidatorValidatePoolBatching(
+    authenValidatorHash,
+    { ScriptCredential: [poolValidatorHash] },
+  );
+  const poolBatchingHash = lucid.utils.validatorToScriptHash(
+    poolBatchingValidator,
+  );
+  const factoryValidator = new FactoryValidatorValidateFactory(
+    authenValidatorHash,
+    poolValidatorHash,
+    {
+      Inline: [{ ScriptCredential: [poolBatchingHash] }],
+    },
+  );
+
+  const data = {
+    authenValidatorHash,
+    poolValidatorHash,
+    validators: {
+      authenValidator,
+      factoryValidator,
+      poolValidator,
+      poolBatchingValidator,
+    },
+  };
+  fs.writeFile(
+    path.resolve("amm-validators.json"),
+    JSON.stringify(data, null, 2),
+    "utf8",
+    (err) => {
+      if (err) {
+        console.error("Error writing JSON file:", err);
+        return;
+      }
+      console.log("amm-validators.json file has been saved.");
+    },
+  );
+}
+
+// const fn = async () => {
+//   await T.loadModule();
+//   const emulator = new T.Emulator([]);
+//   const lucid = await T.Translucent.new(emulator);
+//   collectMinswapValidators(lucid);
+// }
+// fn();
