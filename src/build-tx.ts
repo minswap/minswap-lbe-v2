@@ -22,7 +22,11 @@ import type {
   UnixTime,
   UTxO,
 } from "./types.ts";
-import { LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "./constants.ts";
+import {
+  LBE_INIT_FACTORY_HEAD,
+  LBE_INIT_FACTORY_TAIL,
+  LBE_MAX_PURR_ASSET,
+} from "./constants.ts";
 
 export type BaseBuildOptions = {
   lucid: Translucent;

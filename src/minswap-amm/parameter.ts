@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import * as T from "@minswap/translucent";
 import type { Script, Translucent } from "../types";
 import {
   AuthenMintingPolicyValidateAuthen,
@@ -15,6 +16,48 @@ export type MinswapValidators = {
   poolBatchingValidator: Script;
 };
 
+export type GenerateMinswapAmmParams = ReturnType<
+  typeof generateMinswapAmmParams
+>;
+
+export function generateMinswapAmmParams(lucid: Translucent) {
+  const fileContent = fs.readFileSync(
+    path.resolve("dex-v2-parameters-testnet.json"),
+    "utf8",
+  );
+  const ammParams = JSON.parse(fileContent);
+  const validators = collectMinswapValidators();
+  const factoryAddress = lucid.utils.validatorToAddress(
+    validators.factoryValidator,
+  );
+  const authenPolicyId = lucid.utils.validatorToScriptHash(
+    validators.authenValidator,
+  );
+  const poolBatchingScriptHash = lucid.utils.validatorToScriptHash(
+    validators.poolBatchingValidator,
+  );
+  const factoryAuthAsset = {
+    policyId: authenPolicyId,
+    tokenName: T.fromText(ammParams.factoryNFTName),
+  };
+  const poolAuthAssetName = T.fromText(ammParams.poolNFTName);
+  const factoryAuthAssetName = T.fromText(ammParams.factoryNFTName);
+  const poolEnterpriseAddress = lucid.utils.validatorToAddress(
+    validators.poolValidator,
+  );
+
+  return {
+    factoryAddress,
+    factoryAuthAsset,
+    authenPolicyId,
+    validators,
+    poolAuthAssetName,
+    factoryAuthAssetName,
+    poolBatchingScriptHash,
+    poolEnterpriseAddress,
+  };
+}
+
 export function collectMinswapValidators(): MinswapValidators {
   const fileContent = fs.readFileSync(
     path.resolve("amm-validators.json"),
@@ -23,8 +66,8 @@ export function collectMinswapValidators(): MinswapValidators {
   const data = JSON.parse(fileContent);
   const authenValidator: Script = data.validators.authenValidator;
   const factoryValidator: Script = data.validators.factoryValidator;
-  const poolValidator: Script = data.validator.poolValidator;
-  const poolBatchingValidator: Script = data.validator.poolBatchingValidator;
+  const poolValidator: Script = data.validators.poolValidator;
+  const poolBatchingValidator: Script = data.validators.poolBatchingValidator;
 
   return {
     authenValidator,
@@ -93,6 +136,6 @@ export function generateMinswapValidators(lucid: Translucent) {
 //   await T.loadModule();
 //   const emulator = new T.Emulator([]);
 //   const lucid = await T.Translucent.new(emulator);
-//   collectMinswapValidators(lucid);
-// }
+//   generateMinswapValidators(lucid);
+// };
 // fn();
