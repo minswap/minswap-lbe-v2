@@ -36,6 +36,7 @@ else
 fi
 
 bun gen-amm-plutus
+bun collect-amm-validators
 
 amm_authen_policy_id=$(jq '.authenValidatorHash' amm-validators.json)
 amm_pool_validation_hash=$(jq '.poolValidatorHash' amm-validators.json)

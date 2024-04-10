@@ -1,7 +1,5 @@
 import * as T from "@minswap/translucent";
-import {
-  generateMinswapValidators,
-} from "./minswap-amm";
+import { generateMinswapValidators } from "./minswap-amm";
 import { collectValidators } from "./utils";
 import * as fs from "fs";
 import type { Network, OutRef, Provider, Translucent, UTxO } from "./types";
@@ -12,7 +10,11 @@ let seedUtxo: UTxO;
 let provider: Provider;
 let network: Network;
 
-type Action = "init-params" | "collect-validators" | "deploy-scripts" | "collect-amm-validators";
+type Action =
+  | "init-params"
+  | "collect-validators"
+  | "deploy-scripts"
+  | "collect-amm-validators";
 
 const load = async () => {
   await T.loadModule();
