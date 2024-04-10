@@ -179,10 +179,10 @@ test test_validate_authen_create_treasury() {
   let transaction_redeemers: Dict<ScriptPurpose, Redeemer> =
     dict.new()
       |> dict.insert(
-           Spend(factory_input.output_reference),
-           f_redeemer,
-           test_suits.compare_script_purpose,
-         )
+          Spend(factory_input.output_reference),
+          f_redeemer,
+          test_suits.compare_script_purpose,
+        )
   let inputs =
     [factory_input]
   let outputs: List<Output> =

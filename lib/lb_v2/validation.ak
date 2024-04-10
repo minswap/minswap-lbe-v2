@@ -6,7 +6,8 @@ use aiken/transaction.{
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{
-  AssetName, PolicyId, Value, ada_asset_name, ada_policy_id, quantity_of,
+  AssetName, PolicyId, Value, ada_asset_name, ada_policy_id, add, quantity_of,
+  zero,
 }
 use lb_v2/types.{
   ApplyOrderData, ApplyOrderParams, Asset, DatumMap, Deposit, OrderDatum,
@@ -15,7 +16,8 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  compute_lp_asset_name, factory_auth_an, sort_two_assets, treasury_auth_an,
+  compute_lp_asset_name, default_burn_liquidity, factory_auth_an,
+  sort_two_assets, treasury_auth_an,
 }
 
 pub fn validate_update_lbe(
@@ -273,6 +275,7 @@ pub fn validate_create_dex_pool(
   validity_range: ValidityRange,
   mint_value: Value,
   amm_pool_datum: PoolDatum,
+  owner_outputs: List<Output>,
 ) -> Bool {
   expect Interval {
     lower_bound: IntervalBound {
@@ -327,6 +330,7 @@ pub fn validate_create_dex_pool(
     asset_b: pool_asset_b,
     reserve_a: pool_reserve_a,
     reserve_b: pool_reserve_b,
+    total_liquidity: pool_total_liquidity,
     ..
   } = amm_pool_datum
   expect Output {
@@ -334,14 +338,31 @@ pub fn validate_create_dex_pool(
     datum: InlineDatum(treasury_out_datum_raw),
     ..
   } = treasury_output
+  let treasury_total_liquidity =
+    value.quantity_of(treasury_out_value, amm_authen_policy_id, lp_asset_name)
   expect treasury_out_datum: TreasuryDatum = treasury_out_datum_raw
   expect TreasuryDatum {
     total_liquidity: out_datum_total_liquidity,
     is_created_pool: 1,
     ..
   } = treasury_out_datum
-  let treasury_total_liquidity =
-    value.quantity_of(treasury_out_value, amm_authen_policy_id, lp_asset_name)
+  let owner_total_liquidity =
+    value.quantity_of(
+      list.reduce(
+        owner_outputs,
+        zero(),
+        fn(acc, e) {
+          add(
+            acc,
+            amm_authen_policy_id,
+            lp_asset_name,
+            value.quantity_of(e.value, amm_authen_policy_id, lp_asset_name),
+          )
+        },
+      ),
+      amm_authen_policy_id,
+      lp_asset_name,
+    )
   and {
     value.quantity_of(
       mint_value,
@@ -353,8 +374,10 @@ pub fn validate_create_dex_pool(
     datum_in_reserve_a == pool_reserve_a,
     datum_in_reserve_b == pool_reserve_b,
     out_datum_total_liquidity == treasury_total_liquidity,
+    pool_total_liquidity - default_burn_liquidity == owner_total_liquidity + treasury_total_liquidity,
+    treasury_total_liquidity >= owner_total_liquidity,
+    treasury_total_liquidity - owner_total_liquidity <= 1,
   }
-  // TODO: check owner lp
 }
 
 pub fn validate_order_time(
@@ -378,15 +401,15 @@ pub fn validate_order_time(
   )
     |> list.unique
     |> list.reduce(True, fn(acc, step) { and {
-             acc,
-             when step is {
-               RedeemLP -> start_valid_time_range >= end_time
-               _ -> and {
-                   start_time <= start_valid_time_range,
-                   end_valid_time_range <= end_time,
-                 }
-             },
-           } })
+            acc,
+            when step is {
+              RedeemLP -> start_valid_time_range >= end_time
+              _ -> and {
+                  start_time <= start_valid_time_range,
+                  end_valid_time_range <= end_time,
+                }
+            },
+          } })
 }
 
 fn apply_redeem_raise_asset_orders(
@@ -650,10 +673,10 @@ pub fn apply_orders(
     let new_treasury_state =
       params
         |> when step is {
-             Deposit -> apply_deposit_order
-             RedeemRaiseAsset -> apply_redeem_raise_asset_order
-             RedeemLP -> apply_redeem_lp
-           }
+            Deposit -> apply_deposit_order
+            RedeemRaiseAsset -> apply_redeem_raise_asset_order
+            RedeemLP -> apply_redeem_lp
+          }
     apply_orders(
       order_in_values |> builtin.tail_list,
       order_in_datums |> builtin.tail_list,

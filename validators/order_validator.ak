@@ -93,10 +93,10 @@ test test_validate_order() {
   let withdrawals =
     dict.new()
       |> dict.insert(
-           order_batching_stake_credential,
-           0,
-           test_suits.compare_stake_credential,
-         )
+          order_batching_stake_credential,
+          0,
+          test_suits.compare_stake_credential,
+        )
   let sc =
     ScriptContext {
       transaction: Transaction {

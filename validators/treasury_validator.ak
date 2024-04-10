@@ -58,6 +58,7 @@ validator(authen_policy_id: PolicyId) {
       CreatePool -> {
         expect amm_pool_datum: PoolDatum = get_amm_pool_datum(outputs)
         let TreasuryDatum { order_hash, .. } = datum
+
         //* Should not spend any UTxOs associated with Order Script, as it could lead to unexpected behavior or loss of funds.
         expect [] =
           list.filter(
@@ -72,12 +73,15 @@ validator(authen_policy_id: PolicyId) {
               }
             },
           )
+        let owner_outputs =
+          list.filter(outputs, fn(output) { output.address == datum.owner })
         validate_create_dex_pool(
           treasury_in_datum: datum,
           treasury_output: treasury_output,
           validity_range: validity_range,
           mint_value: mint_value,
           amm_pool_datum: amm_pool_datum,
+          owner_outputs: owner_outputs,
         )
       }
       Batching ->
