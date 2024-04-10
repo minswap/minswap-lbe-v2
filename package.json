@@ -6,7 +6,8 @@
     "gen-plutus": "bun run blueprint.ts && bun run prettier -w plutus.ts",
     "init-params": "bun run src/setup.ts init-params",
     "collect-amm-validators": "bun run src/setup.ts collect-amm-validators",
-    "collect-validators": "bun run src/setup.ts collect-validators"
+    "collect-validators": "bun run src/setup.ts collect-validators",
+    "check": "aiken build && bun gen-plutus && bun init-params && bun collect-validators && bun test"
   },
   "main": "./build/index.js",
   "module": "./build/index.es.js",

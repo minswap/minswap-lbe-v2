@@ -1,6 +1,6 @@
 import { beforeEach, expect, test } from "bun:test";
 import * as T from "@minswap/translucent";
-import type { TreasuryValidatorValidateTreasury } from "../../plutus";
+import { TreasuryValidatorValidateTreasury } from "../../plutus";
 import {
   buildApplyOrders,
   buildCancelOrder,
@@ -213,7 +213,7 @@ test("happy case - full flow", async () => {
       owner: ACCOUNT_0.address,
       baseAsset: treasuryDatum.baseAsset,
       raiseAsset: treasuryDatum.raiseAsset,
-      amount: 1_000_000_000n,
+      amount: 69_000_000_000n,
     });
     const txHash = await quickSubmitBuilder(emulator)({
       txBuilder: depositBuilder.txBuilder,
@@ -295,6 +295,14 @@ test("happy case - full flow", async () => {
     ),
   );
   const createPoolValidFrom = lucid.utils.slotToUnixTime(emulator.slot);
+
+  const curTreasuryDatum: TreasuryValidatorValidateTreasury["datum"] =
+    T.Data.from(treasuryUTxO.datum!, TreasuryValidatorValidateTreasury.datum);
+  console.log({
+    curTreasuryDatum,
+    reserveRaise: curTreasuryDatum.reserveRaise,
+  });
+
   const buildCreatePoolResult = buildCreateAmmPool({
     lucid,
     tx: lucid.newTx(),
@@ -306,6 +314,7 @@ test("happy case - full flow", async () => {
     ammAuthenPolicyId: minswapData.authenPolicyId,
     validFrom: createPoolValidFrom,
   });
+  console.log({ ...buildCreatePoolResult, txBuilder: undefined });
   const buildAmmPoolResult = buildCreatePool({
     lucid,
     tx: buildCreatePoolResult.txBuilder,
@@ -321,6 +330,7 @@ test("happy case - full flow", async () => {
   });
   const buildAmmPoolTx = await quickSubmitBuilder(emulator)({
     txBuilder: buildAmmPoolResult.txBuilder,
+    debug: true,
   });
   expect(buildAmmPoolTx).toBeTruthy();
   console.info("build AMM Pool done");

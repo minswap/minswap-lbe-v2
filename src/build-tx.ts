@@ -439,6 +439,7 @@ export function buildCreateAmmPool(
 ) {
   const { toUnit, Data } = T;
   const {
+    lucid,
     tx,
     validatorRefs: { deployedValidators },
     treasuryUTxO,
@@ -454,21 +455,18 @@ export function buildCreateAmmPool(
     treasuryUTxO.datum!,
     TreasuryValidatorValidateTreasury.datum,
   );
+  const owner = plutusAddress2Address(lucid.network, treasuryDatum.owner);
   const totalLiquidity = calculateInitialLiquidity(
     treasuryDatum.reserveBase,
     treasuryDatum.reserveRaise,
   );
+  const ownerLiquidity = (totalLiquidity - 10n) / 2n;
+  const treasuryTotalLiquidity = totalLiquidity - 10n - ownerLiquidity;
   const newTreasuryDatum: TreasuryValidatorValidateTreasury["datum"] = {
     ...treasuryDatum,
     isCreatedPool: 1n,
-    totalLiquidity: totalLiquidity - 10n,
+    totalLiquidity: treasuryTotalLiquidity,
   };
-  // const convertUnit = (a: { policyId: string; assetName: string }): string => {
-  //   const unit = a.policyId + a.assetName;
-  //   return unit === "" ? "lovelace" : unit;
-  // };
-  // const baseAssetUnit = convertUnit(treasuryDatum.baseAsset);
-  // const raiseAssetUnit = convertUnit(treasuryDatum.raiseAsset);
   const lpAssetName = computeLPAssetName(
     treasuryDatum.baseAsset.policyId + treasuryDatum.baseAsset.assetName,
     treasuryDatum.raiseAsset.policyId + treasuryDatum.raiseAsset.assetName,
@@ -486,12 +484,30 @@ export function buildCreateAmmPool(
     [assetA, assetB] = [assetB, assetA];
     [amountA, amountB] = [amountB, amountA];
   }
+  const baseAssetUnit = toUnit(
+    treasuryDatum.baseAsset.policyId,
+    treasuryDatum.baseAsset.assetName,
+  );
+  let raiseAssetUnit = `${treasuryDatum.raiseAsset.policyId}${treasuryDatum.raiseAsset.assetName}`;
+  if (raiseAssetUnit === "") {
+    raiseAssetUnit = "lovelace";
+  }
+  const newTreasuryAssets = {
+    ...treasuryUTxO.assets,
+    [lpAssetUnit]: newTreasuryDatum.totalLiquidity,
+    [baseAssetUnit]: 0n,
+    [raiseAssetUnit]:
+      treasuryUTxO.assets[raiseAssetUnit] - treasuryDatum.reserveRaise,
+  };
   const txBuilder = tx
     .readFrom([deployedValidators["treasuryValidator"]])
     .collectFrom(
       [treasuryUTxO],
       Data.to(treasuryRedeemer, TreasuryValidatorValidateTreasury.redeemer),
     )
+    .payToAddress(owner, {
+      [lpAssetUnit]: newTreasuryDatum.totalLiquidity / 2n,
+    })
     .payToAddressWithData(
       treasuryUTxO.address,
       {
@@ -500,12 +516,7 @@ export function buildCreateAmmPool(
           TreasuryValidatorValidateTreasury.datum,
         ),
       },
-      {
-        lovelace: 2_000_000n,
-        d477745afecb70aa3c754c2b6d987e92a7b73337508b3c36358ec08b4d5350: 1n,
-        [lpAssetUnit]: 262678510722n,
-      },
-      // treasuryAssets,
+      newTreasuryAssets,
     )
     .validFrom(validFrom)
     .attachMetadata(674, metadata);
