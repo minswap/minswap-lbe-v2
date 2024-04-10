@@ -129,7 +129,7 @@ beforeEach(async () => {
   );
 });
 
-test.skip("happy case - full flow", async () => {
+test("happy case - full flow", async () => {
   /** Steps:
    * 1. Init Factory
    * 2. Create Treasury
@@ -333,7 +333,6 @@ test("test only create AMM Pool", async () => {
       minswapData!.factoryAuthAsset.tokenName,
     ),
   );
-  console.log({ ammFactoryUTxO });
   const options: BuildCreatePoolOptions = {
     lucid,
     tx: lucid.newTx(),
