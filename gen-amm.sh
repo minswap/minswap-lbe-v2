@@ -37,6 +37,22 @@ fi
 
 bun gen-amm-plutus
 
+amm_authen_policy_id=$(jq '.authenValidatorHash' amm-validators.json)
+amm_pool_validation_hash=$(jq '.poolValidatorHash' amm-validators.json)
+echo $amm_authen_policy_id
+echo $amm_pool_validation_hash
+
+# Replace placeholders in utils.ak using sed
+sed -i "s/amm_authen_policy_id.*\"/amm_authen_policy_id = #$amm_authen_policy_id/g" lib/lb_v2/utils.ak
+sed -i "s/amm_pool_validation_hash.*\"/amm_pool_validation_hash = #$amm_pool_validation_hash/g" lib/lb_v2/utils.ak
+
+# Rebuild Aiken
+aiken build
+
+bun gen-plutus
+bun init-params
+bun collect-validators
+
 # # network=$1
 
 # cd minswap-dex-v2

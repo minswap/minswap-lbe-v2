@@ -2,15 +2,13 @@ import * as T from "@minswap/translucent";
 import {
   generateMinswapValidators,
 } from "./minswap-amm";
-import { collectValidators, type Validators } from "./utils";
+import { collectValidators } from "./utils";
 import * as fs from "fs";
 import type { Network, OutRef, Provider, Translucent, UTxO } from "./types";
 import path from "path";
 
 let lucid: Translucent;
-let validators: Validators;
 let seedUtxo: UTxO;
-let deployedValidators: DeployedValidators;
 let provider: Provider;
 let network: Network;
 
@@ -74,18 +72,16 @@ async function main() {
   await load();
 
   const action: Action = process.argv[2] as Action;
-  if (action === "init-params") {
-    await initParams();
-  } else if (action === "deploy-scripts") {
-  } else if (action === "collect-validators") {
-    collect();
-  } else if (action === "collect-amm-validators") {
-    collectAmm();
-  } else {
+  const mapAction = {
+    "init-params": initParams,
+    "deploy-scripts": undefined,
+    "collect-amm-validators": collectAmm,
+    "collect-validators": collect,
+  };
+  if (!mapAction[action]) {
     throw new Error("find correct action bro!");
   }
-
-  minswapData = generateMinswapParams();
+  await mapAction[action]!();
 
   // const seedAddress = await lucid.wallet.address();
   // console.log("seed Address: ", seedAddress);
