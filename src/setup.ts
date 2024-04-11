@@ -1,9 +1,9 @@
 import * as T from "@minswap/translucent";
 import { generateMinswapValidators } from "./minswap-amm";
-import { collectValidators } from "./utils";
 import * as fs from "fs";
 import type { Network, OutRef, Provider, Translucent, UTxO } from "./types";
 import path from "path";
+import { collectValidators } from ".";
 
 let lucid: Translucent;
 let seedUtxo: UTxO;
@@ -67,7 +67,7 @@ const collect = () => {
 };
 
 const collectAmm = () => {
-  generateMinswapValidators(lucid);
+  generateMinswapValidators(lucid, true);
 };
 
 async function main() {

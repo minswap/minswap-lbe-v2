@@ -26,6 +26,7 @@ import {
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
   LBE_MAX_PURR_ASSET,
+  LP_COLATERAL,
 } from "./constants.ts";
 
 export type BaseBuildOptions = {
@@ -460,8 +461,8 @@ export function buildCreateAmmPool(
     treasuryDatum.reserveBase,
     treasuryDatum.reserveRaise,
   );
-  const ownerLiquidity = (totalLiquidity - 10n) / 2n;
-  const treasuryTotalLiquidity = totalLiquidity - 10n - ownerLiquidity;
+  const ownerLiquidity = (totalLiquidity - LP_COLATERAL) / 2n;
+  const treasuryTotalLiquidity = totalLiquidity - LP_COLATERAL - ownerLiquidity;
   const newTreasuryDatum: TreasuryValidatorValidateTreasury["datum"] = {
     ...treasuryDatum,
     isCreatedPool: 1n,

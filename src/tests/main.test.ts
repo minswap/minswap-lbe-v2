@@ -13,6 +13,8 @@ import {
   deployMinswapValidators,
   deployValidators,
   type DeployedValidators,
+  type Validators,
+  collectValidators,
 } from "../deploy-validators";
 import {
   buildCreatePool,
@@ -25,8 +27,6 @@ import {
 import { FactoryValidatorValidateFactory } from "../minswap-amm/plutus";
 import {
   address2PlutusAddress,
-  collectValidators,
-  type Validators,
 } from "../utils";
 import {
   generateAccount,

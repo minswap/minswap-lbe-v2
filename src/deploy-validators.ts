@@ -1,14 +1,87 @@
+import * as fs from "fs";
+import path from "path";
 import * as T from "@minswap/translucent";
 import type { MinswapValidators } from "./minswap-amm";
-import type { Script, Translucent, Tx, UTxO } from "./types";
-import type { Validators } from "./utils";
+import type { OutRef, Script, Translucent, Tx, UTxO } from "./types";
+import { AuthenMintingPolicyValidateAuthen, FactoryValidatorValidateFactory, OrderValidatorFeedType, OrderValidatorValidateOrder, OrderValidatorValidateOrderSpending, TreasuryValidatorValidateTreasury } from "../plutus";
+import { validatorHash2StakeCredential } from "./utils";
+
+export type Validators = {
+  authenValidator: Script;
+  treasuryValidator: Script;
+  orderSpendingValidator: Script;
+  orderValidator: Script;
+  factoryValidator: Script;
+  orderValidatorFeedType: Script;
+};
+
+export function collectValidators(options: {
+  lucid: Translucent,
+  seedOutRef?: OutRef,
+  dry: boolean,
+}): Validators {
+  let { lucid, seedOutRef, dry } = options;
+  if (!seedOutRef) {
+    const fileContent = fs.readFileSync(path.resolve("params.json"), "utf-8");
+    seedOutRef = JSON.parse(fileContent).seedOutRef;
+  }
+  const authenValidator = new AuthenMintingPolicyValidateAuthen({
+    transactionId: { hash: seedOutRef!.txHash },
+    outputIndex: BigInt(seedOutRef!.outputIndex),
+  });
+  const authenValidatorHash =
+    lucid.utils.validatorToScriptHash(authenValidator);
+  const treasuryValidator = new TreasuryValidatorValidateTreasury(
+    authenValidatorHash,
+  );
+  const treasuryValidatorHash =
+    lucid.utils.validatorToScriptHash(treasuryValidator);
+  const orderSpendingValidator = new OrderValidatorValidateOrderSpending(
+    treasuryValidatorHash,
+  );
+  const orderSpendingValidatorHash = lucid.utils.validatorToScriptHash(
+    orderSpendingValidator,
+  );
+  const stakeCredential = validatorHash2StakeCredential(
+    orderSpendingValidatorHash,
+  );
+  const orderValidator = new OrderValidatorValidateOrder(stakeCredential);
+  const orderValidatorHash = lucid.utils.validatorToScriptHash(orderValidator);
+  const factoryValidator = new FactoryValidatorValidateFactory(
+    authenValidatorHash,
+    treasuryValidatorHash,
+    orderValidatorHash,
+  );
+  const orderValidatorFeedType = new OrderValidatorFeedType();
+  const validators = {
+    authenValidator,
+    treasuryValidator,
+    orderSpendingValidator,
+    orderValidator,
+    factoryValidator,
+    orderValidatorFeedType,
+  };
+
+  if (!dry) {
+    const jsonData = JSON.stringify(validators, null, 2);
+    fs.writeFile("validators.json", jsonData, "utf8", (err) => {
+      if (err) {
+        console.error("Error writing JSON file:", err);
+        return;
+      }
+      console.log("validators.json file has been saved.");
+    });
+  }
+
+  return validators;
+}
 
 function buildDeployValidator(lucid: Translucent, validator: Script): Tx {
   const validatorAddress = lucid.utils.validatorToAddress(validator);
   const tx = lucid.newTx().payToContract(
     validatorAddress,
     {
-      inline: "d87980",
+      inline: "d87980", // 121([])
       scriptRef: validator,
     },
     {},
@@ -48,7 +121,7 @@ async function processElement(
     assets: {
       lovelace: BigInt(newTxOutput.amount.coin),
     },
-    datum: "d87980",
+    datum: "d87980", // 121([])
   };
   const newValidator: DeployedValidator = [key, newUtxo];
   await lucid.awaitTx(txHash);

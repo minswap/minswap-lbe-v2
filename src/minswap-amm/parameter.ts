@@ -77,7 +77,10 @@ export function collectMinswapValidators(): MinswapValidators {
   };
 }
 
-export function generateMinswapValidators(lucid: Translucent) {
+export type GenerateMinswapValidators = ReturnType<
+  typeof generateMinswapValidators
+>;
+export function generateMinswapValidators(lucid: Translucent, dry: boolean=true) {
   const fileContent = fs.readFileSync(
     path.resolve("dex-v2-parameters-testnet.json"),
     "utf8",
@@ -118,18 +121,21 @@ export function generateMinswapValidators(lucid: Translucent) {
       poolBatchingValidator,
     },
   };
-  fs.writeFile(
-    path.resolve("amm-validators.json"),
-    JSON.stringify(data, null, 2),
-    "utf8",
-    (err) => {
-      if (err) {
-        console.error("Error writing JSON file:", err);
-        return;
-      }
-      console.log("amm-validators.json file has been saved.");
-    },
-  );
+  if (!dry) {
+    fs.writeFile(
+      path.resolve("amm-validators.json"),
+      JSON.stringify(data, null, 2),
+      "utf8",
+      (err) => {
+        if (err) {
+          console.error("Error writing JSON file:", err);
+          return;
+        }
+        console.log("amm-validators.json file has been saved.");
+      },
+    );
+  }
+  return data;
 }
 
 // const fn = async () => {
