@@ -80,7 +80,7 @@ export function collectMinswapValidators(): MinswapValidators {
 export type GenerateMinswapValidators = ReturnType<
   typeof generateMinswapValidators
 >;
-export function generateMinswapValidators(t: Translucent, dry: boolean = true) {
+export function generateMinswapValidators({ t, dry }: { t: Translucent, dry: boolean }) {
   const fileContent = fs.readFileSync(
     path.resolve("dex-v2-parameters-testnet.json"),
     "utf8",

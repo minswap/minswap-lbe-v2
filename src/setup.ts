@@ -1,9 +1,8 @@
 import * as T from "@minswap/translucent";
-import { generateMinswapValidators } from "./minswap-amm";
+import { collectMinswapValidators, generateMinswapValidators } from "./minswap-amm";
 import * as fs from "fs";
 import type { Network, OutRef, Provider, Translucent, UTxO } from "./types";
-import path from "path";
-import { collectValidators } from ".";
+import { collectValidators, deployMinswapValidators, deployValidators } from ".";
 
 let t: Translucent;
 let seedUtxo: UTxO;
@@ -55,8 +54,34 @@ const collect = () => {
 };
 
 const collectAmm = () => {
-  generateMinswapValidators(t, true);
+  generateMinswapValidators({ t, dry: false });
 };
+
+const deployAmmScripts = async () => {
+  const ammValidators = collectMinswapValidators();
+  const minswapDeployedValidators = await deployMinswapValidators(t, ammValidators);
+  const jsonData = JSON.stringify(minswapDeployedValidators, null, 2);
+  fs.writeFile("deployed-minswap-scripts.json", jsonData, "utf8", (err) => {
+    if (err) {
+      console.error("Error writing JSON file:", err);
+      return;
+    }
+    console.log("deployed-minswap-scripts.json file has been saved.");
+  });
+}
+
+const deployScripts = async () => {
+  const validators = collectValidators({ t, dry: true });
+  const deployedValidators = await deployValidators(t, validators);
+  const jsonData = JSON.stringify(deployedValidators, null, 2);
+  fs.writeFile("deployed-scripts.json", jsonData, "utf8", (err) => {
+    if (err) {
+      console.error("Error writing JSON file:", err);
+      return;
+    }
+    console.log("deployed-scripts.json file has been saved.");
+  });
+}
 
 async function main() {
   await load();
@@ -64,7 +89,8 @@ async function main() {
   const action: Action = process.argv[2] as Action;
   const mapAction = {
     "init-params": initParams,
-    "deploy-scripts": undefined,
+    "deploy-scripts": deployScripts,
+    "deploy-minswap-scripts": deployAmmScripts,
     "collect-amm-validators": collectAmm,
     "collect-validators": collect,
   };

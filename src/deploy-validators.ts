@@ -156,16 +156,16 @@ export async function deployValidators(
   validators: Validators,
 ): Promise<DeployedValidators> {
   const deploymentsChain = [
-    () => processElement(t, "authenValidator", validators!.authenValidator),
-    () => processElement(t, "treasuryValidator", validators!.treasuryValidator),
+    () => processElement(t, "authenValidator", validators.authenValidator),
+    () => processElement(t, "treasuryValidator", validators.treasuryValidator),
     () =>
       processElement(
         t,
         "orderSpendingValidator",
         validators!.orderSpendingValidator,
       ),
-    () => processElement(t, "orderValidator", validators!.orderValidator),
-    () => processElement(t, "factoryValidator", validators!.factoryValidator),
+    () => processElement(t, "orderValidator", validators.orderValidator),
+    () => processElement(t, "factoryValidator", validators.factoryValidator),
   ];
   let res: DeployedValidators = {};
 
@@ -185,9 +185,9 @@ export async function deployMinswapValidators(
   validators: MinswapValidators,
 ): Promise<DeployedValidators> {
   const deploymentsChain = [
-    () => processElement(t, "authenValidator", validators!.authenValidator),
-    () => processElement(t, "poolValidator", validators!.poolValidator),
-    () => processElement(t, "factoryValidator", validators!.factoryValidator),
+    () => processElement(t, "authenValidator", validators.authenValidator),
+    () => processElement(t, "poolValidator", validators.poolValidator),
+    () => processElement(t, "factoryValidator", validators.factoryValidator),
   ];
   let res: DeployedValidators = {};
 
