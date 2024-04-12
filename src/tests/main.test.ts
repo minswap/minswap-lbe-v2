@@ -25,9 +25,7 @@ import {
   type MinswapValidators,
 } from "../minswap-amm";
 import { FactoryValidatorValidateFactory } from "../minswap-amm/plutus";
-import {
-  address2PlutusAddress,
-} from "../utils";
+import { address2PlutusAddress } from "../utils";
 import {
   generateAccount,
   quickSubmitBuilder,
@@ -105,7 +103,7 @@ beforeEach(async () => {
   const utxos = await emulator.getUtxos(ACCOUNT_1.address);
   seedUtxo = utxos[utxos.length - 1];
   validators = collectValidators({
-    lucid,
+    t: lucid,
     seedOutRef: {
       txHash: seedUtxo.txHash,
       outputIndex: seedUtxo.outputIndex,
@@ -320,7 +318,7 @@ test("happy case - full flow", async () => {
   });
   console.log({ ...buildCreatePoolResult, txBuilder: undefined });
   const buildAmmPoolResult = buildCreatePool({
-    lucid,
+    t: lucid,
     tx: buildCreatePoolResult.txBuilder,
     minswapDeployedValidators,
     factoryUTxO: ammFactoryUTxO,
@@ -348,7 +346,7 @@ test("test only create AMM Pool", async () => {
     ),
   );
   const options: BuildCreatePoolOptions = {
-    lucid,
+    t: lucid,
     tx: lucid.newTx(),
     minswapDeployedValidators,
     factoryUTxO: ammFactoryUTxO,

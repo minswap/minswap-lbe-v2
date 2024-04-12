@@ -9,7 +9,7 @@ import type {
   Network,
 } from "./types";
 
-export function quickSubmit(lucid: Translucent) {
+export function quickSubmit(t: Translucent) {
   return async function ({
     txBuilder,
     extraSignatures,
@@ -29,39 +29,8 @@ export function quickSubmit(lucid: Translucent) {
     }
     const txSigned = await signedTx.complete();
     const txHash = await txSigned.submit();
-    await lucid.awaitTx(txHash);
+    await t.awaitTx(txHash);
     return txHash;
-  };
-}
-
-type StakeCredential =
-  | {
-      Inline: [
-        | {
-            VerificationKeyCredential: [string];
-          }
-        | {
-            ScriptCredential: [string];
-          },
-      ];
-    }
-  | {
-      Pointer: {
-        slotNumber: bigint;
-        transactionIndex: bigint;
-        certificateIndex: bigint;
-      };
-    };
-
-export function validatorHash2StakeCredential(
-  scriptHash: string,
-): StakeCredential {
-  return {
-    Inline: [
-      {
-        ScriptCredential: [scriptHash],
-      },
-    ],
   };
 }
 

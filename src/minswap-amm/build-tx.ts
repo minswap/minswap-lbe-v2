@@ -1,6 +1,6 @@
 import * as T from "@minswap/translucent";
 import { generateMinswapAmmParams } from ".";
-import { computeLPAssetName, validatorHash2StakeCredential } from "../utils";
+import { computeLPAssetName } from "../utils";
 import {
   AuthenMintingPolicyValidateAuthen,
   FactoryValidatorValidateFactory,
@@ -9,14 +9,10 @@ import {
 import { calculateInitialLiquidity } from "./utils";
 import type { Translucent, Tx, UTxO } from "../types";
 import type { DeployedValidators } from "../deploy-validators";
-
-// The amount of liquidity that will be locked in pool when creating pools
-export const DEX_V2_DEFAULT_POOL_ADA = 3_000_000n;
-export const DEX_V2_MAX_LIQUIDITY = 9_223_372_036_854_775_807n;
-export const MINIMUM_LIQUIDITY = 10n;
+import { LP_COLATERAL, MINSWAP_V2_DEFAULT_POOL_ADA, MINSWAP_V2_MAX_LIQUIDITY } from "../constants";
 
 export type BuildCreatePoolOptions = {
-  lucid: Translucent;
+  t: Translucent;
   tx: Tx;
   minswapDeployedValidators: DeployedValidators;
   factoryUTxO: UTxO;
@@ -32,14 +28,14 @@ export type BuildCreatePoolOptions = {
 
 export function buildCreatePool(options: BuildCreatePoolOptions) {
   const { Data, toUnit } = T;
-  const { lucid, pool, tx, factoryUTxO, minswapDeployedValidators } = options;
+  const { t, pool, tx, factoryUTxO, minswapDeployedValidators } = options;
   const {
     poolEnterpriseAddress,
     poolBatchingScriptHash,
     authenPolicyId,
     poolAuthAssetName,
     factoryAuthAssetName,
-  } = generateMinswapAmmParams(lucid);
+  } = generateMinswapAmmParams(t);
 
   const factoryRedeemer: FactoryValidatorValidateFactory["redeemer"] = {
     assetA: pool.assetA,
@@ -74,9 +70,9 @@ export function buildCreatePool(options: BuildCreatePoolOptions) {
     pool.amountB,
   );
   const remainingLiquidity =
-    DEX_V2_MAX_LIQUIDITY - (initialLiquidity - MINIMUM_LIQUIDITY);
+    MINSWAP_V2_MAX_LIQUIDITY - (initialLiquidity - LP_COLATERAL);
   const poolAssets = {
-    lovelace: DEX_V2_DEFAULT_POOL_ADA,
+    lovelace: MINSWAP_V2_DEFAULT_POOL_ADA,
     [toUnit(pool.assetB.policyId, pool.assetB.assetName)]: pool.amountB,
     [poolAuthAsset]: 1n,
     [poolLpAsset]: remainingLiquidity,
@@ -88,9 +84,13 @@ export function buildCreatePool(options: BuildCreatePoolOptions) {
       pool.amountA;
   }
   const poolDatum: PoolValidatorValidatePool["datum"] = {
-    poolBatchingStakeCredential: validatorHash2StakeCredential(
-      poolBatchingScriptHash,
-    ),
+    poolBatchingStakeCredential: {
+      Inline: [
+        {
+          ScriptCredential: [poolBatchingScriptHash],
+        },
+      ],
+    },
     assetA: pool.assetA,
     assetB: pool.assetB,
     totalLiquidity: initialLiquidity,

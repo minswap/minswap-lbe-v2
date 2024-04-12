@@ -20,20 +20,20 @@ export type GenerateMinswapAmmParams = ReturnType<
   typeof generateMinswapAmmParams
 >;
 
-export function generateMinswapAmmParams(lucid: Translucent) {
+export function generateMinswapAmmParams(t: Translucent) {
   const fileContent = fs.readFileSync(
     path.resolve("dex-v2-parameters-testnet.json"),
     "utf8",
   );
   const ammParams = JSON.parse(fileContent);
   const validators = collectMinswapValidators();
-  const factoryAddress = lucid.utils.validatorToAddress(
+  const factoryAddress = t.utils.validatorToAddress(
     validators.factoryValidator,
   );
-  const authenPolicyId = lucid.utils.validatorToScriptHash(
+  const authenPolicyId = t.utils.validatorToScriptHash(
     validators.authenValidator,
   );
-  const poolBatchingScriptHash = lucid.utils.validatorToScriptHash(
+  const poolBatchingScriptHash = t.utils.validatorToScriptHash(
     validators.poolBatchingValidator,
   );
   const factoryAuthAsset = {
@@ -42,7 +42,7 @@ export function generateMinswapAmmParams(lucid: Translucent) {
   };
   const poolAuthAssetName = T.fromText(ammParams.poolNFTName);
   const factoryAuthAssetName = T.fromText(ammParams.factoryNFTName);
-  const poolEnterpriseAddress = lucid.utils.validatorToAddress(
+  const poolEnterpriseAddress = t.utils.validatorToAddress(
     validators.poolValidator,
   );
 
@@ -80,7 +80,10 @@ export function collectMinswapValidators(): MinswapValidators {
 export type GenerateMinswapValidators = ReturnType<
   typeof generateMinswapValidators
 >;
-export function generateMinswapValidators(lucid: Translucent, dry: boolean=true) {
+export function generateMinswapValidators(
+  t: Translucent,
+  dry: boolean = true,
+) {
   const fileContent = fs.readFileSync(
     path.resolve("dex-v2-parameters-testnet.json"),
     "utf8",
@@ -93,14 +96,14 @@ export function generateMinswapValidators(lucid: Translucent, dry: boolean=true)
     outputIndex: BigInt(outputIndex),
   });
   const authenValidatorHash =
-    lucid.utils.validatorToScriptHash(authenValidator);
+    t.utils.validatorToScriptHash(authenValidator);
   const poolValidator = new PoolValidatorValidatePool(authenValidatorHash);
-  const poolValidatorHash = lucid.utils.validatorToScriptHash(poolValidator);
+  const poolValidatorHash = t.utils.validatorToScriptHash(poolValidator);
   const poolBatchingValidator = new PoolValidatorValidatePoolBatching(
     authenValidatorHash,
     { ScriptCredential: [poolValidatorHash] },
   );
-  const poolBatchingHash = lucid.utils.validatorToScriptHash(
+  const poolBatchingHash = t.utils.validatorToScriptHash(
     poolBatchingValidator,
   );
   const factoryValidator = new FactoryValidatorValidateFactory(
@@ -137,11 +140,3 @@ export function generateMinswapValidators(lucid: Translucent, dry: boolean=true)
   }
   return data;
 }
-
-// const fn = async () => {
-//   await T.loadModule();
-//   const emulator = new T.Emulator([]);
-//   const lucid = await T.Translucent.new(emulator);
-//   generateMinswapValidators(lucid);
-// };
-// fn();

@@ -3,8 +3,14 @@ import path from "path";
 import * as T from "@minswap/translucent";
 import type { MinswapValidators } from "./minswap-amm";
 import type { OutRef, Script, Translucent, Tx, UTxO } from "./types";
-import { AuthenMintingPolicyValidateAuthen, FactoryValidatorValidateFactory, OrderValidatorFeedType, OrderValidatorValidateOrder, OrderValidatorValidateOrderSpending, TreasuryValidatorValidateTreasury } from "../plutus";
-import { validatorHash2StakeCredential } from "./utils";
+import {
+  AuthenMintingPolicyValidateAuthen,
+  FactoryValidatorValidateFactory,
+  OrderValidatorFeedType,
+  OrderValidatorValidateOrder,
+  OrderValidatorValidateOrderSpending,
+  TreasuryValidatorValidateTreasury,
+} from "../plutus";
 
 export type Validators = {
   authenValidator: Script;
@@ -16,11 +22,11 @@ export type Validators = {
 };
 
 export function collectValidators(options: {
-  lucid: Translucent,
-  seedOutRef?: OutRef,
-  dry: boolean,
+  t: Translucent;
+  seedOutRef?: OutRef;
+  dry: boolean;
 }): Validators {
-  let { lucid, seedOutRef, dry } = options;
+  let { t, seedOutRef, dry } = options;
   if (!seedOutRef) {
     const fileContent = fs.readFileSync(path.resolve("params.json"), "utf-8");
     seedOutRef = JSON.parse(fileContent).seedOutRef;
@@ -30,23 +36,26 @@ export function collectValidators(options: {
     outputIndex: BigInt(seedOutRef!.outputIndex),
   });
   const authenValidatorHash =
-    lucid.utils.validatorToScriptHash(authenValidator);
+    t.utils.validatorToScriptHash(authenValidator);
   const treasuryValidator = new TreasuryValidatorValidateTreasury(
     authenValidatorHash,
   );
   const treasuryValidatorHash =
-    lucid.utils.validatorToScriptHash(treasuryValidator);
+    t.utils.validatorToScriptHash(treasuryValidator);
   const orderSpendingValidator = new OrderValidatorValidateOrderSpending(
     treasuryValidatorHash,
   );
-  const orderSpendingValidatorHash = lucid.utils.validatorToScriptHash(
+  const orderSpendingValidatorHash = t.utils.validatorToScriptHash(
     orderSpendingValidator,
   );
-  const stakeCredential = validatorHash2StakeCredential(
-    orderSpendingValidatorHash,
-  );
-  const orderValidator = new OrderValidatorValidateOrder(stakeCredential);
-  const orderValidatorHash = lucid.utils.validatorToScriptHash(orderValidator);
+  const orderValidator = new OrderValidatorValidateOrder({
+    Inline: [
+      {
+        ScriptCredential: [orderSpendingValidatorHash],
+      },
+    ],
+  });
+  const orderValidatorHash = t.utils.validatorToScriptHash(orderValidator);
   const factoryValidator = new FactoryValidatorValidateFactory(
     authenValidatorHash,
     treasuryValidatorHash,
@@ -76,9 +85,9 @@ export function collectValidators(options: {
   return validators;
 }
 
-function buildDeployValidator(lucid: Translucent, validator: Script): Tx {
-  const validatorAddress = lucid.utils.validatorToAddress(validator);
-  const tx = lucid.newTx().payToContract(
+function buildDeployValidator(t: Translucent, validator: Script): Tx {
+  const validatorAddress = t.utils.validatorToAddress(validator);
+  const tx = t.newTx().payToContract(
     validatorAddress,
     {
       inline: "d87980", // 121([])
@@ -94,11 +103,11 @@ type KeyValueTuple<T> = [string, T];
 type DeployedValidator = [string, UTxO];
 
 async function processElement(
-  lucid: Translucent,
+  t: Translucent,
   key: string,
   validator: Script,
 ): Promise<DeployedValidator> {
-  const validatorTx = buildDeployValidator(lucid, validator);
+  const validatorTx = buildDeployValidator(t, validator);
   const completedTx = await validatorTx.complete();
   const finalOutputs = completedTx.txComplete.to_js_value().body.outputs;
   const scriptV2 = (
@@ -124,7 +133,7 @@ async function processElement(
     datum: "d87980", // 121([])
   };
   const newValidator: DeployedValidator = [key, newUtxo];
-  await lucid.awaitTx(txHash);
+  await t.awaitTx(txHash);
   return newValidator;
 }
 
@@ -144,22 +153,22 @@ async function executePromiseFunctions<T>(
 export type DeployedValidators = Record<string, UTxO>;
 
 export async function deployValidators(
-  lucid: Translucent,
+  t: Translucent,
   validators: Validators,
 ): Promise<DeployedValidators> {
   const deploymentsChain = [
-    () => processElement(lucid, "authenValidator", validators!.authenValidator),
+    () => processElement(t, "authenValidator", validators!.authenValidator),
     () =>
-      processElement(lucid, "treasuryValidator", validators!.treasuryValidator),
+      processElement(t, "treasuryValidator", validators!.treasuryValidator),
     () =>
       processElement(
-        lucid,
+        t,
         "orderSpendingValidator",
         validators!.orderSpendingValidator,
       ),
-    () => processElement(lucid, "orderValidator", validators!.orderValidator),
+    () => processElement(t, "orderValidator", validators!.orderValidator),
     () =>
-      processElement(lucid, "factoryValidator", validators!.factoryValidator),
+      processElement(t, "factoryValidator", validators!.factoryValidator),
   ];
   let res: DeployedValidators = {};
 
@@ -175,14 +184,14 @@ export async function deployValidators(
 }
 
 export async function deployMinswapValidators(
-  lucid: Translucent,
+  t: Translucent,
   validators: MinswapValidators,
 ): Promise<DeployedValidators> {
   const deploymentsChain = [
-    () => processElement(lucid, "authenValidator", validators!.authenValidator),
-    () => processElement(lucid, "poolValidator", validators!.poolValidator),
+    () => processElement(t, "authenValidator", validators!.authenValidator),
+    () => processElement(t, "poolValidator", validators!.poolValidator),
     () =>
-      processElement(lucid, "factoryValidator", validators!.factoryValidator),
+      processElement(t, "factoryValidator", validators!.factoryValidator),
   ];
   let res: DeployedValidators = {};
 
