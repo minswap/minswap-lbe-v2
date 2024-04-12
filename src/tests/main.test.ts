@@ -104,9 +104,13 @@ beforeEach(async () => {
   lucid.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
   const utxos = await emulator.getUtxos(ACCOUNT_1.address);
   seedUtxo = utxos[utxos.length - 1];
-  validators = collectValidators(lucid, {
-    txHash: seedUtxo.txHash,
-    outputIndex: seedUtxo.outputIndex,
+  validators = collectValidators({
+    lucid,
+    seedOutRef: {
+      txHash: seedUtxo.txHash,
+      outputIndex: seedUtxo.outputIndex,
+    },
+    dry: true
   });
   deployedValidators = await deployValidators(lucid, validators);
   emulator.awaitBlock(1);
