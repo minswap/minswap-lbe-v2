@@ -30,7 +30,7 @@ import {
 } from "./constants.ts";
 
 export type BaseBuildOptions = {
-  lucid: Translucent;
+  t: Translucent;
   tx: Tx;
   validatorRefs: any;
 };
@@ -41,7 +41,7 @@ export type BuildInitFactoryOptions = {
 
 export function buildInitFactory({
   validatorRefs: { validators, deployedValidators },
-  lucid,
+  t,
   seedUtxo,
   tx,
 }: BaseBuildOptions & BuildInitFactoryOptions) {
@@ -55,10 +55,10 @@ export function buildInitFactory({
   const metadata = {
     msg: [`Minswap V2: LBE Init Factory.`],
   };
-  const factoryAddress = lucid.utils.validatorToAddress(
+  const factoryAddress = t.utils.validatorToAddress(
     validators.factoryValidator,
   );
-  const authenPolicyId = lucid.utils.validatorToScriptHash(
+  const authenPolicyId = t.utils.validatorToScriptHash(
     validators.authenValidator,
   );
   const factoryAuthAssets = {
@@ -92,7 +92,7 @@ export type BuildCreateTreasury = {
 
 export function buildCreateTreasury({
   validatorRefs: { validators, deployedValidators },
-  lucid,
+  t,
   tx,
   factoryUtxo,
   treasuryDatum,
@@ -100,10 +100,10 @@ export function buildCreateTreasury({
   const { Data, toUnit } = T;
   const authenRedeemer: AuthenMintingPolicyValidateAuthen["redeemer"] =
     "CreateTreasury";
-  const authenPolicyId = lucid.utils.validatorToScriptHash(
+  const authenPolicyId = t.utils.validatorToScriptHash(
     validators.authenValidator,
   );
-  const treasuryAddress = lucid.utils.validatorToAddress(
+  const treasuryAddress = t.utils.validatorToAddress(
     validators!.treasuryValidator,
   );
   const factoryRedeemer: FactoryValidatorValidateFactory["redeemer"] = {
@@ -210,7 +210,7 @@ export type BuildDepositOptions = {
 
 export function buildDeposit({
   validatorRefs: { validators },
-  lucid,
+  t,
   tx,
   owner,
   baseAsset,
@@ -226,7 +226,7 @@ export function buildDeposit({
     owner: address2PlutusAddress(owner),
     lpAssetName,
     expectOutputAsset: {
-      policyId: lucid.utils.validatorToScriptHash(validators!.authenValidator),
+      policyId: t.utils.validatorToScriptHash(validators!.authenValidator),
       assetName: lpAssetName,
     },
     minimumReceive: amount,
@@ -244,9 +244,7 @@ export function buildDeposit({
   const metadata = {
     msg: [`Minswap V2: LBE Deposit.`],
   };
-  const orderAddress = lucid.utils.validatorToAddress(
-    validators!.orderValidator,
-  );
+  const orderAddress = t.utils.validatorToAddress(validators!.orderValidator);
   const txBuilder = tx
     .payToAddressWithData(
       orderAddress,
@@ -313,7 +311,7 @@ export function buildApplyOrders(
 ) {
   const { Data, toUnit } = T;
   const {
-    lucid,
+    t,
     tx,
     validatorRefs: { deployedValidators, validators },
     treasuryUTxO,
@@ -324,7 +322,7 @@ export function buildApplyOrders(
   const treasuryRedeemer: TreasuryValidatorValidateTreasury["redeemer"] =
     "Batching";
   const orderRedeemer: OrderValidatorFeedType["_redeemer"] = "ApplyOrder";
-  const orderRewardAddress = lucid.utils.validatorToRewardAddress(
+  const orderRewardAddress = t.utils.validatorToRewardAddress(
     validators!.orderSpendingValidator,
   );
   const orderBatchingRedeemer: OrderValidatorValidateOrderSpending["redeemer"] =
@@ -349,7 +347,7 @@ export function buildApplyOrders(
       raiseAsset = "lovelace";
     }
     const purrAsset = toUnit(
-      lucid.utils.validatorToScriptHash(validators!.authenValidator),
+      t.utils.validatorToScriptHash(validators!.authenValidator),
       getPurrAssetName(treasuryDatum),
     );
     for (const order of orderUTxOs) {
@@ -407,7 +405,7 @@ export function buildApplyOrders(
   const sortedOrderUTxos = sortUTxOs(orderUTxOs);
   for (const order of sortedOrderUTxos) {
     const orderDatum = Data.from(order.datum!, OrderValidatorFeedType._datum);
-    const owner = plutusAddress2Address(lucid.network, orderDatum.owner);
+    const owner = plutusAddress2Address(t.network, orderDatum.owner);
     const assets = {
       lovelace: 1_500_000n,
       [toUnit(
@@ -440,7 +438,7 @@ export function buildCreateAmmPool(
 ) {
   const { toUnit, Data } = T;
   const {
-    lucid,
+    t,
     tx,
     validatorRefs: { deployedValidators },
     treasuryUTxO,
@@ -456,7 +454,7 @@ export function buildCreateAmmPool(
     treasuryUTxO.datum!,
     TreasuryValidatorValidateTreasury.datum,
   );
-  const owner = plutusAddress2Address(lucid.network, treasuryDatum.owner);
+  const owner = plutusAddress2Address(t.network, treasuryDatum.owner);
   const totalLiquidity = calculateInitialLiquidity(
     treasuryDatum.reserveBase,
     treasuryDatum.reserveRaise,

@@ -9,7 +9,11 @@ import {
 import { calculateInitialLiquidity } from "./utils";
 import type { Translucent, Tx, UTxO } from "../types";
 import type { DeployedValidators } from "../deploy-validators";
-import { LP_COLATERAL, MINSWAP_V2_DEFAULT_POOL_ADA, MINSWAP_V2_MAX_LIQUIDITY } from "../constants";
+import {
+  LP_COLATERAL,
+  MINSWAP_V2_DEFAULT_POOL_ADA,
+  MINSWAP_V2_MAX_LIQUIDITY,
+} from "../constants";
 
 export type BuildCreatePoolOptions = {
   t: Translucent;

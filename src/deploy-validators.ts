@@ -35,8 +35,7 @@ export function collectValidators(options: {
     transactionId: { hash: seedOutRef!.txHash },
     outputIndex: BigInt(seedOutRef!.outputIndex),
   });
-  const authenValidatorHash =
-    t.utils.validatorToScriptHash(authenValidator);
+  const authenValidatorHash = t.utils.validatorToScriptHash(authenValidator);
   const treasuryValidator = new TreasuryValidatorValidateTreasury(
     authenValidatorHash,
   );
@@ -158,8 +157,7 @@ export async function deployValidators(
 ): Promise<DeployedValidators> {
   const deploymentsChain = [
     () => processElement(t, "authenValidator", validators!.authenValidator),
-    () =>
-      processElement(t, "treasuryValidator", validators!.treasuryValidator),
+    () => processElement(t, "treasuryValidator", validators!.treasuryValidator),
     () =>
       processElement(
         t,
@@ -167,8 +165,7 @@ export async function deployValidators(
         validators!.orderSpendingValidator,
       ),
     () => processElement(t, "orderValidator", validators!.orderValidator),
-    () =>
-      processElement(t, "factoryValidator", validators!.factoryValidator),
+    () => processElement(t, "factoryValidator", validators!.factoryValidator),
   ];
   let res: DeployedValidators = {};
 
@@ -190,8 +187,7 @@ export async function deployMinswapValidators(
   const deploymentsChain = [
     () => processElement(t, "authenValidator", validators!.authenValidator),
     () => processElement(t, "poolValidator", validators!.poolValidator),
-    () =>
-      processElement(t, "factoryValidator", validators!.factoryValidator),
+    () => processElement(t, "factoryValidator", validators!.factoryValidator),
   ];
   let res: DeployedValidators = {};
 

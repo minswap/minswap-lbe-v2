@@ -80,10 +80,7 @@ export function collectMinswapValidators(): MinswapValidators {
 export type GenerateMinswapValidators = ReturnType<
   typeof generateMinswapValidators
 >;
-export function generateMinswapValidators(
-  t: Translucent,
-  dry: boolean = true,
-) {
+export function generateMinswapValidators(t: Translucent, dry: boolean = true) {
   const fileContent = fs.readFileSync(
     path.resolve("dex-v2-parameters-testnet.json"),
     "utf8",
@@ -95,17 +92,16 @@ export function generateMinswapValidators(
     transactionId: { hash: txHash },
     outputIndex: BigInt(outputIndex),
   });
-  const authenValidatorHash =
-    t.utils.validatorToScriptHash(authenValidator);
+  const authenValidatorHash = t.utils.validatorToScriptHash(authenValidator);
   const poolValidator = new PoolValidatorValidatePool(authenValidatorHash);
   const poolValidatorHash = t.utils.validatorToScriptHash(poolValidator);
   const poolBatchingValidator = new PoolValidatorValidatePoolBatching(
     authenValidatorHash,
-    { ScriptCredential: [poolValidatorHash] },
+    {
+      ScriptCredential: [poolValidatorHash],
+    },
   );
-  const poolBatchingHash = t.utils.validatorToScriptHash(
-    poolBatchingValidator,
-  );
+  const poolBatchingHash = t.utils.validatorToScriptHash(poolBatchingValidator);
   const factoryValidator = new FactoryValidatorValidateFactory(
     authenValidatorHash,
     poolValidatorHash,

@@ -51,19 +51,7 @@ const initParams = async () => {
 };
 
 const collect = () => {
-  const fileContent = fs.readFileSync(path.resolve("params.json"), {
-    encoding: "utf-8",
-  });
-  const { seedOutRef } = JSON.parse(fileContent);
-  const validators = collectValidators({t, seedOutRef);
-  const jsonData = JSON.stringify(validators, null, 2);
-  fs.writeFile("validators.json", jsonData, "utf8", (err) => {
-    if (err) {
-      console.error("Error writing JSON file:", err);
-      return;
-    }
-    console.log("validators.json file has been saved.");
-  });
+  collectValidators({ t, dry: false });
 };
 
 const collectAmm = () => {

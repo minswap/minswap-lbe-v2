@@ -43,7 +43,7 @@ import type {
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
 let emulator: Emulator;
-let lucid: Translucent;
+let t: Translucent;
 let validators: Validators;
 let deployedValidators: DeployedValidators;
 let seedUtxo: UTxO;
@@ -97,36 +97,34 @@ beforeEach(async () => {
     },
   };
   emulator = new T.Emulator([ACCOUNT_0, ACCOUNT_1, factoryAccount]);
-  lucid = await T.Translucent.new(emulator);
+  t = await T.Translucent.new(emulator);
   emulator.awaitBlock(10_000); // For validity ranges to be valid
-  lucid.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
+  t.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
   const utxos = await emulator.getUtxos(ACCOUNT_1.address);
   seedUtxo = utxos[utxos.length - 1];
   validators = collectValidators({
-    t: lucid,
+    t: t,
     seedOutRef: {
       txHash: seedUtxo.txHash,
       outputIndex: seedUtxo.outputIndex,
     },
-    dry: true
+    dry: true,
   });
-  deployedValidators = await deployValidators(lucid, validators);
+  deployedValidators = await deployValidators(t, validators);
   emulator.awaitBlock(1);
 
   // registerStake
   await quickSubmitBuilder(emulator)({
-    txBuilder: lucid
+    txBuilder: t
       .newTx()
       .registerStake(
-        lucid.utils.validatorToRewardAddress(
-          validators!.orderSpendingValidator,
-        ),
+        t.utils.validatorToRewardAddress(validators!.orderSpendingValidator),
       ),
   });
 
   minswapValidators = collectMinswapValidators();
   minswapDeployedValidators = await deployMinswapValidators(
-    lucid,
+    t,
     minswapValidators,
   );
 });
@@ -143,8 +141,8 @@ test("happy case - full flow", async () => {
 
   // Step 1: Init Factory
   const initFactoryBuilder = buildInitFactory({
-    lucid,
-    tx: lucid.newTx(),
+    t: t,
+    tx: t.newTx(),
     validatorRefs: {
       validators,
       deployedValidators,
@@ -169,13 +167,13 @@ test("happy case - full flow", async () => {
       policyId: "",
       assetName: "",
     },
-    discoveryStartTime: BigInt(lucid.utils.slotToUnixTime(discoveryStartSlot)),
-    discoveryEndTime: BigInt(lucid.utils.slotToUnixTime(discoveryEndSlot)),
-    encounterStartTime: BigInt(lucid.utils.slotToUnixTime(encounterStartSlot)),
+    discoveryStartTime: BigInt(t.utils.slotToUnixTime(discoveryStartSlot)),
+    discoveryEndTime: BigInt(t.utils.slotToUnixTime(discoveryEndSlot)),
+    encounterStartTime: BigInt(t.utils.slotToUnixTime(encounterStartSlot)),
     owner: address2PlutusAddress(ACCOUNT_0.address),
     minimumRaise: null,
     maximumRaise: null,
-    orderHash: lucid.utils.validatorToScriptHash(validators!.orderValidator),
+    orderHash: t.utils.validatorToScriptHash(validators!.orderValidator),
     reserveBase: 69_000_000_000_000n,
     reserveRaise: 0n,
     totalLiquidity: 0n,
@@ -183,8 +181,8 @@ test("happy case - full flow", async () => {
     isCreatedPool: 0n,
   };
   const createFactoryBuilder = buildCreateTreasury({
-    lucid,
-    tx: lucid.newTx(),
+    t: t,
+    tx: t.newTx(),
     validatorRefs: {
       validators,
       deployedValidators,
@@ -192,7 +190,7 @@ test("happy case - full flow", async () => {
     treasuryDatum,
     factoryUtxo: (
       await emulator.getUtxos(
-        lucid.utils.validatorToAddress(validators!.factoryValidator),
+        t.utils.validatorToAddress(validators!.factoryValidator),
       )
     ).find((u) => !u.scriptRef) as UTxO,
   });
@@ -206,8 +204,8 @@ test("happy case - full flow", async () => {
   const pendingOrderTxIds: string[] = [];
   for (let i = 0; i < 2; i++) {
     const depositBuilder = buildDeposit({
-      lucid,
-      tx: lucid.newTx(),
+      t: t,
+      tx: t.newTx(),
       validatorRefs: {
         validators,
         deployedValidators,
@@ -235,8 +233,8 @@ test("happy case - full flow", async () => {
     ])
   )[0];
   const cancelBuilder = buildCancelOrder({
-    lucid,
-    tx: lucid.newTx(),
+    t: t,
+    tx: t.newTx(),
     validatorRefs: {
       validators,
       deployedValidators,
@@ -259,14 +257,14 @@ test("happy case - full flow", async () => {
   );
   let treasuryUTxO = (
     await emulator.getUtxos(
-      lucid.utils.validatorToAddress(validators!.treasuryValidator),
+      t.utils.validatorToAddress(validators!.treasuryValidator),
     )
   ).find((u) => u.scriptRef === undefined)!;
-  let validFrom = lucid.utils.slotToUnixTime(emulator.slot);
-  let validTo = lucid.utils.slotToUnixTime(emulator.slot + 60 * 10);
+  let validFrom = t.utils.slotToUnixTime(emulator.slot);
+  let validTo = t.utils.slotToUnixTime(emulator.slot + 60 * 10);
   const applyOrderBuilder = buildApplyOrders({
-    lucid,
-    tx: lucid.newTx(),
+    t: t,
+    tx: t.newTx(),
     validatorRefs: {
       validators,
       deployedValidators,
@@ -287,7 +285,7 @@ test("happy case - full flow", async () => {
   emulator.awaitSlot(waitSlots);
   treasuryUTxO = treasuryUTxO = (
     await emulator.getUtxos(
-      lucid.utils.validatorToAddress(validators!.treasuryValidator),
+      t.utils.validatorToAddress(validators!.treasuryValidator),
     )
   ).find((u) => u.scriptRef === undefined)!;
   const ammFactoryUTxO = await emulator.getUtxoByUnit(
@@ -296,7 +294,7 @@ test("happy case - full flow", async () => {
       minswapData!.factoryAuthAsset.tokenName,
     ),
   );
-  const createPoolValidFrom = lucid.utils.slotToUnixTime(emulator.slot);
+  const createPoolValidFrom = t.utils.slotToUnixTime(emulator.slot);
 
   const curTreasuryDatum: TreasuryValidatorValidateTreasury["datum"] =
     T.Data.from(treasuryUTxO.datum!, TreasuryValidatorValidateTreasury.datum);
@@ -306,8 +304,8 @@ test("happy case - full flow", async () => {
   });
 
   const buildCreatePoolResult = buildCreateAmmPool({
-    lucid,
-    tx: lucid.newTx(),
+    t: t,
+    tx: t.newTx(),
     validatorRefs: {
       validators,
       deployedValidators,
@@ -318,7 +316,7 @@ test("happy case - full flow", async () => {
   });
   console.log({ ...buildCreatePoolResult, txBuilder: undefined });
   const buildAmmPoolResult = buildCreatePool({
-    t: lucid,
+    t: t,
     tx: buildCreatePoolResult.txBuilder,
     minswapDeployedValidators,
     factoryUTxO: ammFactoryUTxO,
@@ -346,8 +344,8 @@ test("test only create AMM Pool", async () => {
     ),
   );
   const options: BuildCreatePoolOptions = {
-    t: lucid,
-    tx: lucid.newTx(),
+    t: t,
+    tx: t.newTx(),
     minswapDeployedValidators,
     factoryUTxO: ammFactoryUTxO,
     pool: {
