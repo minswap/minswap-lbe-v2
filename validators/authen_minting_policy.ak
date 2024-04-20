@@ -9,12 +9,10 @@ use aiken/transaction/credential
 use aiken/transaction/value.{PolicyId}
 use lb_v2/test_suits
 use lb_v2/types.{
-  Asset, AuthenRedeemer, CreateTreasury, FactoryDatum, FactoryRedeemer,
+  AuthenRedeemer, CreateTreasury, FactoryDatum, FactoryRedeemer,
   MintFactoryAuthen,
 }
-use lb_v2/utils.{
-  compute_lp_asset_name, factory_auth_an, sort_two_assets, treasury_auth_an,
-}
+use lb_v2/utils.{factory_auth_an, treasury_auth_an}
 use lb_v2/validation.{get_treasury_creation_expected_mint}
 
 validator(out_ref: OutputReference) {
@@ -62,10 +60,10 @@ validator(out_ref: OutputReference) {
         }
       }
       CreateTreasury -> {
-        let Transaction { inputs, mint, redeemers, .. } = transaction
+        let Transaction { inputs, mint, .. } = transaction
         // validate that there's a single Factory UTxO in the Transaction Inputs. 
         // Factory UTxO must contain Factory NFT Token in the value
-        expect [factory_input] =
+        expect [_] =
           list.filter(
             inputs,
             fn(input) {
@@ -74,40 +72,8 @@ validator(out_ref: OutputReference) {
               value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1
             },
           )
-        let Input { output_reference: factory_input_ref, .. } = factory_input
-        let redeemer_list = dict.to_list(redeemers)
-        expect [(_, raw_factory_redeemer)] =
-          list.filter(
-            redeemer_list,
-            fn(r) {
-              let (p, _) = r
-              when p is {
-                Spend(ref) -> factory_input_ref == ref
-                _ -> False
-              }
-            },
-          )
-        expect factory_redeemer: FactoryRedeemer = raw_factory_redeemer
-        let FactoryRedeemer { base_asset, raise_asset } = factory_redeemer
-        let (asset_a, asset_b) = sort_two_assets(base_asset, raise_asset)
-        let Asset {
-          policy_id: asset_a_policy_id,
-          asset_name: asset_a_asset_name,
-        } = asset_a
-        let Asset {
-          policy_id: asset_b_policy_id,
-          asset_name: asset_b_asset_name,
-        } = asset_b
-        let lp_asset_name =
-          compute_lp_asset_name(
-            asset_a_policy_id,
-            asset_a_asset_name,
-            asset_b_policy_id,
-            asset_b_asset_name,
-          )
         value.from_minted_value(mint) == get_treasury_creation_expected_mint(
           authen_policy_id: authen_policy_id,
-          lp_asset_name: lp_asset_name,
         )
       }
     }
@@ -174,7 +140,7 @@ test test_validate_authen_create_treasury() {
   let policy_id: PolicyId = test_suits.gen_authen_minting_policy_id()
   let purpose = Mint(policy_id)
   let factory_input = test_suits.gen_factory_input()
-  expect [base_asset, raise_asset, lp_asset] = test_suits.gen_lbe_assets()
+  expect [base_asset, raise_asset, _] = test_suits.gen_lbe_assets()
   let f_redeemer: Redeemer = FactoryRedeemer { base_asset, raise_asset }
   let transaction_redeemers: Dict<ScriptPurpose, Redeemer> =
     dict.new()
@@ -191,7 +157,6 @@ test test_validate_authen_create_treasury() {
     value.zero()
       |> value.add(policy_id, factory_auth_an, 1)
       |> value.add(policy_id, treasury_auth_an, 1)
-      |> value.add(policy_id, lp_asset.asset_name, 9223372036854775807)
       |> value.to_minted_value
   let sc =
     ScriptContext {

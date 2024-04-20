@@ -127,7 +127,6 @@ validator(
       },
       value.from_minted_value(mint) == validation.get_treasury_creation_expected_mint(
         authen_policy_id: authen_policy_id,
-        lp_asset_name: lp_asset_name,
       ),
       validation.validate_creating_treasury_out(
         treasury_out_value: treasury_out_value,
@@ -136,8 +135,6 @@ validator(
         raise_asset: raise_asset,
         order_hash: order_hash,
         authen_policy_id: authen_policy_id,
-        treasury_auth_an: treasury_auth_an,
-        lp_asset_name: lp_asset_name,
       ),
     }
   }
@@ -156,7 +153,6 @@ test test_001_create_treasury_passed() {
   let mint =
     validation.get_treasury_creation_expected_mint(
       authen_policy_id: authen_policy_id,
-      lp_asset_name: lp_asset.asset_name,
     )
       |> value.to_minted_value
   let purpose = Spend(f_in_out_ref)

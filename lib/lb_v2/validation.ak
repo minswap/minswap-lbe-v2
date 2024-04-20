@@ -164,8 +164,6 @@ pub fn validate_creating_treasury_out(
   raise_asset: Asset,
   order_hash: ValidatorHash,
   authen_policy_id: PolicyId,
-  treasury_auth_an: AssetName,
-  lp_asset_name: AssetName,
 ) -> Bool {
   let TreasuryDatum {
     base_asset: t_base_asset,
@@ -175,6 +173,12 @@ pub fn validate_creating_treasury_out(
     reserve_raise,
     total_liquidity,
     is_cancel,
+    discovery_start_time,
+    discovery_end_time,
+    encounter_start_time,
+    minimum_raise,
+    maximum_raise,
+    is_created_pool,
     ..
   } = treasury_out_datum
   let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
@@ -182,7 +186,6 @@ pub fn validate_creating_treasury_out(
   let expected_treasury_out_value =
     value.zero()
       |> value.add(authen_policy_id, treasury_auth_an, 1)
-      |> value.add(authen_policy_id, lp_asset_name, 9223372036854775807)
       |> value.add(base_asset_pid, base_asset_an, t_reserve_base)
   and {
     t_base_asset == base_asset,
@@ -194,17 +197,25 @@ pub fn validate_creating_treasury_out(
     total_liquidity == 0,
     reserve_raise == 0,
     is_cancel == 0,
+    is_created_pool == 0,
+    discovery_start_time > 0,
+    discovery_start_time < discovery_end_time,
+    discovery_end_time < encounter_start_time,
+    when minimum_raise is {
+      Some(minn) ->
+        when maximum_raise is {
+          Some(maxx) -> minn < maxx
+          _ -> True
+        } && minn > 0
+      _ -> True
+    },
   }
 }
 
-pub fn get_treasury_creation_expected_mint(
-  authen_policy_id: PolicyId,
-  lp_asset_name: AssetName,
-) -> Value {
+pub fn get_treasury_creation_expected_mint(authen_policy_id: PolicyId) -> Value {
   value.zero()
     |> value.add(authen_policy_id, factory_auth_an, 1)
     |> value.add(authen_policy_id, treasury_auth_an, 1)
-    |> value.add(authen_policy_id, lp_asset_name, 9223372036854775807)
 }
 
 pub fn get_treasury_input(

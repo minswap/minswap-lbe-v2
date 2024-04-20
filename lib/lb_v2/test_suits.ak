@@ -160,25 +160,12 @@ pub fn gen_dummy_treasury_out() -> Output {
       asset_name: @"h'42415345'" |> bytearray.from_string,
     }
   let raise_asset = Asset { policy_id: #"", asset_name: #"" }
-  let lp_asset_name =
-    compute_lp_asset_name(
-      raise_asset.policy_id,
-      raise_asset.asset_name,
-      base_asset.policy_id,
-      base_asset.asset_name,
-    )
-  let lp_asset =
-    Asset {
-      policy_id: @"h'ceee94bdc6c54c1d7361b3dd1a0d586188082f8a8ab55f1fa0e90352'"
-        |> bytearray.from_string,
-      asset_name: lp_asset_name,
-    }
+  let authen_policy_id = gen_authen_minting_policy_id()
   let value =
     value.zero()
       |> value.add(ada_policy_id, ada_asset_name, 10000000)
-      |> value.add(lp_asset.policy_id, treasury_auth_an, 1)
+      |> value.add(authen_policy_id, treasury_auth_an, 1)
       |> value.add(base_asset.policy_id, base_asset.asset_name, 100000000) // 100 * 1e6
-      |> value.add(lp_asset.policy_id, lp_asset.asset_name, 9223372036854775807)
   let treasury_datum: TreasuryDatum =
     TreasuryDatum {
       base_asset,
