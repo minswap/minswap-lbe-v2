@@ -63,7 +63,7 @@ pub type OrderBatchingRedeemer {
 }
 
 pub type AuthenRedeemer {
-  MintFactoryAuthen
+  InitialContract
   CreateTreasury
 }
 

@@ -1,8 +1,9 @@
 use aiken/builtin
+use aiken/dict
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
-  InlineDatum, Input, Output, OutputReference, ValidityRange,
+  InlineDatum, Input, Output, OutputReference, Spend, Transaction, ValidityRange,
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{
@@ -10,9 +11,9 @@ use aiken/transaction/value.{
   zero,
 }
 use lb_v2/types.{
-  ApplyOrderData, ApplyOrderParams, Asset, DatumMap, Deposit, OrderDatum,
-  PoolDatum, RedeemLP, RedeemRaiseAsset, TreasuryDatum, TreasuryState,
-  ValidatorHash,
+  ApplyOrderData, ApplyOrderParams, Asset, DatumMap, Deposit, FactoryDatum,
+  FactoryRedeemer, OrderDatum, PoolDatum, RedeemLP, RedeemRaiseAsset,
+  TreasuryDatum, TreasuryState, ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
@@ -815,4 +816,126 @@ pub fn validate_apply_order(
     ),
     mint_value == value.zero(),
   }
+}
+
+pub fn validate_initial_contract(
+  script_hash: ByteArray,
+  transaction: Transaction,
+  initial_out_ref: OutputReference,
+) -> Bool {
+  let authen_policy_id = script_hash
+  let script_payment_credential = ScriptCredential(script_hash)
+  let Transaction { inputs, mint, outputs, .. } = transaction
+
+  // validate that `initial_out_ref` must be presented in the Transaction Inputs
+  expect [_] =
+    list.filter(
+      inputs,
+      fn(input) {
+        let Input { output_reference, .. } = input
+        output_reference == initial_out_ref
+      },
+    )
+  // Transaction must mint only 1 Factory Auth Asset
+  let mint_value = value.from_minted_value(mint)
+  expect [(minted_pid, minted_an, minted_amount)] = value.flatten(mint_value)
+  expect and {
+      minted_pid == authen_policy_id,
+      minted_an == factory_auth_an,
+      minted_amount == 1,
+    }
+  // validate that there's only 1 Factory UTxO in the Transaction Outputs
+  // The Factory UTxO must contain Factory Token in the value
+  expect [factory_output] =
+    list.filter(
+      outputs,
+      fn(output) {
+        let Output {
+          address: Address(payment_credential, ..),
+          value: out_value,
+          ..
+        } = output
+        and {
+          value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1,
+          payment_credential == script_payment_credential,
+        }
+      },
+    )
+  expect Output { datum: InlineDatum(factory_datum), .. } = factory_output
+  expect FactoryDatum { head, tail }: FactoryDatum = factory_datum
+  and {
+    head == #"00",
+    tail == #"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
+  }
+}
+
+pub fn validate_create_treasury(
+  script_hash: ByteArray,
+  transaction: Transaction,
+) -> Bool {
+  let authen_policy_id = script_hash
+  let script_payment_credential = ScriptCredential(script_hash)
+  let Transaction { inputs, mint, redeemers, .. } = transaction
+  // validate that there's a single Factory UTxO in the Transaction Inputs. 
+  // Factory UTxO must contain Factory NFT Token in the value
+  expect [factory_input] =
+    list.filter(
+      inputs,
+      fn(input) {
+        let Input {
+          output: Output {
+            address: Address(payment_credential, ..),
+            value: out_value,
+            ..
+          },
+          ..
+        } = input
+        if script_payment_credential == payment_credential {
+          expect
+            value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1
+          True
+        } else {
+          False
+        }
+      },
+    )
+  let Input { output_reference: factory_input_ref, .. } = factory_input
+  let redeemer_list = dict.to_list(redeemers)
+  expect [(_, raw_factory_redeemer)] =
+    list.filter(
+      redeemer_list,
+      fn(r) {
+        let (p, _) = r
+        when p is {
+          Spend(ref) -> factory_input_ref == ref
+          _ -> False
+        }
+      },
+    )
+  let factory_redeemer_1: Data =
+    raw_factory_redeemer
+      |> builtin.un_constr_data
+      |> builtin.snd_pair
+
+  expect _: FactoryRedeemer = factory_redeemer_1
+  // let FactoryRedeemer { base_asset, raise_asset } = factory_redeemer
+  // let (asset_a, asset_b) = sort_two_assets(base_asset, raise_asset)
+  // let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
+  //   asset_a
+  // let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
+  //   asset_b
+  // let lp_asset_name =
+  //   compute_lp_asset_name(
+  //     asset_a_policy_id,
+  //     asset_a_asset_name,
+  //     asset_b_policy_id,
+  //     asset_b_asset_name,
+  //   )
+  // expect
+  //   value.from_minted_value(mint) == get_treasury_creation_expected_mint(
+  //     authen_policy_id: authen_policy_id,
+  //     lp_asset_name: lp_asset_name,
+  //   )
+  // TODO: add logic of factory validator
+  True
 }

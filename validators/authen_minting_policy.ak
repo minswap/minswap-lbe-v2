@@ -10,7 +10,7 @@ use aiken/transaction/value.{PolicyId}
 use lb_v2/test_suits
 use lb_v2/types.{
   Asset, AuthenRedeemer, CreateTreasury, FactoryDatum, FactoryRedeemer,
-  MintFactoryAuthen,
+  InitialContract,
 }
 use lb_v2/utils.{
   compute_lp_asset_name, factory_auth_an, sort_two_assets, treasury_auth_an,
@@ -23,7 +23,7 @@ validator(out_ref: OutputReference) {
     expect Mint(authen_policy_id) = purpose
     when redeemer is {
       // The redeemer can be called once to initialize the whole LBE system
-      MintFactoryAuthen -> {
+      InitialContract -> {
         let Transaction { inputs, mint, outputs, .. } = transaction
 
         // validate that `out_ref` must be presented in the Transaction Inputs
@@ -116,7 +116,7 @@ validator(out_ref: OutputReference) {
 
 test test_validate_authen_create_factory() {
   let out_ref = test_suits.gen_authen_out_ref()
-  let redeemer = MintFactoryAuthen
+  let redeemer = InitialContract
   let policy_id: PolicyId = test_suits.gen_authen_minting_policy_id()
   let purpose = Mint(policy_id)
   let mint_value =
