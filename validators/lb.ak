@@ -82,7 +82,7 @@ validator(initial_out_ref: OutputReference) {
       extra_signatories,
       ..
     } = transaction
-    //TODO: this logic make having O(n^2) complexity beacause order is in the contract
+    //TODO: this logic make having O(n^2) complexity beacause each order of batching action run below logic
     expect Some(own_input) =
       list.find(
         inputs,
