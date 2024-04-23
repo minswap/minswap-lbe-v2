@@ -11,12 +11,18 @@ use lb_v2/types.{Asset, DatumMap}
 /// IMPORTANT: This block is code-gen. Please do not edit!
 /// *******************************************
 pub const amm_pool_auth_asset_name = #"4d5350"
-pub const amm_authen_policy_id = #"de7c3d0ebf7e841678ae7d90467f4c12a34ded85cc876a6af5d25337"
-pub const amm_pool_validation_hash = #"9eb0bf0d627d18a1a0ad751e8ecc004a58c58da05c44c212220eb420"
-pub const default_burn_liquidity = 10
-/// *******************************************
 
+pub const amm_authen_policy_id =
+  #"de7c3d0ebf7e841678ae7d90467f4c12a34ded85cc876a6af5d25337"
+
+pub const amm_pool_validation_hash =
+  #"9eb0bf0d627d18a1a0ad751e8ecc004a58c58da05c44c212220eb420"
+
+pub const default_burn_liquidity = 10
+
+/// *******************************************
 pub const treasury_auth_an = #"4d5350"
+
 pub const factory_auth_an = #"4d53"
 
 pub fn list_at_index(outputs: List<a>, payout_outputs_offset: Int) -> a {

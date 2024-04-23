@@ -54,9 +54,11 @@ validator(initial_out_ref: OutputReference) {
             inputs,
             fn(input) {
               let Input { output: Output { value: out_value, .. }, .. } = input
+              // make sure treasury must hold treasury authen
               value.quantity_of(out_value, authen_policy_id, treasury_auth_an) == 1
             },
           )
+        //TODO: logic batch must be here
         True
       }
       _ -> False
@@ -80,6 +82,7 @@ validator(initial_out_ref: OutputReference) {
       extra_signatories,
       ..
     } = transaction
+    //TODO: this logic make having O(n^2) complexity beacause order is in the contract
     expect Some(own_input) =
       list.find(
         inputs,
@@ -88,8 +91,9 @@ validator(initial_out_ref: OutputReference) {
           out_ref == script_ref
         },
       )
-    let Input { output: Output { address, value, .. }, .. } = own_input
-    let Address { payment_credential: script_credential, .. } = address
+    let Input { output: Output { address: contract_address, value, .. }, .. } =
+      own_input
+    let Address { payment_credential: script_credential, .. } = contract_address
     expect ScriptCredential(script_hash) = script_credential
     let authen_policy_id = script_hash
     if value.quantity_of(value, script_hash, factory_auth_an) == 1 {
@@ -98,7 +102,7 @@ validator(initial_out_ref: OutputReference) {
       policy_id == authen_policy_id
     } else if value.quantity_of(value, script_hash, treasury_auth_an) == 1 {
       // treasury UTxO
-
+      // re-find treasury input to make sure tx having only 1 treasury UTxO
       let treasury_input =
         get_treasury_input(
           inputs,
@@ -106,37 +110,33 @@ validator(initial_out_ref: OutputReference) {
           authen_policy_id,
           treasury_auth_an,
         )
-      let Input { output: Output { address: treasury_address, .. }, .. } =
-        treasury_input
+      // already validate Treasury Auth and Addr inside(not validate datum yet)
       let treasury_output =
         get_treasury_output(
           outputs,
-          treasury_address,
+          contract_address,
           authen_policy_id,
           treasury_auth_an,
         )
       let mint_value = value.from_minted_value(mint)
       expect redeemer: TreasuryRedeemer = raw_redeemer
       expect datum: TreasuryDatum = raw_datum
+      let contract_input =
+        list.filter(
+          inputs,
+          fn(input) {
+            let Input { output: out, .. } = input
+            let Output { address: addr, .. } = out
+            let Address { payment_credential: payment_cred, .. } = addr
+            script_credential == payment_cred
+          },
+        )
       when redeemer is {
         CreatePool -> {
           expect amm_pool_datum: PoolDatum = get_amm_pool_datum(outputs)
-          let TreasuryDatum { order_hash, .. } = datum
 
-          //* Should not spend any UTxOs associated with Order Script, as it could lead to unexpected behavior or loss of funds.
-          expect [] =
-            list.filter(
-              inputs,
-              fn(input) {
-                let Input { output: out, .. } = input
-                let Output { address: addr, .. } = out
-                let Address { payment_credential: payment_cred, .. } = addr
-                when payment_cred is {
-                  ScriptCredential(hash) -> hash == order_hash
-                  _ -> False
-                }
-              },
-            )
+          // Having one contract UTxO(don't contain order and Factory UTxO)
+          expect [_] = contract_input
           let owner_outputs =
             list.filter(outputs, fn(output) { output.address == datum.owner })
           validate_create_dex_pool(
@@ -159,8 +159,11 @@ validator(initial_out_ref: OutputReference) {
             authen_policy_id: authen_policy_id,
             amm_authen_policy_id: amm_authen_policy_id,
             mint_value: mint_value,
+            script_credential: script_credential,
           )
-        CancelLBE ->
+        CancelLBE -> {
+          // Having one contract UTxO(don't contain order and Factory UTxO)
+          expect [_] = contract_input
           validation.validate_cancel_lbe(
             treasury_in_datum: datum,
             treasury_input: treasury_input,
@@ -171,19 +174,21 @@ validator(initial_out_ref: OutputReference) {
             amm_authen_policy_id: amm_authen_policy_id,
             amm_pool_auth_asset_name: amm_pool_auth_asset_name,
           )
+        }
         UpdateLBE -> {
           let TreasuryDatum { owner, .. } = datum
           expect Address {
             payment_credential: VerificationKeyCredential(owner_pkh),
             ..
           } = owner
+          // Having one contract UTxO(don't contain order and Factory UTxO)
+          expect [_] = contract_input
           and {
             list.has(extra_signatories, owner_pkh),
             validation.validate_update_lbe(
               treasury_in_datum: datum,
               treasury_input: treasury_input,
               treasury_output: treasury_output,
-              datums: datums,
               validity_range: validity_range,
             ),
           }

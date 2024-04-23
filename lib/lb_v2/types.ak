@@ -23,7 +23,6 @@ pub type TreasuryDatum {
   owner: Address,
   minimum_raise: Option<Int>,
   maximum_raise: Option<Int>,
-  order_hash: ValidatorHash,
   reserve_base: Int,
   reserve_raise: Int,
   total_liquidity: Int,
