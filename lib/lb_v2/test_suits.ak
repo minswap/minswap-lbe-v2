@@ -14,6 +14,7 @@ use lb_v2/types.{
   TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{compute_lp_asset_name, factory_auth_an, treasury_auth_an}
+use lb_v2/validation.{validate_order_step}
 
 pub fn gen_authen_minting_policy_id() -> PolicyId {
   @"h'ceee94bdc6c54c1d7361b3dd1a0d586188082f8a8ab55f1fa0e90352'"
@@ -150,60 +151,59 @@ pub fn compare_stake_credential(
   bytearray.compare(b1, b2)
 }
 
-// pub fn gen_dummy_treasury_out() -> Output {
-//   let address = gen_treasury_address()
-//   let base_asset =
-//     Asset {
-//       policy_id: @"h'd67261e2bd37085ec0a91d4a5f2dde07a0dff4a58f563f6bee8b7e51'"
-//         |> bytearray.from_string,
-//       asset_name: @"h'42415345'" |> bytearray.from_string,
-//     }
-//   let raise_asset = Asset { policy_id: #"", asset_name: #"" }
-//   let lp_asset_name =
-//     compute_lp_asset_name(
-//       raise_asset.policy_id,
-//       raise_asset.asset_name,
-//       base_asset.policy_id,
-//       base_asset.asset_name,
-//     )
-//   let lp_asset =
-//     Asset {
-//       policy_id: @"h'ceee94bdc6c54c1d7361b3dd1a0d586188082f8a8ab55f1fa0e90352'"
-//         |> bytearray.from_string,
-//       asset_name: lp_asset_name,
-//     }
-//   let value =
-//     value.zero()
-//       |> value.add(ada_policy_id, ada_asset_name, 10000000)
-//       |> value.add(lp_asset.policy_id, treasury_auth_an, 1)
-//       |> value.add(base_asset.policy_id, base_asset.asset_name, 100000000) // 100 * 1e6
-//       |> value.add(lp_asset.policy_id, lp_asset.asset_name, 9223372036854775807)
-//   let treasury_datum: TreasuryDatum =
-//     TreasuryDatum {
-//       base_asset,
-//       raise_asset,
-//       owner: @"h'6508d97458392cbc453922493dacb743c405c7a7c254ee8b85fa6af5'"
-//         |> bytearray.from_string
-//         |> credential.from_verification_key,
-//       discovery_start_time: 1701405708,
-//       discovery_end_time: 1702615308,
-//       encounter_start_time: 1702701708,
-//       minimum_raise: None,
-//       maximum_raise: None,
-//       order_hash: gen_order_hash(),
-//       reserve_base: 100000000,
-//       reserve_raise: 0,
-//       total_liquidity: 0,
-//       is_cancel: 0,
-//       is_created_pool: 0,
-//     }
-//   Output {
-//     address,
-//     value,
-//     datum: InlineDatum(treasury_datum),
-//     reference_script: None,
-//   }
-// }
+pub fn gen_dummy_treasury_out() -> Output {
+  let address = gen_treasury_address()
+  let base_asset =
+    Asset {
+      policy_id: @"h'd67261e2bd37085ec0a91d4a5f2dde07a0dff4a58f563f6bee8b7e51'"
+        |> bytearray.from_string,
+      asset_name: @"h'42415345'" |> bytearray.from_string,
+    }
+  let raise_asset = Asset { policy_id: #"", asset_name: #"" }
+  let lp_asset_name =
+    compute_lp_asset_name(
+      raise_asset.policy_id,
+      raise_asset.asset_name,
+      base_asset.policy_id,
+      base_asset.asset_name,
+    )
+  let lp_asset =
+    Asset {
+      policy_id: @"h'ceee94bdc6c54c1d7361b3dd1a0d586188082f8a8ab55f1fa0e90352'"
+        |> bytearray.from_string,
+      asset_name: lp_asset_name,
+    }
+  let value =
+    value.zero()
+      |> value.add(ada_policy_id, ada_asset_name, 10000000)
+      |> value.add(lp_asset.policy_id, treasury_auth_an, 1)
+      |> value.add(base_asset.policy_id, base_asset.asset_name, 100000000) // 100 * 1e6
+      |> value.add(lp_asset.policy_id, lp_asset.asset_name, 9223372036854775807)
+  let treasury_datum: TreasuryDatum =
+    TreasuryDatum {
+      base_asset,
+      raise_asset,
+      owner: @"h'6508d97458392cbc453922493dacb743c405c7a7c254ee8b85fa6af5'"
+        |> bytearray.from_string
+        |> credential.from_verification_key,
+      discovery_start_time: 1701405708,
+      discovery_end_time: 1702615308,
+      encounter_start_time: 1702701708,
+      minimum_raise: None,
+      maximum_raise: None,
+      reserve_base: 100000000,
+      reserve_raise: 0,
+      total_liquidity: 0,
+      is_cancel: 0,
+      is_created_pool: 0,
+    }
+  Output {
+    address,
+    value,
+    datum: InlineDatum(treasury_datum),
+    reference_script: None,
+  }
+}
 
 // fn gen_dummy_assets() -> List<Asset> {
 //   let base_asset =
@@ -247,72 +247,88 @@ pub fn gen_authen_out_ref() -> OutputReference {
     output_index: 0,
   }
 }
-// test test_validate_order_time() {
-//   let start_time = 100
-//   let end_time = 500
-//   let validity_range: ValidityRange =
-//     Interval {
-//       lower_bound: IntervalBound {
-//         is_inclusive: False,
-//         bound_type: Finite(150),
-//       },
-//       upper_bound: IntervalBound {
-//         is_inclusive: False,
-//         bound_type: Finite(200),
-//       },
-//     }
-//   let address =
-//     @"h'6508d97458392cbc453922493dacb743c405c7a7c254ee8b85fa6af5'"
-//       |> bytearray.from_string
-//       |> credential.from_verification_key
-//   let order_datum =
-//     OrderDatum {
-//       owner: address,
-//       expect_output_asset: Asset {
-//         policy_id: ada_policy_id,
-//         asset_name: ada_asset_name,
-//       },
-//       minimum_receive: 100,
-//       step: Deposit,
-//       lp_asset_name: #"",
-//     }
-//   let order_datums =
-//     [order_datum, OrderDatum { ..order_datum, step: RedeemRaiseAsset }]
-//   validate_order_time(start_time, end_time, validity_range, order_datums)
-// }
 
-// test test_validate_order_time_failed() fail {
-//   let start_time = 100
-//   let end_time = 500
-//   let validity_range: ValidityRange =
-//     Interval {
-//       lower_bound: IntervalBound {
-//         is_inclusive: False,
-//         bound_type: Finite(150),
-//       },
-//       upper_bound: IntervalBound {
-//         is_inclusive: False,
-//         bound_type: Finite(200),
-//       },
-//     }
-//   let address =
-//     @"h'6508d97458392cbc453922493dacb743c405c7a7c254ee8b85fa6af5'"
-//       |> bytearray.from_string
-//       |> credential.from_verification_key
-//   let order_datum =
-//     OrderDatum {
-//       owner: address,
-//       expect_output_asset: Asset {
-//         policy_id: ada_policy_id,
-//         asset_name: ada_asset_name,
-//       },
-//       minimum_receive: 100,
-//       step: Deposit,
-//       lp_asset_name: #"",
-//     }
+test test_validate_order_time() {
+  let start_time = 100
+  let end_time = 500
+  let validity_range: ValidityRange =
+    Interval {
+      lower_bound: IntervalBound {
+        is_inclusive: False,
+        bound_type: Finite(150),
+      },
+      upper_bound: IntervalBound {
+        is_inclusive: False,
+        bound_type: Finite(200),
+      },
+    }
+  let address =
+    @"h'6508d97458392cbc453922493dacb743c405c7a7c254ee8b85fa6af5'"
+      |> bytearray.from_string
+      |> credential.from_verification_key
+  let order_datum =
+    OrderDatum {
+      owner: address,
+      expect_output_asset: Asset {
+        policy_id: ada_policy_id,
+        asset_name: ada_asset_name,
+      },
+      minimum_receive: 100,
+      step: Deposit,
+      lp_asset_name: #"",
+    }
+  let order_datums =
+    [order_datum, OrderDatum { ..order_datum, step: RedeemRaiseAsset }]
+  validate_order_step(
+    start_time,
+    end_time,
+    is_cancel: 0,
+    is_created_pool: 0,
+    validity_range: validity_range,
+    order_datums: order_datums,
+  )
+}
 
-//   let order_datums =
-//     [order_datum, OrderDatum { ..order_datum, step: RedeemLP }]
-//   expect validate_order_time(start_time, end_time, validity_range, order_datums)
-//   True
-// }
+test test_validate_order_time_failed() fail {
+  let start_time = 100
+  let end_time = 500
+  let validity_range: ValidityRange =
+    Interval {
+      lower_bound: IntervalBound {
+        is_inclusive: False,
+        bound_type: Finite(150),
+      },
+      upper_bound: IntervalBound {
+        is_inclusive: False,
+        bound_type: Finite(200),
+      },
+    }
+  let address =
+    @"h'6508d97458392cbc453922493dacb743c405c7a7c254ee8b85fa6af5'"
+      |> bytearray.from_string
+      |> credential.from_verification_key
+  let order_datum =
+    OrderDatum {
+      owner: address,
+      expect_output_asset: Asset {
+        policy_id: ada_policy_id,
+        asset_name: ada_asset_name,
+      },
+      minimum_receive: 100,
+      step: Deposit,
+      lp_asset_name: #"",
+    }
+
+  let order_datums =
+    [order_datum, OrderDatum { ..order_datum, step: RedeemLP }]
+  expect
+    validate_order_step(
+      start_time,
+      end_time,
+      is_cancel: 0,
+      is_created_pool: 0,
+      validity_range: validity_range,
+      order_datums: order_datums,
+    )
+  True
+}
