@@ -1,6 +1,5 @@
 use aiken/dict.{Dict}
 use aiken/hash.{Blake2b_224, Blake2b_256, Hash}
-use aiken/time.{PosixTime}
 use aiken/transaction/credential.{Address, Script}
 use aiken/transaction/value.{AssetName, PolicyId}
 
@@ -15,51 +14,9 @@ pub type Asset {
   asset_name: AssetName,
 }
 
-pub type TreasuryDatum {
-  raise_asset: Asset,
-  asset_a: Asset,
-  asset_b: Asset,
-  lbe_owner: Address,
-  start_time: PosixTime,
-  end_time: PosixTime,
-  create_pool_time: PosixTime,
-  order_hash: ValidatorHash,
-  lp_asset_name: AssetName,
-  reserve_a: Int,
-  reserve_b: Int,
-  total_liquidity: Int,
-}
-
-pub type TreasuryRedeemer {
-  CreatePool
-  Batching
-}
-
-pub type OrderStep {
-  Deposit
-  RedeemRaiseAsset
-  RedeemLP
-}
-
-pub type OrderDatum {
-  owner: Address,
-  expect_output_asset: Asset,
-  minimum_receive: Int,
-  step: OrderStep,
-}
-
-pub type OrderRedeemer {
-  ApplyOrder
-  CancelOrder
-}
-
-pub type OrderBatchingRedeemer {
-  treasury_input_index: Int,
-}
-
 pub type AuthenRedeemer {
-  MintFactoryAuthen
-  CreateTreasury
+  LBEInitialization
+  CreateOrRemoveLBE
 }
 
 pub type FactoryDatum {
@@ -68,29 +25,80 @@ pub type FactoryDatum {
 }
 
 pub type FactoryRedeemer {
-  asset_a: Asset,
-  asset_b: Asset,
+  CreateLBE { asset_a: Asset, asset_b: Asset }
+
+  RemoveLBE { asset_a: Asset, asset_b: Asset }
 }
 
-pub type AmmPoolDatum {
-  asset_a: Asset,
-  asset_b: Asset,
-  reserve_a: Int,
-  reserve_b: Int,
-  total_liquidity: Int,
+pub type TreasuryStatus {
+  Living
+  CreatedPool
+  Canceled
 }
 
-pub type ProfitSharing =
-  (Int, Int)
-
-pub type PoolDatum {
-  asset_a: Asset,
-  asset_b: Asset,
-  total_liquidity: Int,
-  reserve_a: Int,
-  reserve_b: Int,
-  trading_fee_numerator: Int,
-  trading_fee_denominator: Int,
+pub type TreasuryDatum {
+  seller_hash: ValidatorHash,
   order_hash: ValidatorHash,
-  profit_sharing_opt: Option<ProfitSharing>,
+  seller_count: Int,
+  total_fund: Int,
+  total_penalty: Int,
+  total_lp: Int,
+  status: TreasuryStatus,
+  // LBE details
+  base_asset: Asset,
+  raise_asset: Asset,
+  lbe_id: ByteArray,
+  //hash(base_asset, raise_asset)
+  start_discovery_phase: Int,
+  penalty_config: Option<Int>,
+  // Option<penalty time>
+  stop_discovery_phase: Int,
+  min_raise: Int,
+  max_raise: Int,
+}
+
+pub type TreasurySpendingRedeemer {
+  CreateSeller
+  CollectSeller
+  CollectOrder
+  CreateAMMPool
+  RedeemLP
+}
+
+pub type SellerTokenMintingRedeemer {
+  SellerMintingCreateLBE
+  SellerMintingCreateSeller
+  SellerMintingCollectSeller
+}
+
+pub type SellerDatum {
+  lbe_id: ByteArray,
+  total_fund: Int,
+  total_penalty: Int,
+}
+
+pub type SellerRedeemer {
+  DepositOrders
+  EditOrders
+  ApplySeller
+}
+
+pub type OrderTokenMintingRedeemer {
+  OrderMintingDepositOrders
+  OrderMintingEditOrders
+  OrderMintingRedeemLP
+}
+
+pub type OrderDatum {
+  owner: Address,
+  amount: Int,
+  lbe_id: ByteArray,
+  is_collected: Bool,
+  penalty_amount: Int,
+}
+
+pub type OrderRedeemer {
+  CancelOrder
+  OrderCollectADA
+  OrderRedeemLP
 }

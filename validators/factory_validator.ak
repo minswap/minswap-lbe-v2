@@ -1,7 +1,6 @@
 use aiken/transaction.{ScriptContext}
-use aiken/transaction/value.{AssetName, PolicyId}
+use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{FactoryDatum, FactoryRedeemer, ValidatorHash}
-use lb_v2/validation
 
 validator(
   // The PolicyID of Authen Minting Policy
@@ -10,25 +9,14 @@ validator(
   treasury_hash: ValidatorHash,
   // ValidatorHash of Order Contract
   order_hash: ValidatorHash,
-  // the legitimate Factory TokenName
-  factory_auth_asset_name: AssetName,
-  // the legitimate Treasury TokenName     
-  treasury_auth_asset_name: AssetName,
+  // ValidatorHash of Saller Contract
+  seller_hash: ValidatorHash,
 ) {
   fn validate_factory(
     datum: FactoryDatum,
     redeemer: FactoryRedeemer,
     context: ScriptContext,
   ) {
-    validation.validate_factory(
-      authen_policy_id,
-      treasury_hash,
-      order_hash,
-      factory_auth_asset_name,
-      treasury_auth_asset_name,
-      datum,
-      redeemer,
-      context,
-    )
+    todo
   }
 }
