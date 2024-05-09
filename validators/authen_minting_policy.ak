@@ -1,11 +1,13 @@
 use aiken/list
 use aiken/transaction.{
-  InlineDatum, Input, Mint, NoDatum, Output, OutputReference, Redeemer,
-  ScriptContext, ScriptPurpose, Spend, Transaction,
+  InlineDatum, Input, Mint, Output, OutputReference, ScriptContext, Transaction,
 }
 use aiken/transaction/value
-use lb_v2/types.{AuthenRedeemer, CreateTreasury, FactoryDatum, MintFactory, MintTreasury, RemoveTreasury}
-use lb_v2/utils.{factory_auth_an, treasury_auth_an}
+use lb_v2/types.{
+  AuthenRedeemer, CreateTreasury, FactoryDatum, MintFactory, MintTreasury,
+  RemoveTreasury,
+}
+use lb_v2/utils.{factory_auth_an}
 
 validator(out_ref: OutputReference) {
   fn validate_authen(redeemer: AuthenRedeemer, context: ScriptContext) {
@@ -51,7 +53,7 @@ validator(out_ref: OutputReference) {
       }
       MintTreasury { step } -> {
         let Transaction { inputs, .. } = transaction
-        expect factory_inputs =
+        let factory_inputs =
           list.filter(
             inputs,
             fn(input) {

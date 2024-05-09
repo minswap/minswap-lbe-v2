@@ -1,6 +1,6 @@
-use aiken/transaction.{ScriptContext}
+use aiken/transaction.{ScriptContext, Spend}
 use aiken/transaction/value.{PolicyId}
-use lb_v2/types.{OrderDatum, OrderRedeemer, ValidatorHash}
+use lb_v2/types.{CancelOrder, OrderDatum, OrderRedeemer, ValidatorHash}
 
 validator(
   // The PolicyID of Authen Minting Policy
@@ -15,6 +15,14 @@ validator(
     redeemer: OrderRedeemer,
     context: ScriptContext,
   ) {
-    todo
+    let ScriptContext { purpose, .. } = context
+    expect Spend(_) = purpose
+    and {
+      authen_policy_id == #"00",
+      treasury_hash == #"00",
+      seller_hash == #"00",
+      datum.amount == 0,
+      redeemer == CancelOrder,
+    }
   }
 }

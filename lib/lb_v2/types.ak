@@ -37,29 +37,36 @@ pub type FactoryRedeemer {
 
 pub type TreasuryStatus {
   Living
-  CreatedPool
+  Counting
+  Redeeming
   Canceled
 }
 
+pub type PenaltyConfig {
+  penalty_start_time: Int,
+  penalty_end_time: Int,
+  percent: Int,
+}
+
 pub type TreasuryDatum {
+  // Protocol Info
   seller_hash: ValidatorHash,
   order_hash: ValidatorHash,
   seller_count: Int,
-  total_fund: Int,
-  total_penalty: Int,
-  total_lp: Int,
   status: TreasuryStatus,
   // LBE details
   base_asset: Asset,
   raise_asset: Asset,
-  lbe_id: ByteArray,
-  //hash(base_asset, raise_asset)
-  start_discovery_phase: Int,
-  penalty_config: Option<Int>,
-  // Option<penalty time>
-  stop_discovery_phase: Int,
-  min_raise: Int,
-  max_raise: Int,
+  discovery_start_time: Int,
+  discovery_end_time: Int,
+  owner: Address,
+  minimum_raise: Option<Int>,
+  maximum_raise: Option<Int>,
+  reserve_base: Int,
+  reserve_raise: Int,
+  total_liquidity: Int,
+  penalty_config: Option<PenaltyConfig>,
+  total_penalty: Int,
 }
 
 pub type TreasurySpendingRedeemer {

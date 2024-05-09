@@ -1,7 +1,8 @@
-use aiken/transaction.{ScriptContext}
-use aiken/transaction/value.{AssetName, PolicyId, from_minted_value}
+use aiken/transaction.{ScriptContext, Spend}
+use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  OrderTokenMintingRedeemer, SellerDatum, SellerRedeemer, ValidatorHash,
+  DepositOrders, OrderMintingDepositOrders, OrderTokenMintingRedeemer,
+  SellerDatum, SellerRedeemer, ValidatorHash,
 }
 
 validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
@@ -10,13 +11,22 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
     redeemer: SellerRedeemer,
     context: ScriptContext,
   ) {
-    todo
+    let ScriptContext { purpose, .. } = context
+    expect Spend(_) = purpose
+    and {
+      datum.total_fund == 0,
+      authen_policy_id == #"00",
+      treasury_hash == #"00",
+      redeemer == DepositOrders,
+    }
   }
 
   fn validate_minting_order_nft(
     redeemer: OrderTokenMintingRedeemer,
     context: ScriptContext,
   ) {
-    todo
+    let ScriptContext { purpose, .. } = context
+    expect Spend(_) = purpose
+    redeemer == OrderMintingDepositOrders
   }
 }
