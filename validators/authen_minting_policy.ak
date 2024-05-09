@@ -3,7 +3,8 @@ use aiken/transaction.{
   InlineDatum, Input, Mint, NoDatum, Output, OutputReference, Redeemer,
   ScriptContext, ScriptPurpose, Spend, Transaction,
 }
-use lb_v2/types.{AuthenRedeemer, BurnTreasury, MintFactory, MintTreasury}
+use aiken/transaction/value
+use lb_v2/types.{AuthenRedeemer, FactoryDatum, MintFactory, MintTreasury}
 use lb_v2/utils.{factory_auth_an, treasury_auth_an}
 
 validator(out_ref: OutputReference) {
@@ -13,7 +14,6 @@ validator(out_ref: OutputReference) {
     when redeemer is {
       MintFactory -> {
         let Transaction { inputs, mint, outputs, .. } = transaction
-
         // validate that `out_ref` must be presented in the Transaction Inputs
         expect [_] =
           list.filter(
@@ -49,11 +49,9 @@ validator(out_ref: OutputReference) {
           tail == #"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
         }
       }
-      MintTreasury -> {
-        let Transaction { inputs, mint, .. } = transaction
-        // validate that there's a single Factory UTxO in the Transaction Inputs. 
-        // Factory UTxO must contain factory_token in the value
-        expect [_] =
+      MintTreasury { step } -> {
+        let Transaction { inputs, .. } = transaction
+        expect factory_inputs =
           list.filter(
             inputs,
             fn(input) {
@@ -62,55 +60,11 @@ validator(out_ref: OutputReference) {
               value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1
             },
           )
-        // cause of foward logic to factory's validator,
-        // only check mint 1 factory_token for new Factory UTxO (create node linked list)
-        // and mint 1 treasury_token for new Treasury UTxO (create LBE)
-        value.from_minted_value(mint) == value.from_asset(
-          authen_policy_id,
-          factory_auth_an,
-          1,
-        ).add(
-          authen_policy_id,
-          treasury_auth_an,
-          1,
-        )
-      }
-      BurnTreasury -> {
-        // validate that there are 2 and only 2 Factory UTxOs in the Transaction Inputs. 
-        // Factory UTxO must contain factory_token in the value
-        expect [_, __] =
-          list.filter(
-            inputs,
-            fn(input) {
-              let Input { output, .. } = input
-              let Output { value: out_value, .. } = output
-              value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1
-            },
-          )
-
-        // validate that there's a single Treasury UTxO in the Transaction Inputs. 
-        // Treasury UTxO must contain treasury_token in the value
-        expect [_] =
-          list.filter(
-            inputs,
-            fn(input) {
-              let Input { output, .. } = input
-              let Output { value: out_value, .. } = output
-              value.quantity_of(out_value, authen_policy_id, treasury_auth_an) == 1
-            },
-          )
-        // cause of foward logic to factory's validator and treasury's validator,
-        // only check burn 1 factory_token for spent Factory UTxO (remove node linked-list)
-        // and burn 1 treasury_token for spent Treasury UTxO (close LBE)
-        value.from_minted_value(mint) == value.from_asset(
-          authen_policy_id,
-          factory_auth_an,
-          -1,
-        ).add(
-          authen_policy_id,
-          treasury_auth_an,
-          -1,
-        )
+        let count_factory_inputs = list.length(factory_inputs)
+        when step is {
+          CreateTreasury -> count_factory_inputs == 1
+          RemoveTreasury -> count_factory_inputs == 2
+        }
       }
     }
   }

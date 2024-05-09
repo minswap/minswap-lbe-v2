@@ -14,10 +14,14 @@ pub type Asset {
   asset_name: AssetName,
 }
 
+pub type FactoryStep {
+  CreateTreasury
+  RemoveTreasury
+}
+
 pub type AuthenRedeemer {
   MintFactory
-  MintTreasury
-  BurnTreasury
+  MintTreasury { step: FactoryStep }
 }
 
 pub type FactoryDatum {
@@ -26,9 +30,9 @@ pub type FactoryDatum {
 }
 
 pub type FactoryRedeemer {
-  CreateLBE { asset_a: Asset, asset_b: Asset }
-
-  RemoveLBE { asset_a: Asset, asset_b: Asset }
+  base_asset: Asset,
+  raise_asset: Asset,
+  step: FactoryStep,
 }
 
 pub type TreasuryStatus {
