@@ -4,7 +4,7 @@ use aiken/transaction.{
   ScriptContext, ScriptPurpose, Spend, Transaction,
 }
 use aiken/transaction/value
-use lb_v2/types.{AuthenRedeemer, FactoryDatum, MintFactory, MintTreasury}
+use lb_v2/types.{AuthenRedeemer, CreateTreasury, FactoryDatum, MintFactory, MintTreasury, RemoveTreasury}
 use lb_v2/utils.{factory_auth_an, treasury_auth_an}
 
 validator(out_ref: OutputReference) {
