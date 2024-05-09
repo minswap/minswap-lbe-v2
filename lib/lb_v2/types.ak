@@ -15,8 +15,9 @@ pub type Asset {
 }
 
 pub type AuthenRedeemer {
-  LBEInitialization
-  CreateOrRemoveLBE
+  MintFactory
+  MintTreasury
+  BurnTreasury
 }
 
 pub type FactoryDatum {
