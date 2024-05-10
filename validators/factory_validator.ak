@@ -8,8 +8,8 @@ use aiken/transaction/credential.{
 }
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  Asset, Canceled, CreateTreasury, FactoryDatum, FactoryRedeemer, Redeeming,
-  RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
+  Asset, CreateTreasury, FactoryDatum, FactoryRedeemer, RemoveTreasury,
+  SellerDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   compute_lp_asset_name, default_number_seller, factory_auth_an, seller_auth_an,
@@ -275,11 +275,6 @@ validator(
             treasury_policy_id: treasury_hash,
             step: factory_step,
           ),
-          when treasury_datum.status is {
-            Redeeming -> treasury_datum.reserve_raise == 0
-            Canceled -> True
-            _ -> False
-          },
           owner_output.address == treasury_datum.owner,
           list.has(extra_signatories, owner_pkh),
         }

@@ -7,7 +7,7 @@ use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
   CreateSeller, CreateTreasury, InitTreasury, MintSeller, SellerDatum,
-  TreasuryDatum, TreasuryRedeemer,
+  SpendTreasury, TreasuryDatum, TreasuryRedeemer,
 }
 use lb_v2/utils.{seller_auth_an, treasury_auth_an}
 use lb_v2/validation
@@ -22,7 +22,14 @@ validator(authen_policy_id: PolicyId) {
     let Transaction { inputs, outputs, mint, validity_range, .. } = transaction
     let ok =
       when purpose is {
-        Spend(_) -> True
+        Spend(_) -> {
+          let x =
+            when redeemer is {
+              SpendTreasury -> True
+              _ -> False
+            }
+          x
+        }
         Mint(treasury_policy_id) -> {
           expect MintSeller { step: mint_seller_step } = redeemer
           when mint_seller_step is {
@@ -70,7 +77,7 @@ validator(authen_policy_id: PolicyId) {
                 seller_hash,
                 base_asset,
                 raise_asset,
-                discovery_end_time,
+                end_time,
                 ..
               } = treasury_in_datum
               // validate timing
@@ -81,7 +88,7 @@ validator(authen_policy_id: PolicyId) {
                 },
                 ..
               } = validity_range
-              expect end_valid_time_range < discovery_end_time
+              expect end_valid_time_range < end_time
               expect [treasury_out] =
                 list.filter(
                   outputs,

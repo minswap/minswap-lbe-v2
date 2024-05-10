@@ -1,6 +1,6 @@
 use aiken/dict.{Dict}
 use aiken/hash.{Blake2b_224, Blake2b_256, Hash}
-use aiken/transaction/credential.{Address, Script}
+use aiken/transaction/credential.{Address, Script, StakeCredential}
 use aiken/transaction/value.{AssetName, PolicyId}
 
 pub type ValidatorHash =
@@ -35,13 +35,6 @@ pub type FactoryRedeemer {
   step: FactoryStep,
 }
 
-pub type TreasuryStatus {
-  Living
-  Counting
-  Redeeming
-  Canceled
-}
-
 pub type PenaltyConfig {
   penalty_start_time: Int,
   penalty_end_time: Int,
@@ -53,12 +46,12 @@ pub type TreasuryDatum {
   seller_hash: ValidatorHash,
   order_hash: ValidatorHash,
   seller_count: Int,
-  status: TreasuryStatus,
+  collected_fund: Int,
   // LBE details
   base_asset: Asset,
   raise_asset: Asset,
-  discovery_start_time: Int,
-  discovery_end_time: Int,
+  start_time: Int,
+  end_time: Int,
   owner: Address,
   minimum_raise: Option<Int>,
   maximum_raise: Option<Int>,
@@ -126,4 +119,17 @@ pub type OrderRedeemer {
   WithdrawOrder
   CollectOrder
   RedeemOrder
+}
+
+pub type PoolDatum {
+  pool_batching_stake_credential: StakeCredential,
+  asset_a: Asset,
+  asset_b: Asset,
+  total_liquidity: Int,
+  reserve_a: Int,
+  reserve_b: Int,
+  base_fee_a_numerator: Int,
+  base_fee_b_numerator: Int,
+  fee_sharing_numerator_opt: Option<Int>,
+  allow_dynamic_fee: Bool,
 }

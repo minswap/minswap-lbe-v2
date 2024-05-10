@@ -14,6 +14,19 @@ pub const order_auth_an = #"6f72646572"
 
 pub const default_number_seller = 20
 
+/// IMPORTANT: This block is code-gen. Please do not edit!
+/// *******************************************
+pub const amm_pool_auth_asset_name = #"4d5350"
+
+pub const amm_authen_policy_id =
+  #"de7c3d0ebf7e841678ae7d90467f4c12a34ded85cc876a6af5d25337"
+
+pub const amm_pool_validation_hash =
+  #"9eb0bf0d627d18a1a0ad751e8ecc004a58c58da05c44c212220eb420"
+
+pub const default_burn_liquidity = 10
+
+/// *******************************************
 pub fn sort_two_assets(asset_a: Asset, asset_b: Asset) -> (Asset, Asset) {
   let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
     asset_a
