@@ -71,12 +71,12 @@ pub type TreasuryDatum {
 
 pub type MintSellerStep {
   InitTreasury
-  CreateSeller
-  RemoveSeller
+  CreateSeller { amount: Int }
+  RemoveSeller { amount: Int }
 }
 
 pub type TreasuryRedeemer {
-  MintSeller { step: MintSellerStep, amount: Int }
+  MintSeller { step: MintSellerStep }
   // Spending Seller for Counting Phase
   SpendSeller
   // Spending Order for Counting | Encounter Phase (after spent all Seller)
