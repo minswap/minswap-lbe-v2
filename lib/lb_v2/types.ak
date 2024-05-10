@@ -62,20 +62,14 @@ pub type TreasuryDatum {
   total_penalty: Int,
 }
 
-pub type MintSellerStep {
-  InitTreasury
-  CreateSeller { amount: Int }
-  RemoveSeller { amount: Int }
-}
-
 pub type TreasuryRedeemer {
-  MintSeller { step: MintSellerStep }
+  InitTreasury
+  MintSeller { amount: Int }
   // Spending Seller for Counting Phase
   SpendSeller
   // Spending Order for Counting | Encounter Phase (after spent all Seller)
   SpendOrder
-  // Spending Treasury to create AMM Pool or return values to project's owner
-  SpendTreasury
+  CreateAmmPool
 }
 
 pub type SellerTokenMintingRedeemer {

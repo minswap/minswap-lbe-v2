@@ -1,18 +1,22 @@
-use aiken/transaction.{ScriptContext, Spend}
+use aiken/transaction.{ScriptContext, Spend, Transaction}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  OrderMintingDepositOrders, OrderTokenMintingRedeemer, SellerDatum,
-  ValidatorHash,
+  OrderMintingDepositOrders, OrderTokenMintingRedeemer, SellerRedeemer,
+  SpendCounting, ValidatorHash,
 }
+use lb_v2/utils.{seller_auth_an}
 
 validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
-  fn validate_seller(datum: SellerDatum, _: Data, context: ScriptContext) {
-    let ScriptContext { purpose, .. } = context
+  fn validate_seller(_: Data, redeemer: SellerRedeemer, context: ScriptContext) {
+    let ScriptContext { purpose, transaction } = context
+    let Transaction { mint, .. } = transaction
     expect Spend(_) = purpose
-    and {
-      datum.amount == 0,
-      authen_policy_id == #"00",
-      treasury_hash == #"00",
+    when redeemer is {
+      SpendCounting -> {
+        let mint_value = value.from_minted_value(mint)
+        value.quantity_of(mint_value, treasury_hash, seller_auth_an) < 0
+      }
+      _ -> authen_policy_id == #"00"
     }
   }
 
