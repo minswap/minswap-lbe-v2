@@ -1,8 +1,10 @@
 use aiken/dict
-use aiken/transaction.{ScriptContext, Transaction}
-use aiken/transaction/credential.{Inline, ScriptCredential}
+use aiken/list
+use aiken/transaction.{Input, Output, ScriptContext, Spend, Transaction}
+use aiken/transaction/credential.{Address, ScriptCredential}
 use lb_v2/types.{
-  CollectOrder, OrderRedeemer, RedeemOrder, ValidatorHash, WithdrawOrder,
+  OrderRedeemer, SellerRedeemer, SpendOrder, SpendWithdraw, TreasuryRedeemer,
+  ValidatorHash, WithdrawOrder,
 }
 
 // use aiken/transaction/value.{PolicyId}
@@ -15,16 +17,58 @@ validator(
   // ValidatorHash of Saller Contract
   seller_hash: ValidatorHash,
 ) {
-  fn validate_order(_: Data, redeemer: OrderRedeemer, context: ScriptContext) {
+  fn validate_order(
+    _raw_order_datum: Data,
+    redeemer: OrderRedeemer,
+    context: ScriptContext,
+  ) {
     let ScriptContext { transaction, .. } = context
-    let Transaction { withdrawals, .. } = transaction
+    let Transaction { inputs, redeemers, .. } = transaction
     when redeemer is {
-      WithdrawOrder ->
-        dict.has_key(withdrawals, Inline(ScriptCredential(seller_hash)))
-      CollectOrder ->
-        dict.has_key(withdrawals, Inline(ScriptCredential(treasury_hash)))
-      RedeemOrder ->
-        dict.has_key(withdrawals, Inline(ScriptCredential(treasury_hash)))
+      WithdrawOrder -> {
+        expect [seller_input] =
+          list.filter(
+            inputs,
+            fn(input) {
+              let Input {
+                output: Output {
+                  address: Address { payment_credential, .. },
+                  ..
+                },
+                ..
+              } = input
+              payment_credential == ScriptCredential(seller_hash)
+            },
+          )
+        let Input { output_reference, .. } = seller_input
+        let seller_purpose = Spend(output_reference)
+        expect Some(seller_redeemer) = dict.get(redeemers, seller_purpose)
+        expect SpendWithdraw(_): SellerRedeemer = seller_redeemer
+        True
+      }
+      // 1 treasury UTxO
+      other_redeemer -> {
+        expect [treasury_input] =
+          list.filter(
+            inputs,
+            fn(input) {
+              let Input {
+                output: Output {
+                  address: Address { payment_credential, .. },
+                  ..
+                },
+                ..
+              } = input
+              payment_credential == ScriptCredential(treasury_hash)
+            },
+          )
+        let Input { output_reference, .. } = treasury_input
+        let treasury_purpose = Spend(output_reference)
+        expect Some(raw_treasury_redeemer) =
+          dict.get(redeemers, treasury_purpose)
+        expect treasury_redeemer: TreasuryRedeemer = raw_treasury_redeemer
+        treasury_redeemer == SpendOrder
+      }
     }
   }
 }
