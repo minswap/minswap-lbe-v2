@@ -10,6 +10,8 @@ pub const treasury_auth_an = #"7472656173757279"
 
 pub const seller_auth_an = #"73656c6c6572"
 
+pub const order_auth_an = #"6f72646572"
+
 pub const default_number_seller = 20
 
 pub fn sort_two_assets(asset_a: Asset, asset_b: Asset) -> (Asset, Asset) {

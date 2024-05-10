@@ -9,10 +9,11 @@ use aiken/transaction/credential.{
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
   Asset, Canceled, CreateTreasury, FactoryDatum, FactoryRedeemer, Redeeming,
-  RemoveTreasury, TreasuryDatum, ValidatorHash,
+  RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
-  compute_lp_asset_name, factory_auth_an, sort_two_assets, treasury_auth_an,
+  compute_lp_asset_name, default_number_seller, factory_auth_an, seller_auth_an,
+  sort_two_assets, treasury_auth_an,
 }
 use lb_v2/validation
 
@@ -107,20 +108,52 @@ validator(
             outputs,
             fn(output) {
               let Output { address: out_addr, value: out_value, .. } = output
-              let Address {
-                payment_credential: out_addr_payment_credential,
-                ..
-              } = out_addr
-              when out_addr_payment_credential is {
-                ScriptCredential(hash) -> and {
-                    treasury_hash == hash,
-                    value.quantity_of(
-                      out_value,
-                      authen_policy_id,
-                      treasury_auth_an,
-                    ) == 1,
-                  }
-                _ -> False
+              let Address { payment_credential, .. } = out_addr
+              and {
+                value.quantity_of(out_value, authen_policy_id, treasury_auth_an) == 1,
+                when payment_credential is {
+                  ScriptCredential(hash) -> treasury_hash == hash
+                  _ -> False
+                },
+              }
+            },
+          )
+        // validate that there's default_number_seller Seller UTxOs in the Transaction Outputs
+        // Each Seller UTxO must cointain seller_token in the value
+        let seller_outputs =
+          list.filter(
+            outputs,
+            fn(output) {
+              let Output { address: out_addr, value: out_value, .. } = output
+              let Address { payment_credential, .. } = out_addr
+              and {
+                value.quantity_of(out_value, treasury_hash, seller_auth_an) == 1,
+                when payment_credential is {
+                  ScriptCredential(hash) -> seller_hash == hash
+                  _ -> False
+                },
+              }
+            },
+          )
+        expect list.length(seller_outputs) == default_number_seller
+        expect
+          list.all(
+            seller_outputs,
+            fn(seller_output) {
+              expect Output { datum: InlineDatum(seller_raw_datum), .. } =
+                seller_output
+              expect seller_datum: SellerDatum = seller_raw_datum
+              let SellerDatum {
+                base_asset: s_base_asset,
+                raise_asset: s_raise_asset,
+                amount: s_amount,
+                penalty_amount: s_penalty_amount,
+              } = seller_datum
+              and {
+                s_base_asset == base_asset,
+                s_raise_asset == raise_asset,
+                s_amount == 0,
+                s_penalty_amount == 0,
               }
             },
           )

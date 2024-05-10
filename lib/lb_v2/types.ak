@@ -69,12 +69,20 @@ pub type TreasuryDatum {
   total_penalty: Int,
 }
 
-pub type TreasurySpendingRedeemer {
+pub type MintSellerStep {
+  InitTreasury
   CreateSeller
-  CollectSeller
-  CollectOrder
-  CreateAMMPool
-  RedeemLP
+  RemoveSeller
+}
+
+pub type TreasuryRedeemer {
+  MintSeller { step: MintSellerStep, amount: Int }
+  // Spending Seller for Counting Phase
+  SpendSeller
+  // Spending Order for Counting | Encounter Phase (after spent all Seller)
+  SpendOrder
+  // Spending Treasury to create AMM Pool or return values to project's owner
+  SpendTreasury
 }
 
 pub type SellerTokenMintingRedeemer {
@@ -84,15 +92,19 @@ pub type SellerTokenMintingRedeemer {
 }
 
 pub type SellerDatum {
-  lbe_id: ByteArray,
-  total_fund: Int,
-  total_penalty: Int,
+  base_asset: Asset,
+  raise_asset: Asset,
+  amount: Int,
+  penalty_amount: Int,
 }
 
 pub type SellerRedeemer {
-  DepositOrders
-  EditOrders
-  ApplySeller
+  SpendDeposit { amount: Int }
+  SpendWithdraw { amount: Int }
+  SpendCounting
+  MintDeposit
+  MintWithdrawAll
+  MintCounting
 }
 
 pub type OrderTokenMintingRedeemer {
@@ -102,15 +114,16 @@ pub type OrderTokenMintingRedeemer {
 }
 
 pub type OrderDatum {
+  base_asset: Asset,
+  raise_asset: Asset,
   owner: Address,
   amount: Int,
-  lbe_id: ByteArray,
   is_collected: Bool,
   penalty_amount: Int,
 }
 
 pub type OrderRedeemer {
-  CancelOrder
-  OrderCollectADA
-  OrderRedeemLP
+  WithdrawOrder
+  CollectOrder
+  RedeemOrder
 }
