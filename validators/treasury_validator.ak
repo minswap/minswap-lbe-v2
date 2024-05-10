@@ -1,22 +1,108 @@
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
-  InlineDatum, Input, Mint, Output, ScriptContext, Transaction,
+  InlineDatum, Input, Mint, Output, ScriptContext, Spend, Transaction,
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  CreateSeller, CreateTreasury, InitTreasury, MintSeller, SellerDatum,
-  TreasuryDatum, TreasuryRedeemer,
+  CreateSeller, CreateTreasury, InitTreasury, MintSeller, PoolDatum, SellerDatum,
+  SpendTreasury, TreasuryDatum, TreasuryRedeemer,
 }
-use lb_v2/utils.{seller_auth_an, treasury_auth_an}
+use lb_v2/utils.{
+  amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
+  seller_auth_an, treasury_auth_an,
+}
 use lb_v2/validation
 
 validator(authen_policy_id: PolicyId) {
-  fn validate_minting_treasury(
+  fn spending_treasury(
+    _: Data,
     redeemer: TreasuryRedeemer,
     context: ScriptContext,
   ) {
+    expect ScriptContext { purpose: Spend(out_ref), transaction } = context
+    let Transaction { inputs, outputs, mint, validity_range, .. } = transaction
+    expect [treasury_input] =
+      list.filter(
+        inputs,
+        fn(input) {
+          let Input {
+            output_reference,
+            output: Output { value: out_value, .. },
+          } = input
+          and {
+            value.quantity_of(out_value, authen_policy_id, treasury_auth_an) == 1,
+            output_reference == out_ref,
+          }
+        },
+      )
+    let Input { output: Output { address: treasury_address, .. }, .. } =
+      treasury_input
+    expect [_] =
+      list.filter(
+        inputs,
+        fn(input) {
+          let Input { output: Output { address, .. }, .. } = input
+          address == treasury_address
+        },
+      )
+    expect Input {
+      output: Output { datum: InlineDatum(treasury_in_raw_datum), .. },
+      ..
+    } = treasury_input
+    expect treasury_in_datum: TreasuryDatum = treasury_in_raw_datum
+    when redeemer is {
+      SpendTreasury -> {
+        expect [treasury_output] =
+          list.filter(
+            outputs,
+            fn(output) {
+              let Output { address, value: out_value, .. } = output
+              and {
+                address == treasury_address,
+                value.quantity_of(out_value, authen_policy_id, treasury_auth_an) == 1,
+              }
+            },
+          )
+        let mint_value = value.from_minted_value(mint)
+        expect [pool_output] =
+          list.filter(
+            outputs,
+            fn(output) {
+              let Output {
+                address: Address { payment_credential, .. },
+                value,
+                ..
+              } = output
+              when payment_credential is {
+                ScriptCredential(hash) -> and {
+                    hash == amm_pool_validation_hash,
+                    value.quantity_of(
+                      value,
+                      amm_authen_policy_id,
+                      amm_pool_auth_asset_name,
+                    ) == 1,
+                  }
+                _ -> False
+              }
+            },
+          )
+        expect Output { datum: InlineDatum(pool_raw_datum), .. } = pool_output
+        expect amm_pool_datum: PoolDatum = pool_raw_datum
+        validation.validate_create_dex_pool(
+          treasury_in_datum: treasury_in_datum,
+          treasury_output: treasury_output,
+          validity_range: validity_range,
+          mint_value: mint_value,
+          amm_pool_datum: amm_pool_datum,
+        )
+      }
+      _ -> False
+    }
+  }
+
+  fn minting_treasury(redeemer: TreasuryRedeemer, context: ScriptContext) {
     expect ScriptContext { purpose: Mint(treasury_policy_id), transaction } =
       context
     let Transaction { inputs, outputs, mint, validity_range, .. } = transaction
