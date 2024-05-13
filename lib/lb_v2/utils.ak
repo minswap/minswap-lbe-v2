@@ -27,6 +27,10 @@ pub const amm_pool_validation_hash =
 pub const default_burn_liquidity = 10
 
 /// *******************************************
+pub const minimum_ada = 3_000_000
+
+pub const fee_ada = 1_000_000
+
 pub fn sort_two_assets(asset_a: Asset, asset_b: Asset) -> (Asset, Asset) {
   let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
     asset_a

@@ -46,8 +46,10 @@ validator(
         expect SpendWithdraw(_): SellerRedeemer = seller_redeemer
         True
       }
-      // 1 treasury UTxO
-      other_redeemer -> {
+      // CollectOrder
+      // RedeemOrder
+      // having 1 treasury UTxO
+      _other_redeemer -> {
         expect [treasury_input] =
           list.filter(
             inputs,
