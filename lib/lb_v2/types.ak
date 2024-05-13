@@ -89,12 +89,9 @@ pub type SellerRedeemer {
   SpendDeposit { amount: Int }
   SpendWithdraw { amount: Int }
   SpendCounting
-}
-
-pub type OrderTokenMintingRedeemer {
-  OrderMintingDepositOrder
-  OrderMintingEditOrder
-  OrderMintingRedeemLP
+  MintDeposit
+  MintWithdrawAll
+  MintCounting
 }
 
 pub type OrderDatum {

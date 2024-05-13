@@ -2,13 +2,14 @@ use aiken/builtin
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
-  InlineDatum, Input, Output, ScriptContext, Spend, Transaction,
+  InlineDatum, Input, Mint, Output, ScriptContext, Spend, Transaction,
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId, ada_asset_name, ada_policy_id}
 use lb_v2/types.{
-  Asset, OrderDatum, SellerDatum, SellerRedeemer, SpendCounting, SpendDeposit,
-  SpendWithdraw, TreasuryDatum, ValidatorHash,
+  Asset, MintCounting, MintDeposit, MintWithdrawAll, OrderDatum, PenaltyConfig,
+  SellerDatum, SellerRedeemer, SpendCounting, SpendDeposit, SpendWithdraw,
+  TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   fee_ada, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
@@ -112,7 +113,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
           raise_asset: t_raise_asset,
           start_time,
           end_time,
-          // penalty_config,
+          penalty_config,
           order_hash,
           ..
         }: TreasuryDatum = raw_treasury_datum
@@ -147,7 +148,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
           seller_address
         when other_redeemer is {
           SpendDeposit(amount) -> {
-            expect [o_output] =
+            expect [order_output] =
               list.filter(
                 outputs,
                 fn(output) {
@@ -160,7 +161,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
               value: o_out_value,
               datum: InlineDatum(raw_o_out_datum),
               ..
-            } = o_output
+            } = order_output
             expect OrderDatum {
               base_asset: o_base_asset,
               raise_asset: o_raise_asset,
@@ -179,6 +180,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
                     // 1 fee_ada for collect order tx, 1 fee_ada for redeem order tx
                     minimum_ada + fee_ada * 2,
                   )
+                |> value.add(seller_hash, order_auth_an, 1)
                 |> value.add(raise_pid, raise_an, amount)
             and {
               // mint value
@@ -197,110 +199,172 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
             }
           }
           // cancel or udpate order
-          SpendWithdraw(_) ->
-            // let order_inputs =
-            //   list.filter(
-            //     inputs,
-            //     fn(output) {
-            //       let Input {
-            //         output: Output {
-            //           address: Address { payment_credential, .. },
-            //           ..
-            //         },
-            //         ..
-            //       } = output
-            //       payment_credential == ScriptCredential(order_hash)
-            //     },
-            //   )
-            // (owners, acc_input_amount, acc_penalty)
-            // let (_owners, _acc_input_amount, _acc_input_penalty) =
-            //   list.foldl(
-            //     order_inputs,
-            //     ([], 0, 0),
-            //     fn(order_input, acc) {
-            //       let (owners, acc_amount, acc_penalty) = acc
-            //       expect Input {
-            //         output: Output {
-            //           datum: InlineDatum(raw_o_datum),
-            //           value: _o_out_value,
-            //           ..
-            //         },
-            //         ..
-            //       } = order_input
-            //       expect OrderDatum {
-            //         base_asset: _o_base_asset,
-            //         raise_asset: _o_raise_asset,
-            //         amount: o_amount,
-            //         ..
-            //       }: OrderDatum =
-            //         // is_collected,
-            //         // penalty_amount,
-            //         // owner,
-            //         raw_o_datum
-            //       (
-            //         // [owner, ..owners],
-            //         owners,
-            //         acc_amount + o_amount,
-            //         acc_penalty + penalty_amount,
-            //       )
-            //     },
-            //   )
-            True
-          _ -> True
+          SpendWithdraw(_) -> {
+            // (owners, acc_input_amount, acc_penalty) and validate orders
+            let (owners, acc_input_amount, acc_input_penalty) =
+              list.foldl(
+                inputs,
+                ([], 0, 0),
+                fn(order_input, acc) {
+                  expect Input {
+                    output: Output {
+                      datum: InlineDatum(raw_o_datum),
+                      value: o_out_value,
+                      address: Address { payment_credential, .. },
+                      ..
+                    },
+                    ..
+                  } = order_input
+                  if payment_credential == ScriptCredential(order_hash) {
+                    let (owners, acc_amount, acc_penalty) = acc
+                    expect OrderDatum {
+                      base_asset: o_base_asset,
+                      raise_asset: o_raise_asset,
+                      amount,
+                      is_collected,
+                      penalty_amount,
+                      owner,
+                    }: OrderDatum = raw_o_datum
+                    // validate orders
+                    expect and {
+                        is_collected == False,
+                        o_base_asset == t_base_asset,
+                        o_raise_asset == t_raise_asset,
+                        value.quantity_of(
+                          o_out_value,
+                          seller_hash,
+                          order_auth_an,
+                        ) == 1,
+                      }
+                    (
+                      [owner, ..owners],
+                      acc_amount + amount,
+                      acc_penalty + penalty_amount,
+                    )
+                  } else {
+                    acc
+                  }
+                },
+              )
+            let order_in_amount = list.length(owners)
+            let (acc_output_amount, acc_output_penalty, order_out_amount) =
+              list.foldl(
+                outputs,
+                (0, 0, 0),
+                fn(output, acc) {
+                  expect Output {
+                    datum: InlineDatum(raw_o_datum),
+                    value: o_out_value,
+                    address: Address { payment_credential, .. },
+                    ..
+                  } = output
+                  if payment_credential == ScriptCredential(order_hash) {
+                    let (acc_amount, acc_penalty, order_amount) = acc
+                    expect OrderDatum {
+                      base_asset: o_base_asset,
+                      raise_asset: o_raise_asset,
+                      amount,
+                      is_collected,
+                      penalty_amount,
+                      ..
+                    }: OrderDatum = raw_o_datum
+                    // validate orders
+                    expect and {
+                        is_collected == False,
+                        o_base_asset == t_base_asset,
+                        o_raise_asset == t_raise_asset,
+                        value.quantity_of(
+                          o_out_value,
+                          seller_hash,
+                          order_auth_an,
+                        ) == 1,
+                      }
+                    (
+                      acc_amount + amount,
+                      acc_penalty + penalty_amount,
+                      order_amount + 1,
+                    )
+                  } else {
+                    acc
+                  }
+                },
+              )
+            let penalty =
+              when penalty_config is {
+                None -> 0
+                Some(PenaltyConfig {
+                  penalty_start_time,
+                  penalty_end_time,
+                  percent,
+                }) ->
+                  if
+                  upper_bound < penalty_start_time || lower_bound > penalty_end_time{
+                  
+                    0
+                  } else {
+                    let withdrawal_amount =
+                      if acc_input_amount > acc_output_amount {
+                        acc_input_amount - acc_output_amount
+                      } else {
+                        0
+                      }
+                    withdrawal_amount * percent / 100
+                  }
+              }
+
+            let is_valid_mint =
+              if order_in_amount == order_out_amount {
+                mint_value == []
+              } else {
+                mint_value == [
+                  (
+                    seller_hash,
+                    order_auth_an,
+                    order_out_amount - order_in_amount,
+                  ),
+                ]
+              }
+            // TODO: uniq owner and verify they signature
+            and {
+              is_valid_mint,
+              // valid acc penalty of input and output
+              acc_output_penalty == acc_input_penalty + penalty,
+              // seller datum(amount+ penalty)
+              s_out_amount == s_in_amount - acc_input_amount + acc_output_amount,
+              s_out_penalty_amount == s_in_penalty_amount - acc_input_penalty + acc_output_penalty,
+            }
+          }
+          _ -> False
         }
       }
     }
   }
 
-  // fn validate_minting_order_nft_and_seller_withdrawal(
-  //   raw_redeemer: Data,
-  //   context: ScriptContext,
-  // ) {
-  //   let ScriptContext { purpose, transaction } = context
-  //   when purpose is {
-  //     WithdrawFrom(stake_credential) -> {
-  //       let Transaction { outputs, inputs, reference_inputs, mint, .. } =
-  //         transaction
-  //       expect Inline(seller_hash_credential) = stake_credential
-  //       expect ScriptCredential(seller_hash) = seller_hash_credential
-  //       expect [treasury_ref_input] =
-  //         list.filter(
-  //           reference_inputs,
-  //           fn(ref_input) {
-  //             let Input { output: Output { value, .. }, .. } = ref_input
-  //             value.quantity_of(value, authen_policy_id, treasury_auth_an) == 1
-  //           },
-  //         )
-  //       let order_input =
-  //         list.filter(
-  //           inputs,
-  //           fn(input) {
-  //             let Input { output: Output { value, .. }, .. } = input
-  //             value.quantity_of(value, seller_hash, order_auth_an) == 1
-  //           },
-  //         )
-  //       let order_output =
-  //         list.filter(
-  //           outputs,
-  //           fn(output) {
-  //             let Output { value, .. } = output
-  //             value.quantity_of(value, seller_hash, order_auth_an) == 1
-  //           },
-  //         )
-  //       expect Input {
-  //         output: Output { datum: InlineDatum(treasury_raw_datum), .. },
-  //         ..
-  //       } = treasury_ref_input
-  //       expect treasury_datum: TreasuryDatum = treasury_raw_datum
-  //       let TreasuryDatum {
-  //         base_asset: t_base_asset,
-  //         raise_asset: t_raise_asset,
-  //         ..
-  //       } = treasury_datum
-  //       True
-  //     }
-  //     Mint(policy_id) -> True
-  //     _ -> False
-  //   }
-  // }
+  fn validate_minting_order_nft(
+    redeemer: SellerRedeemer,
+    context: ScriptContext,
+  ) {
+    let ScriptContext { purpose, transaction } = context
+    expect Mint(policy_id) = purpose
+    if redeemer == MintDeposit || redeemer == MintWithdrawAll {
+      let Transaction { inputs, .. } = transaction
+      expect [_] =
+        list.filter(
+          inputs,
+          fn(input) {
+            let Input {
+              output: Output { address: Address { payment_credential, .. }, .. },
+              ..
+            } = input
+            payment_credential == ScriptCredential(policy_id)
+          },
+        )
+      True
+    } else if redeemer == MintCounting {
+      // TODO:
+      True
+    } else {
+      False
+    }
+  }
 }
