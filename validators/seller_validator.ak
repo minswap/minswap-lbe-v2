@@ -7,8 +7,8 @@ use aiken/transaction.{
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId, ada_asset_name, ada_policy_id}
 use lb_v2/types.{
-  Asset, MintCounting, MintDeposit, MintWithdraw, OrderDatum, PenaltyConfig,
-  SellerDatum, SellerRedeemer, SpendCounting, SpendDeposit, SpendWithdraw,
+  Asset, CountingSeller, MintCounting, MintDeposit, MintWithdraw, OrderDatum,
+  PenaltyConfig, SellerDatum, SellerRedeemer, SpendDeposit, SpendWithdraw,
   TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
@@ -31,11 +31,14 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
       mint,
       ..
     } = transaction
-
+    let mint_value = value.from_minted_value(mint)
     when redeemer is {
-      // treasury counting raise asset(burn Seller)
-      // TODO:
-      SpendCounting -> True
+      CountingSeller { amount: collect_seller_count } ->
+        // foward logic to Treasury Minting
+        mint_value == validation.get_mint_value_of_collect_sellers(
+          treasury_hash,
+          collect_seller_count,
+        )
       // communicate with order(SpendDeposit,SpendWithdraw)
       other_redeemer -> {
         let SellerDatum {

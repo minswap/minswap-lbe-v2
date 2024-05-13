@@ -9,7 +9,6 @@ use lb_v2/types.{
   AddSeller, CloseEvent, CollectSeller, CreateAmmPool, CreateTreasury,
   InitTreasury, PoolDatum, TreasuryDatum, TreasuryRedeemer,
 }
-use lb_v2/utils.{seller_auth_an}
 use lb_v2/validation
 
 validator(authen_policy_id: PolicyId) {
@@ -161,10 +160,8 @@ validator(authen_policy_id: PolicyId) {
           step: CreateTreasury,
         )
       AddSeller { amount: add_seller_count } -> and {
-          add_seller_count > 0,
-          mint_value == value.from_asset(
+          mint_value == validation.get_mint_value_of_add_sellers(
             treasury_policy_id,
-            seller_auth_an,
             add_seller_count,
           ),
           // foward logic to spending treasury
@@ -175,11 +172,9 @@ validator(authen_policy_id: PolicyId) {
           ),
         }
       CollectSeller { amount: collect_seller_count } -> and {
-          collect_seller_count > 0,
-          mint_value == value.from_asset(
+          mint_value == validation.get_mint_value_of_collect_sellers(
             treasury_policy_id,
-            seller_auth_an,
-            -1 * collect_seller_count,
+            collect_seller_count,
           ),
           // foward logic to spending treasury
           validation.has_spend_treasury(
