@@ -3,8 +3,7 @@ use aiken/list
 use aiken/transaction.{Input, Output, ScriptContext, Spend, Transaction}
 use aiken/transaction/credential.{Address, ScriptCredential}
 use lb_v2/types.{
-  OrderRedeemer, SellerRedeemer, SpendOrder, SpendWithdraw, TreasuryRedeemer,
-  ValidatorHash, WithdrawOrder,
+  OrderRedeemer, SellerRedeemer, SpendWithdraw, ValidatorHash, WithdrawOrder,
 }
 
 // use aiken/transaction/value.{PolicyId}
@@ -13,7 +12,7 @@ validator(
   // // The PolicyID of Authen Minting Policy
   // authen_policy_id: PolicyId,
   // ValidatorHash of Treasury Contract
-  treasury_hash: ValidatorHash,
+  // treasury_hash: ValidatorHash,
   // ValidatorHash of Saller Contract
   seller_hash: ValidatorHash,
 ) {
@@ -49,28 +48,29 @@ validator(
       // CollectOrder
       // RedeemOrder
       // having 1 treasury UTxO
-      _other_redeemer -> {
-        expect [treasury_input] =
-          list.filter(
-            inputs,
-            fn(input) {
-              let Input {
-                output: Output {
-                  address: Address { payment_credential, .. },
-                  ..
-                },
-                ..
-              } = input
-              payment_credential == ScriptCredential(treasury_hash)
-            },
-          )
-        let Input { output_reference, .. } = treasury_input
-        let treasury_purpose = Spend(output_reference)
-        expect Some(raw_treasury_redeemer) =
-          dict.get(redeemers, treasury_purpose)
-        expect treasury_redeemer: TreasuryRedeemer = raw_treasury_redeemer
-        treasury_redeemer == SpendOrder
-      }
+      _other_redeemer -> False
     }
+    // _other_redeemer -> {
+    //   expect [treasury_input] =
+    //     list.filter(
+    //       inputs,
+    //       fn(input) {
+    //         let Input {
+    //           output: Output {
+    //             address: Address { payment_credential, .. },
+    //             ..
+    //           },
+    //           ..
+    //         } = input
+    //         payment_credential == ScriptCredential(treasury_hash)
+    //       },
+    //     )
+    //   let Input { output_reference, .. } = treasury_input
+    //   let treasury_purpose = Spend(output_reference)
+    //   expect Some(raw_treasury_redeemer) =
+    //     dict.get(redeemers, treasury_purpose)
+    //   expect treasury_redeemer: TreasuryRedeemer = raw_treasury_redeemer
+    //   // treasury_redeemer == SpendOrder
+    // }
   }
 }

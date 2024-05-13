@@ -64,11 +64,9 @@ pub type TreasuryDatum {
 
 pub type TreasuryRedeemer {
   InitTreasury
-  MintSeller { amount: Int }
-  // Spending Seller for Counting Phase
-  SpendSeller
-  // Spending Order for Counting | Encounter Phase (after spent all Seller)
-  SpendOrder
+  AddSeller { amount: Int }
+  CollectSeller { amount: Int }
+  CloseEvent
   CreateAmmPool
 }
 
@@ -104,6 +102,7 @@ pub type OrderDatum {
 }
 
 pub type OrderRedeemer {
+  UpdateOrder
   WithdrawOrder
   CollectOrder
   RedeemOrder

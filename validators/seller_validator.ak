@@ -342,9 +342,10 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
   }
 
   fn validate_seller_minting(redeemer: SellerRedeemer, context: ScriptContext) {
-    let ScriptContext { purpose, transaction } = context
-    let Transaction { inputs, mint, .. } = transaction
-    expect Mint(seller_policy_id) = purpose
+    expect ScriptContext {
+      purpose: Mint(seller_policy_id),
+      transaction: Transaction { inputs, mint, .. },
+    } = context
     when redeemer is {
       MintDeposit -> and {
           value.from_minted_value(mint) == value.from_asset(
@@ -362,8 +363,21 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
           ),
           validation.has_spend_seller(inputs, treasury_hash, seller_policy_id),
         }
-      MintCounting ->
-        validation.has_spend_treasury(inputs, authen_policy_id, treasury_hash)
+      MintCounting -> {
+        let seller_inputs =
+          validation.get_seller_inputs(inputs, treasury_hash, seller_policy_id)
+        let seller_input_count = list.length(seller_inputs)
+        and {
+          seller_input_count > 0,
+          value.from_minted_value(mint) == value.from_asset(
+            seller_policy_id,
+            order_auth_an,
+            -1 * seller_input_count,
+          ),
+          validation.has_spend_treasury(inputs, authen_policy_id, treasury_hash),
+        }
+      }
+
       _ -> False
     }
   }

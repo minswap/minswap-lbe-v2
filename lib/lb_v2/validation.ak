@@ -1,15 +1,18 @@
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
-use aiken/transaction.{InlineDatum, Input, Output, ValidityRange}
+use aiken/transaction.{
+  InlineDatum, Input, Output, OutputReference, ValidityRange,
+}
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId, Value}
 use lb_v2/types.{
   Asset, CreateTreasury, FactoryStep, PenaltyConfig, PoolDatum, RemoveTreasury,
-  TreasuryDatum, ValidatorHash,
+  SellerDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
-  amm_authen_policy_id, amm_pool_auth_asset_name, default_burn_liquidity,
-  default_number_seller, factory_auth_an, seller_auth_an, treasury_auth_an,
+  amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
+  default_burn_liquidity, default_number_seller, factory_auth_an, seller_auth_an,
+  treasury_auth_an,
 }
 
 pub fn get_value_of_minting_treasury(
@@ -201,7 +204,11 @@ pub fn validate_create_dex_pool(
   }
 }
 
-pub fn has_spend_treasury(inputs, authen_policy_id, treasury_hash) -> Bool {
+pub fn has_spend_treasury(
+  inputs: List<Input>,
+  authen_policy_id: PolicyId,
+  treasury_hash: ValidatorHash,
+) -> Bool {
   expect [_] =
     list.filter(
       inputs,
@@ -223,7 +230,11 @@ pub fn has_spend_treasury(inputs, authen_policy_id, treasury_hash) -> Bool {
   True
 }
 
-pub fn has_spend_seller(inputs, treasury_hash, seller_hash) -> Bool {
+pub fn has_spend_seller(
+  inputs: List<Input>,
+  treasury_policy_id: PolicyId,
+  seller_hash: ValidatorHash,
+) -> Bool {
   expect [_] =
     list.filter(
       inputs,
@@ -234,7 +245,7 @@ pub fn has_spend_seller(inputs, treasury_hash, seller_hash) -> Bool {
         } = input
         let Address { payment_credential, .. } = in_addr
         and {
-          value.quantity_of(in_value, treasury_hash, seller_auth_an) == 1,
+          value.quantity_of(in_value, treasury_policy_id, seller_auth_an) == 1,
           when payment_credential is {
             ScriptCredential(hash) -> seller_hash == hash
             _ -> False
@@ -243,4 +254,256 @@ pub fn has_spend_seller(inputs, treasury_hash, seller_hash) -> Bool {
       },
     )
   True
+}
+
+pub fn get_seller_inputs(
+  inputs: List<Input>,
+  treasury_policy_id: PolicyId,
+  seller_hash: ValidatorHash,
+) -> List<Input> {
+  list.filter(
+    inputs,
+    fn(input) {
+      let Input { output: Output { address: in_addr, value: in_value, .. }, .. } =
+        input
+      let Address { payment_credential, .. } = in_addr
+      and {
+        value.quantity_of(in_value, treasury_policy_id, seller_auth_an) == 1,
+        when payment_credential is {
+          ScriptCredential(hash) -> seller_hash == hash
+          _ -> False
+        },
+      }
+    },
+  )
+}
+
+pub fn get_treasury_input_by_out_ref(
+  inputs: List<Input>,
+  authen_policy_id: PolicyId,
+  out_ref: OutputReference,
+) -> Input {
+  expect [treasury_input] =
+    list.filter(
+      inputs,
+      fn(input) {
+        let Input { output_reference, output: Output { value: out_value, .. } } =
+          input
+        and {
+          value.quantity_of(out_value, authen_policy_id, treasury_auth_an) == 1,
+          output_reference == out_ref,
+        }
+      },
+    )
+  treasury_input
+}
+
+pub fn get_amm_pool_output(outputs: List<Output>) -> Output {
+  expect [pool_output] =
+    list.filter(
+      outputs,
+      fn(output) {
+        let Output { address: Address { payment_credential, .. }, value, .. } =
+          output
+        when payment_credential is {
+          ScriptCredential(hash) -> and {
+              hash == amm_pool_validation_hash,
+              value.quantity_of(
+                value,
+                amm_authen_policy_id,
+                amm_pool_auth_asset_name,
+              ) == 1,
+            }
+          _ -> False
+        }
+      },
+    )
+  pool_output
+}
+
+pub fn get_treasury_output(
+  outputs: List<Output>,
+  authen_policy_id: PolicyId,
+  treasury_hash: ValidatorHash,
+) -> Output {
+  expect [treasury_output] =
+    list.filter(
+      outputs,
+      fn(output) {
+        let Output {
+          address: Address { payment_credential, .. },
+          value: out_value,
+          ..
+        } = output
+        and {
+          value.quantity_of(out_value, authen_policy_id, treasury_auth_an) == 1,
+          when payment_credential is {
+            ScriptCredential(hash) -> hash == treasury_hash
+            _ -> False
+          },
+        }
+      },
+    )
+  treasury_output
+}
+
+pub fn get_seller_outputs(
+  outputs: List<Output>,
+  treasury_policy_id: PolicyId,
+  seller_hash: ValidatorHash,
+) -> List<Output> {
+  list.filter(
+    outputs,
+    fn(output) {
+      let Output {
+        address: Address { payment_credential, .. },
+        value: out_value,
+        ..
+      } = output
+      and {
+        value.quantity_of(out_value, treasury_policy_id, seller_auth_an) == 1,
+        when payment_credential is {
+          ScriptCredential(hash) -> hash == seller_hash
+          _ -> False
+        },
+      }
+    },
+  )
+}
+
+pub fn validate_add_seller(
+  add_seller_count: Int,
+  treasury_output: Output,
+  treasury_in_datum: TreasuryDatum,
+  treasury_in_value: Value,
+  mint_value: Value,
+  treasury_hash: ValidatorHash,
+  seller_outputs: List<Output>,
+  end_valid_time_range: Int,
+) -> Bool {
+  let TreasuryDatum { base_asset, raise_asset, seller_count, end_time, .. } =
+    treasury_in_datum
+  expect Output {
+    value: treasury_out_value,
+    datum: InlineDatum(treasury_out_raw_datum),
+    ..
+  } = treasury_output
+  expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
+  and {
+    // validate time frame
+    end_valid_time_range < end_time,
+    // validate Mint Amount
+    add_seller_count > 0,
+    mint_value == value.from_asset(
+      treasury_hash,
+      seller_auth_an,
+      add_seller_count,
+    ),
+    // validate seller outputs
+    list.length(seller_outputs) == add_seller_count,
+    list.all(
+      seller_outputs,
+      fn(output) {
+        expect Output { datum: InlineDatum(seller_raw_datum), .. } = output
+        expect seller_datum: SellerDatum = seller_raw_datum
+        let SellerDatum {
+          base_asset: s_base_asset,
+          raise_asset: s_raise_asset,
+          amount: s_amount,
+          penalty_amount: s_penalty_amount,
+        } = seller_datum
+        and {
+          s_base_asset == base_asset,
+          s_raise_asset == raise_asset,
+          s_amount == 0,
+          s_penalty_amount == 0,
+        }
+      },
+    ),
+    // validate treasury output
+    treasury_in_value == treasury_out_value,
+    treasury_out_datum == TreasuryDatum {
+      ..treasury_in_datum,
+      seller_count: seller_count + add_seller_count,
+    },
+  }
+}
+
+pub fn validate_collect_seller(
+  collect_seller_count: Int,
+  treasury_output: Output,
+  treasury_in_datum: TreasuryDatum,
+  treasury_in_value: Value,
+  seller_inputs: List<Input>,
+  start_valid_time_range: Int,
+  mint_value: Value,
+  treasury_hash: ValidatorHash,
+) -> Bool {
+  let TreasuryDatum {
+    base_asset,
+    raise_asset,
+    seller_count,
+    end_time,
+    reserve_raise: in_reserve_raise,
+    total_penalty: in_total_penalty,
+    ..
+  } = treasury_in_datum
+  expect Output {
+    value: treasury_out_value,
+    datum: InlineDatum(treasury_out_raw_datum),
+    ..
+  } = treasury_output
+  expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
+  // Apply sellers
+  expect [reserve_raise, total_penalty] =
+    list.foldl(
+      seller_inputs,
+      [0, 0],
+      fn(seller_input, acc) {
+        expect [acc_reserve_raise, acc_total_penalty] = acc
+        expect Input {
+          output: Output { datum: InlineDatum(seller_raw_datum), .. },
+          ..
+        } = seller_input
+        expect seller_datum: SellerDatum = seller_raw_datum
+        let SellerDatum {
+          base_asset: s_base_asset,
+          raise_asset: s_raise_asset,
+          amount,
+          penalty_amount,
+        } = seller_datum
+        expect and {
+            s_base_asset == base_asset,
+            s_raise_asset == raise_asset,
+          }
+        [acc_reserve_raise + amount, acc_total_penalty + penalty_amount]
+      },
+    )
+  let new_treasury_value =
+    value.add(
+      treasury_in_value,
+      raise_asset.policy_id,
+      raise_asset.asset_name,
+      reserve_raise + total_penalty,
+    )
+  and {
+    // validate time frame
+    start_valid_time_range > end_time,
+    // validate Mint Amount
+    mint_value == value.from_asset(
+      treasury_hash,
+      seller_auth_an,
+      -1 * collect_seller_count,
+    ),
+    // validate Seller Inputs
+    list.length(seller_inputs) == collect_seller_count,
+    // validate treasury output
+    treasury_out_value == new_treasury_value,
+    treasury_out_datum == TreasuryDatum {
+      ..treasury_in_datum,
+      seller_count: seller_count - collect_seller_count,
+      reserve_raise: in_reserve_raise + reserve_raise,
+      total_penalty: in_total_penalty + total_penalty,
+    },
+  }
 }
