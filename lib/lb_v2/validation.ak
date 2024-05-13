@@ -1,5 +1,7 @@
 use aiken/interval.{Finite, Interval, IntervalBound}
-use aiken/transaction.{InlineDatum, Output, ValidityRange}
+use aiken/list
+use aiken/transaction.{InlineDatum, Input, Output, ValidityRange}
+use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId, Value}
 use lb_v2/types.{
   Asset, CreateTreasury, FactoryStep, PenaltyConfig, PoolDatum, RemoveTreasury,
@@ -197,4 +199,48 @@ pub fn validate_create_dex_pool(
       total_liquidity: treasury_total_liquidity,
     },
   }
+}
+
+pub fn has_spend_treasury(inputs, authen_policy_id, treasury_hash) -> Bool {
+  expect [_] =
+    list.filter(
+      inputs,
+      fn(input) {
+        let Input {
+          output: Output { address: in_addr, value: in_value, .. },
+          ..
+        } = input
+        let Address { payment_credential, .. } = in_addr
+        and {
+          value.quantity_of(in_value, authen_policy_id, treasury_auth_an) == 1,
+          when payment_credential is {
+            ScriptCredential(hash) -> treasury_hash == hash
+            _ -> False
+          },
+        }
+      },
+    )
+  True
+}
+
+pub fn has_spend_seller(inputs, treasury_hash, seller_hash) -> Bool {
+  expect [_] =
+    list.filter(
+      inputs,
+      fn(input) {
+        let Input {
+          output: Output { address: in_addr, value: in_value, .. },
+          ..
+        } = input
+        let Address { payment_credential, .. } = in_addr
+        and {
+          value.quantity_of(in_value, treasury_hash, seller_auth_an) == 1,
+          when payment_credential is {
+            ScriptCredential(hash) -> seller_hash == hash
+            _ -> False
+          },
+        }
+      },
+    )
+  True
 }

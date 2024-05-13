@@ -90,7 +90,7 @@ pub type SellerRedeemer {
   SpendWithdraw { amount: Int }
   SpendCounting
   MintDeposit
-  MintWithdrawAll
+  MintWithdraw
   MintCounting
 }
 

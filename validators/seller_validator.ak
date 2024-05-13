@@ -7,16 +7,17 @@ use aiken/transaction.{
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId, ada_asset_name, ada_policy_id}
 use lb_v2/types.{
-  Asset, MintCounting, MintDeposit, MintWithdrawAll, OrderDatum, PenaltyConfig,
+  Asset, MintCounting, MintDeposit, MintWithdraw, OrderDatum, PenaltyConfig,
   SellerDatum, SellerRedeemer, SpendCounting, SpendDeposit, SpendWithdraw,
   TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   fee_ada, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
 }
+use lb_v2/validation
 
 validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
-  fn validate_seller(
+  fn validate_seller_spending(
     datum: SellerDatum,
     redeemer: SellerRedeemer,
     context: ScriptContext,
@@ -340,31 +341,30 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
     }
   }
 
-  fn validate_minting_order_nft(
-    redeemer: SellerRedeemer,
-    context: ScriptContext,
-  ) {
+  fn validate_seller_minting(redeemer: SellerRedeemer, context: ScriptContext) {
     let ScriptContext { purpose, transaction } = context
-    expect Mint(policy_id) = purpose
-    if redeemer == MintDeposit || redeemer == MintWithdrawAll {
-      let Transaction { inputs, .. } = transaction
-      expect [_] =
-        list.filter(
-          inputs,
-          fn(input) {
-            let Input {
-              output: Output { address: Address { payment_credential, .. }, .. },
-              ..
-            } = input
-            payment_credential == ScriptCredential(policy_id)
-          },
-        )
-      True
-    } else if redeemer == MintCounting {
-      // TODO:
-      True
-    } else {
-      False
+    let Transaction { inputs, mint, .. } = transaction
+    expect Mint(seller_policy_id) = purpose
+    when redeemer is {
+      MintDeposit -> and {
+          value.from_minted_value(mint) == value.from_asset(
+            seller_policy_id,
+            order_auth_an,
+            1,
+          ),
+          validation.has_spend_seller(inputs, treasury_hash, seller_policy_id),
+        }
+      MintWithdraw -> and {
+          value.from_minted_value(mint) == value.from_asset(
+            seller_policy_id,
+            order_auth_an,
+            -1,
+          ),
+          validation.has_spend_seller(inputs, treasury_hash, seller_policy_id),
+        }
+      MintCounting ->
+        validation.has_spend_treasury(inputs, authen_policy_id, treasury_hash)
+      _ -> False
     }
   }
 }
