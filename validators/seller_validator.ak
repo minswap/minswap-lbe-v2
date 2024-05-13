@@ -1,16 +1,14 @@
 use aiken/builtin
-use aiken/dict
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
-  InlineDatum, Input, Mint, Output, ScriptContext, Spend, Transaction,
-  WithdrawFrom,
+  InlineDatum, Input, Output, ScriptContext, Spend, Transaction,
 }
-use aiken/transaction/credential.{Address, Inline, ScriptCredential}
+use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId, ada_asset_name, ada_policy_id}
 use lb_v2/types.{
-  Asset, OrderDatum, OrderTokenMintingRedeemer, SellerDatum, SellerRedeemer,
-  SpendCounting, SpendDeposit, SpendWithdraw, TreasuryDatum, ValidatorHash,
+  Asset, OrderDatum, SellerDatum, SellerRedeemer, SpendCounting, SpendDeposit,
+  SpendWithdraw, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   fee_ada, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
@@ -114,7 +112,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
           raise_asset: t_raise_asset,
           start_time,
           end_time,
-          penalty_config,
+          // penalty_config,
           order_hash,
           ..
         }: TreasuryDatum = raw_treasury_datum
@@ -199,130 +197,110 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
             }
           }
           // cancel or udpate order
-          SpendWithdraw(amout) -> {
-            let order_inputs =
-              list.filter(
-                inputs,
-                fn(output) {
-                  let Input {
-                    output: Output {
-                      address: Address { payment_credential, .. },
-                      ..
-                    },
-                    ..
-                  } = output
-                  payment_credential == ScriptCredential(order_hash)
-                },
-              )
+          SpendWithdraw(_) ->
+            // let order_inputs =
+            //   list.filter(
+            //     inputs,
+            //     fn(output) {
+            //       let Input {
+            //         output: Output {
+            //           address: Address { payment_credential, .. },
+            //           ..
+            //         },
+            //         ..
+            //       } = output
+            //       payment_credential == ScriptCredential(order_hash)
+            //     },
+            //   )
             // (owners, acc_input_amount, acc_penalty)
-            let (owners, acc_input_amount, acc_input_penalty) =
-              list.foldl(
-                order_inputs,
-                ([], 0, 0),
-                fn(order_input, owners, acc_amount, acc_penalty) {
-                  expect Input {
-                    output: Output {
-                      datum: InlineDatum(raw_o_datum),
-                      o_out_value,
-                      ..
-                    },
-                    ..
-                  } = order_input
-                  expect OrderDatum {
-                    base_asset: o_base_asset,
-                    raise_asset: o_raise_asset,
-                    amount: o_amount,
-                    is_collected,
-                    penalty_amount,
-                    owner,
-                  }: OrderDatum = raw_o_datum
-                  (
-                    [owner, ..owners],
-                    acc_amount + o_amount,
-                    acc_penalty + penalty_amount,
-                  )
-                },
-              )
+            // let (_owners, _acc_input_amount, _acc_input_penalty) =
+            //   list.foldl(
+            //     order_inputs,
+            //     ([], 0, 0),
+            //     fn(order_input, acc) {
+            //       let (owners, acc_amount, acc_penalty) = acc
+            //       expect Input {
+            //         output: Output {
+            //           datum: InlineDatum(raw_o_datum),
+            //           value: _o_out_value,
+            //           ..
+            //         },
+            //         ..
+            //       } = order_input
+            //       expect OrderDatum {
+            //         base_asset: _o_base_asset,
+            //         raise_asset: _o_raise_asset,
+            //         amount: o_amount,
+            //         ..
+            //       }: OrderDatum =
+            //         // is_collected,
+            //         // penalty_amount,
+            //         // owner,
+            //         raw_o_datum
+            //       (
+            //         // [owner, ..owners],
+            //         owners,
+            //         acc_amount + o_amount,
+            //         acc_penalty + penalty_amount,
+            //       )
+            //     },
+            //   )
             True
-          }
           _ -> True
         }
       }
     }
   }
 
-  fn validate_minting_order_nft_and_seller_withdrawal(
-    raw_redeemer: Data,
-    context: ScriptContext,
-  ) {
-    let ScriptContext { purpose, transaction } = context
-    when purpose is {
-      WithdrawFrom(stake_credential) -> {
-        let Transaction { outputs, inputs, reference_inputs, mint, .. } =
-          transaction
-        expect Inline(seller_hash_credential) = stake_credential
-        expect ScriptCredential(seller_hash) = seller_hash_credential
-        expect [treasury_ref_input] =
-          list.filter(
-            reference_inputs,
-            fn(ref_input) {
-              let Input { output: Output { value, .. }, .. } = ref_input
-              value.quantity_of(value, authen_policy_id, treasury_auth_an) == 1
-            },
-          )
-        let order_input =
-          list.filter(
-            inputs,
-            fn(input) {
-              let Input { output: Output { value, .. }, .. } = input
-              value.quantity_of(value, seller_hash, order_auth_an) == 1
-            },
-          )
-        let order_output =
-          list.filter(
-            outputs,
-            fn(output) {
-              let Output { value, .. } = output
-              value.quantity_of(value, seller_hash, order_auth_an) == 1
-            },
-          )
-        expect Input {
-          output: Output { datum: InlineDatum(treasury_raw_datum), .. },
-          ..
-        } = treasury_ref_input
-        expect treasury_datum: TreasuryDatum = treasury_raw_datum
-        let TreasuryDatum {
-          base_asset: t_base_asset,
-          raise_asset: t_raise_asset,
-          ..
-        } = treasury_datum
-        True
-      }
-      Mint(policy_id) -> {
-        expect redeemer: OrderTokenMintingRedeemer = raw_redeemer
-        when redeemer is {
-          OrderMintingEditOrders -> {
-            let Transaction { withdrawals, .. } = transaction
-            // policy_id == seller_hash
-            dict.has_key(withdrawals, Inline(ScriptCredential(policy_id)))
-          }
-          _ -> True
-        }
-      }
-      _ -> False
-    }
-  }
-}
-
-fn validate_order_utxo(
-  treasury_datum: TreasuryDatum,
-  order_output: Output,
-  seller_hash: ByteArray,
-) -> Bool {
-  let TreasuryDatum { base_asset, raise_asset, status, .. } = treasury_datum
-  let Output { value, datum: InlineDatum(raw_order_datum), .. } = output
-  expect OrderDatum { base_asset: o_base_asset, raise_asset: o_raise_asset, .. }: OrderDatum =
-    raw_order_datum
-  value.quantity_of(value, seller_hash, order_auth_an) == 1
-  True
+  // fn validate_minting_order_nft_and_seller_withdrawal(
+  //   raw_redeemer: Data,
+  //   context: ScriptContext,
+  // ) {
+  //   let ScriptContext { purpose, transaction } = context
+  //   when purpose is {
+  //     WithdrawFrom(stake_credential) -> {
+  //       let Transaction { outputs, inputs, reference_inputs, mint, .. } =
+  //         transaction
+  //       expect Inline(seller_hash_credential) = stake_credential
+  //       expect ScriptCredential(seller_hash) = seller_hash_credential
+  //       expect [treasury_ref_input] =
+  //         list.filter(
+  //           reference_inputs,
+  //           fn(ref_input) {
+  //             let Input { output: Output { value, .. }, .. } = ref_input
+  //             value.quantity_of(value, authen_policy_id, treasury_auth_an) == 1
+  //           },
+  //         )
+  //       let order_input =
+  //         list.filter(
+  //           inputs,
+  //           fn(input) {
+  //             let Input { output: Output { value, .. }, .. } = input
+  //             value.quantity_of(value, seller_hash, order_auth_an) == 1
+  //           },
+  //         )
+  //       let order_output =
+  //         list.filter(
+  //           outputs,
+  //           fn(output) {
+  //             let Output { value, .. } = output
+  //             value.quantity_of(value, seller_hash, order_auth_an) == 1
+  //           },
+  //         )
+  //       expect Input {
+  //         output: Output { datum: InlineDatum(treasury_raw_datum), .. },
+  //         ..
+  //       } = treasury_ref_input
+  //       expect treasury_datum: TreasuryDatum = treasury_raw_datum
+  //       let TreasuryDatum {
+  //         base_asset: t_base_asset,
+  //         raise_asset: t_raise_asset,
+  //         ..
+  //       } = treasury_datum
+  //       True
+  //     }
+  //     Mint(policy_id) -> True
+  //     _ -> False
+  //   }
+  // }
 }
