@@ -318,6 +318,57 @@ pub fn get_treasury_input_by_out_ref(
   treasury_input
 }
 
+pub fn get_treasury_ref_input_datum(
+  reference_inputs: List<Input>,
+  authen_policy_id: PolicyId,
+  treasury_hash: ValidatorHash,
+) -> TreasuryDatum {
+  expect [treasury_ref_input] =
+    list.filter(
+      reference_inputs,
+      fn(input) {
+        let Input {
+          output: Output {
+            address: Address { payment_credential, .. },
+            value: out_value,
+            ..
+          },
+          ..
+        } = input
+        and {
+          value.quantity_of(out_value, authen_policy_id, treasury_auth_an) == 1,
+          payment_credential == ScriptCredential(treasury_hash),
+        }
+      },
+    )
+  expect Input {
+    output: Output { datum: InlineDatum(raw_treasury_datum), .. },
+    ..
+  } = treasury_ref_input
+  expect treasury_datum: TreasuryDatum = raw_treasury_datum
+  treasury_datum
+}
+
+pub fn get_seller_input_by_out_ref(
+  inputs: List<Input>,
+  treasury_policy_id: PolicyId,
+  out_ref: OutputReference,
+) -> Input {
+  expect [seller_input] =
+    list.filter(
+      inputs,
+      fn(input) {
+        let Input { output_reference, output: Output { value: out_value, .. } } =
+          input
+        and {
+          value.quantity_of(out_value, treasury_policy_id, seller_auth_an) == 1,
+          output_reference == out_ref,
+        }
+      },
+    )
+  seller_input
+}
+
 pub fn get_amm_pool_output(outputs: List<Output>) -> Output {
   expect [pool_output] =
     list.filter(

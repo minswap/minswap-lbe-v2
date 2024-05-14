@@ -13,7 +13,7 @@ use lb_v2/validation
 
 validator(authen_policy_id: PolicyId) {
   fn validate_treasury_spending(
-    _: Data,
+    treasury_in_datum: TreasuryDatum,
     redeemer: TreasuryRedeemer,
     context: ScriptContext,
   ) {
@@ -31,6 +31,7 @@ validator(authen_policy_id: PolicyId) {
           payment_credential: ScriptCredential(treasury_hash),
           ..
         },
+        value: treasury_in_value,
         ..
       },
       ..
@@ -50,15 +51,6 @@ validator(authen_policy_id: PolicyId) {
           }
         },
       )
-    expect Input {
-      output: Output {
-        datum: InlineDatum(treasury_in_raw_datum),
-        value: treasury_in_value,
-        ..
-      },
-      ..
-    } = treasury_input
-    expect treasury_in_datum: TreasuryDatum = treasury_in_raw_datum
     let mint_value = value.from_minted_value(mint)
     expect Interval {
       upper_bound: IntervalBound {
