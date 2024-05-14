@@ -3,16 +3,19 @@ use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Output, OutputReference, ValidityRange,
 }
-use aiken/transaction/credential.{Address, ScriptCredential}
+use aiken/transaction/credential.{
+  Address, ScriptCredential, VerificationKeyCredential,
+}
 use aiken/transaction/value.{PolicyId, Value}
 use lb_v2/types.{
-  Asset, CreateTreasury, FactoryStep, PenaltyConfig, PoolDatum, RemoveTreasury,
-  SellerDatum, TreasuryDatum, ValidatorHash,
+  Asset, CreateTreasury, FactoryStep, OrderDatum, PenaltyConfig, PoolDatum,
+  RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  default_burn_liquidity, default_number_seller, factory_auth_an, order_auth_an,
-  seller_auth_an, treasury_auth_an,
+  calculate_penalty, default_burn_liquidity, default_number_seller,
+  factory_auth_an, get_order_value, order_auth_an, seller_auth_an,
+  treasury_auth_an,
 }
 
 pub fn get_value_of_minting_treasury(
@@ -611,6 +614,121 @@ pub fn validate_collect_seller(
       total_penalty: in_total_penalty + total_penalty,
     },
   }
+}
+
+pub fn apply_order(
+  order_inputs: List<Input>,
+  order_outputs: List<Output>,
+  penalty_config: Option<PenaltyConfig>,
+  start_valid_time_range: Int,
+  end_valid_time_range: Int,
+  seller_hash: ValidatorHash,
+  base_asset: Asset,
+  raise_asset: Asset,
+  extra_signatories: List<ByteArray>,
+) -> (Int, Int) {
+  let (total_input_amount, total_input_penalty) =
+    list.foldl(
+      order_inputs,
+      (0, 0),
+      fn(order_input, acc) {
+        expect Input {
+          output: Output {
+            datum: InlineDatum(raw_o_datum),
+            value: order_value,
+            ..
+          },
+          ..
+        } = order_input
+        let (acc_amount, acc_penalty) = acc
+        expect OrderDatum {
+          base_asset: o_base_asset,
+          raise_asset: o_raise_asset,
+          amount,
+          is_collected,
+          penalty_amount,
+          owner,
+        }: OrderDatum = raw_o_datum
+        expect Address {
+          payment_credential: VerificationKeyCredential(pub_key_hash),
+          ..
+        } = owner
+        let expected_order =
+          get_order_value(
+            amount: amount,
+            penalty_amount: penalty_amount,
+            seller_policy_id: seller_hash,
+            is_collected: False,
+            raise_asset: raise_asset,
+          )
+        // validate orders
+        expect and {
+            list.has(extra_signatories, pub_key_hash),
+            is_collected == is_collected,
+            o_base_asset == base_asset,
+            o_raise_asset == raise_asset,
+            expected_order == order_value,
+          }
+        (acc_amount + amount, acc_penalty + penalty_amount)
+      },
+    )
+  let (total_output_amount, total_output_penalty) =
+    list.foldl(
+      order_outputs,
+      (0, 0),
+      fn(order_output, acc) {
+        expect Output {
+          datum: InlineDatum(raw_o_datum),
+          value: order_value,
+          ..
+        } = order_output
+        let (acc_amount, acc_penalty) = acc
+        expect OrderDatum {
+          base_asset: o_base_asset,
+          raise_asset: o_raise_asset,
+          amount,
+          is_collected,
+          penalty_amount,
+          owner,
+        }: OrderDatum = raw_o_datum
+        expect Address {
+          payment_credential: VerificationKeyCredential(pub_key_hash),
+          ..
+        } = owner
+        let expected_order =
+          get_order_value(
+            amount: amount,
+            penalty_amount: penalty_amount,
+            seller_policy_id: seller_hash,
+            is_collected: is_collected,
+            raise_asset: raise_asset,
+          )
+        // validate orders
+        expect and {
+            list.has(extra_signatories, pub_key_hash),
+            is_collected == False,
+            o_base_asset == base_asset,
+            o_raise_asset == raise_asset,
+            expected_order == order_value,
+          }
+        (acc_amount + amount, acc_penalty + penalty_amount)
+      },
+    )
+  // penalty of this tx
+  let penalty =
+    calculate_penalty(
+      penalty_config: penalty_config,
+      start_valid_time_range: start_valid_time_range,
+      end_valid_time_range: end_valid_time_range,
+      total_input_amount: total_input_amount,
+      total_output_amount: total_output_amount,
+    )
+  expect total_output_penalty - total_input_penalty == penalty
+
+  (
+    total_output_amount - total_input_amount,
+    total_output_penalty - total_input_penalty,
+  )
 }
 // pub fn validate_collect_order(
 //   order_inputs: List<Input>,
