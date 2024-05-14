@@ -658,13 +658,12 @@ pub fn apply_order(
             amount: amount,
             penalty_amount: penalty_amount,
             seller_policy_id: seller_hash,
-            is_collected: False,
             raise_asset: raise_asset,
           )
         // validate orders
         expect and {
             list.has(extra_signatories, pub_key_hash),
-            is_collected == is_collected,
+            is_collected == False,
             o_base_asset == base_asset,
             o_raise_asset == raise_asset,
             expected_order == order_value,
@@ -700,7 +699,6 @@ pub fn apply_order(
             amount: amount,
             penalty_amount: penalty_amount,
             seller_policy_id: seller_hash,
-            is_collected: is_collected,
             raise_asset: raise_asset,
           )
         // validate orders

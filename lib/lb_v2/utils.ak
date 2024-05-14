@@ -71,21 +71,10 @@ pub fn get_order_value(
   amount: Int,
   penalty_amount: Int,
   seller_policy_id: PolicyId,
-  is_collected: Bool,
   raise_asset: Asset,
 ) -> Value {
   value.zero()
-    |> value.add(
-        ada_policy_id,
-        ada_asset_name,
-        if is_collected {
-          // 1 fee_ada for redeem order tx
-          minimum_ada + fee_ada
-        } else {
-          // 1 fee_ada for collect order tx, 1 fee_ada for redeem order tx
-          minimum_ada + fee_ada * 2
-        },
-      )
+    |> value.add(ada_policy_id, ada_asset_name, minimum_ada + fee_ada * 2)
     |> value.add(
         raise_asset.policy_id,
         raise_asset.asset_name,
