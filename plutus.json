@@ -74,20 +74,43 @@
       "hash": "3719944e65786dfb1dbaa8288627302899f5a111b2df6b31358b9101"
     },
     {
+      "title": "order_validator.feed_type_order",
+      "datum": {
+        "title": "_datum",
+        "schema": {
+          "$ref": "#/definitions/lb_v2~1types~1OrderDatum"
+        }
+      },
+      "redeemer": {
+        "title": "_redeemer",
+        "schema": {
+          "$ref": "#/definitions/lb_v2~1types~1OrderRedeemer"
+        }
+      },
+      "compiledCode": "59023f0100003232323232322323232232253330084a029309b2b19299980398028008a99980518049baa00214985854ccc01cc01000454ccc028c024dd50010a4c2c2a66600e66e1d20040011533300a300937540042930b0a99980399b874801800454ccc028c024dd50010a4c2c2c600e6ea8004c8c94ccc018c010c01cdd50028991919191919191919191919299980a980b801099191924ca6660286024602a6ea80244c8c8c8c94ccc06cc0740084c8c92632533301a301800113232533301f3021002132498c94ccc074c06c0044c8c94ccc088c0900084c926301b001163022001301f37540042a66603a60340022646464646464a66604c60500042930b1bad30260013026002375a604800260480046eb4c088004c07cdd50010b180e9baa00116301f001301c37540062a666034602e0022a66603a60386ea800c5261616301a375400460280062c603600260360046032002602c6ea802458c038028c03402c58dd6980a800980a80119299980998090008a999808180698088008a5115333010300e301100114a02c2c6ea8c04c004c04c008dd6980880098088011807800980780118068009806801180580098041baa0051625333006300430073754002264646464a66601a601e0042930b1bae300d001300d002375c601600260106ea8004588c94ccc018c0100044c8c94ccc02cc03400852616375c601600260106ea800854ccc018c00c0044c8c94ccc02cc03400852616375c601600260106ea800858c018dd50009b8748008dc3a4000ae6955ceaab9e5573eae855d101",
+      "hash": "731270b4582dc0762db615dad89220f7ea837b4710407b34ee94582c"
+    },
+    {
       "title": "order_validator.validate_order",
       "datum": {
-        "title": "_raw_order_datum",
+        "title": "_raw_datum",
         "schema": {
           "$ref": "#/definitions/Data"
         }
       },
       "redeemer": {
-        "title": "redeemer",
+        "title": "raw_redeemer",
         "schema": {
-          "$ref": "#/definitions/lb_v2~1types~1OrderRedeemer"
+          "$ref": "#/definitions/Data"
         }
       },
       "parameters": [
+        {
+          "title": "treasury_hash",
+          "schema": {
+            "$ref": "#/definitions/ByteArray"
+          }
+        },
         {
           "title": "seller_hash",
           "schema": {
@@ -95,8 +118,8 @@
           }
         }
       ],
-      "compiledCode": "5901b101000032323232323232232223225333007323232533300a3370e900118059baa00613232533300f3012002132533300d3370e900018071baa001132533300e3370e900218079baa001132325333013301600214a22c6eb4c050004c040dd50008b180918079baa0011632323300100100522533301200114c0103d87a8000132323253330123375e00c6026006266e952000330160014bd700998028028011809801180b001180a00099ba548008cc040c044c038dd5000a5eb8058c040004c8cc00400400c894ccc03c00452f5c026464a66601c66ebcc04cc040dd5180998081baa301330143010375400466e95200233012375201897ae0133012002330040040011330040040013013002301100114a06eacc038c03cc03cc03cc03cc03cc03cc03cc03cc03c008dd6180680098049baa300c3009375400229309b2b19299980319b874800000454ccc024c020dd50010a4c2c2a66600c66e1d200200115333009300837540042930b0a99980319b874801000454ccc024c020dd50010a4c2c2a66600c66e1d200600115333009300837540042930b0b18031baa001375c002ae6955ceaab9e5573eae815d0aba21",
-      "hash": "1ceb5915f4bd69421cf89f44bc5936c8cd0fc5fbff02908cd0b33740"
+      "compiledCode": "5902760100003232323232323223223222253330083232323253323300d3001300e37546024602600a26464646464a666024600c008266e20ccc004c00c020039221056f7264657200480004c94ccc04ccdc3a400800a26600201060066602e66e95200233017375202297ae04bd700a99980999b87480000144cc004020c00ccc05ccdd2a40046602e6ea403d2f5c097ae0133710666004600801201e9101056f72646572004800088c8cc00400400c894ccc064004528099299980b99baf0043018301c00214a2266006006002603800244464a66602a6012602c6ea8004520001375a6034602e6ea8004c94ccc054c024c058dd50008a6103d87a8000132330010013756603660306ea8008894ccc068004530103d87a80001323232533301a3371e00e6eb8c06c00c4c028cc078dd4000a5eb804cc014014008dd6980d801180f001180e000991980080080211299980c8008a6103d87a8000132323253330193371e00e6eb8c06800c4c024cc074dd3000a5eb804cc014014008dd5980d001180e801180d8009ba5480008c8cc004004008894ccc05400452f5bded8c0264646464a66602c66e3d220100002100313301a337606ea4008dd3000998030030019bab3017003375c602a0046032004602e002601e6ea8020c94ccc038cdc3a40000022a66602260206ea8020526161533300e300200115333011301037540102930b0a99980719b874801000454ccc044c040dd50040a4c2c2a66601c66e1d200600115333011301037540102930b0b18071baa007370e90010b1bab3010301130110023756601e002601e601e601e601e60166ea8c038004c028dd50008a4c26cac6eb8004dd7000ab9a5573aaae7955cfaba05742ae89",
+      "hash": "c22176cb1288c6689c570c541a2c72eae8912b38331ca9edf24d72e0"
     },
     {
       "title": "seller_validator.validate_seller_spending",
@@ -200,6 +223,23 @@
     }
   ],
   "definitions": {
+    "Bool": {
+      "title": "Bool",
+      "anyOf": [
+        {
+          "title": "False",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        },
+        {
+          "title": "True",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        }
+      ]
+    },
     "ByteArray": {
       "dataType": "bytes"
     },
@@ -209,6 +249,29 @@
     },
     "Int": {
       "dataType": "integer"
+    },
+    "Option$aiken/transaction/credential/Referenced$aiken/transaction/credential/Credential": {
+      "title": "Optional",
+      "anyOf": [
+        {
+          "title": "Some",
+          "description": "An optional value.",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "$ref": "#/definitions/aiken~1transaction~1credential~1Referenced$aiken~1transaction~1credential~1Credential"
+            }
+          ]
+        },
+        {
+          "title": "None",
+          "description": "Nothing.",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        }
+      ]
     },
     "RedeemerWrapper$lb_v2/types/SellerRedeemer": {
       "title": "Wrapped Redeemer",
@@ -273,6 +336,88 @@
             {
               "title": "hash",
               "$ref": "#/definitions/ByteArray"
+            }
+          ]
+        }
+      ]
+    },
+    "aiken/transaction/credential/Address": {
+      "title": "Address",
+      "description": "A Cardano `Address` typically holding one or two credential references.\n\n Note that legacy bootstrap addresses (a.k.a. 'Byron addresses') are\n completely excluded from Plutus contexts. Thus, from an on-chain\n perspective only exists addresses of type 00, 01, ..., 07 as detailed\n in [CIP-0019 :: Shelley Addresses](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0019/#shelley-addresses).",
+      "anyOf": [
+        {
+          "title": "Address",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "payment_credential",
+              "$ref": "#/definitions/aiken~1transaction~1credential~1Credential"
+            },
+            {
+              "title": "stake_credential",
+              "$ref": "#/definitions/Option$aiken~1transaction~1credential~1Referenced$aiken~1transaction~1credential~1Credential"
+            }
+          ]
+        }
+      ]
+    },
+    "aiken/transaction/credential/Credential": {
+      "title": "Credential",
+      "description": "A general structure for representing an on-chain `Credential`.\n\n Credentials are always one of two kinds: a direct public/private key\n pair, or a script (native or Plutus).",
+      "anyOf": [
+        {
+          "title": "VerificationKeyCredential",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "$ref": "#/definitions/ByteArray"
+            }
+          ]
+        },
+        {
+          "title": "ScriptCredential",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": [
+            {
+              "$ref": "#/definitions/ByteArray"
+            }
+          ]
+        }
+      ]
+    },
+    "aiken/transaction/credential/Referenced$aiken/transaction/credential/Credential": {
+      "title": "Referenced",
+      "description": "Represent a type of object that can be represented either inline (by hash)\n or via a reference (i.e. a pointer to an on-chain location).\n\n This is mainly use for capturing pointers to a stake credential\n registration certificate in the case of so-called pointer addresses.",
+      "anyOf": [
+        {
+          "title": "Inline",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "$ref": "#/definitions/aiken~1transaction~1credential~1Credential"
+            }
+          ]
+        },
+        {
+          "title": "Pointer",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": [
+            {
+              "title": "slot_number",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "transaction_index",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "certificate_index",
+              "$ref": "#/definitions/Int"
             }
           ]
         }
@@ -378,6 +523,42 @@
           "dataType": "constructor",
           "index": 1,
           "fields": []
+        }
+      ]
+    },
+    "lb_v2/types/OrderDatum": {
+      "title": "OrderDatum",
+      "anyOf": [
+        {
+          "title": "OrderDatum",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "base_asset",
+              "$ref": "#/definitions/lb_v2~1types~1Asset"
+            },
+            {
+              "title": "raise_asset",
+              "$ref": "#/definitions/lb_v2~1types~1Asset"
+            },
+            {
+              "title": "owner",
+              "$ref": "#/definitions/aiken~1transaction~1credential~1Address"
+            },
+            {
+              "title": "amount",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "is_collected",
+              "$ref": "#/definitions/Bool"
+            },
+            {
+              "title": "penalty_amount",
+              "$ref": "#/definitions/Int"
+            }
+          ]
         }
       ]
     },
