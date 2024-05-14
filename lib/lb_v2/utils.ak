@@ -73,8 +73,17 @@ pub fn get_order_value(
   seller_policy_id: PolicyId,
   raise_asset: Asset,
 ) -> Value {
+  let base_ada =
+    if amount > 0 {
+      // fee for collect order and redeem lp
+      minimum_ada + fee_ada * 2
+    } else {
+      // order dont have any raise asset
+      // => fee is only for collect order(just collect penalty)
+      minimum_ada + fee_ada
+    }
   value.zero()
-    |> value.add(ada_policy_id, ada_asset_name, minimum_ada + fee_ada * 2)
+    |> value.add(ada_policy_id, ada_asset_name, base_ada)
     |> value.add(
         raise_asset.policy_id,
         raise_asset.asset_name,

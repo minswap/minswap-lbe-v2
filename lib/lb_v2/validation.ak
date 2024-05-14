@@ -667,6 +667,9 @@ pub fn apply_order(
             o_base_asset == base_asset,
             o_raise_asset == raise_asset,
             expected_order == order_value,
+            amount >= 0,
+            penalty_amount >= 0,
+            amount + penalty_amount >= 0,
           }
         (acc_amount + amount, acc_penalty + penalty_amount)
       },
