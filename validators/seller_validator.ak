@@ -93,12 +93,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
             treasury_hash,
           )
 
-        // order_inputs
-        // order_ouputs
-        // expect [delta_amount, delta_penalty] = validation.apply_oders(order_inputs, order_ouputs, penalty_configs)
-        // expect seller_out_datum.amount == seller_in_datum.amount + delta_amount
-        // expect seller_out_datum.total_penalty == seller_in_datum.total_penalty + delta_penalty
-        // expect list.length(order_ouputs) == list.lengt(order_input) + value.quantity_of(mint_value, seller_hash, order_auth_an)
+
         let order_inputs =
           validation.get_order_inputs(
             inputs,
