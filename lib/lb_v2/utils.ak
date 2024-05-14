@@ -33,6 +33,8 @@ pub const minimum_ada = 3_000_000
 
 pub const fee_ada = 1_000_000
 
+pub const penalty_fee = 2_000_000
+
 pub fn sort_two_assets(asset_a: Asset, asset_b: Asset) -> (Asset, Asset) {
   let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
     asset_a
@@ -79,8 +81,8 @@ pub fn get_order_value(
       minimum_ada + fee_ada * 2
     } else {
       // order dont have any raise asset
-      // => fee is only for collect order(just collect penalty)
-      minimum_ada + fee_ada
+      // => this is fee for collect penalty order(just collect penalty)
+      penalty_fee
     }
   value.zero()
     |> value.add(ada_policy_id, ada_asset_name, base_ada)
