@@ -4,13 +4,17 @@ use aiken/transaction.{
   InlineDatum, Input, Mint, Output, ScriptContext, Spend, Transaction,
   WithdrawFrom,
 }
-use aiken/transaction/credential.{Address, Inline, ScriptCredential}
+use aiken/transaction/credential.{
+  Address, Inline, ScriptCredential, VerificationKeyCredential,
+}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  CollectOrderToken, CountingSeller, SellerDatum, SellerRedeemer, TreasuryDatum,
-  UsingSeller, ValidatorHash,
+  CollectOrderToken, CountingSeller, OrderDatum, SellerDatum, SellerRedeemer,
+  TreasuryDatum, UsingSeller, ValidatorHash,
 }
-use lb_v2/utils.{seller_auth_an}
+use lb_v2/utils.{
+  calculate_penalty, get_order_value, order_auth_an, seller_auth_an,
+}
 use lb_v2/validation
 
 validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
@@ -32,6 +36,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
           reference_inputs,
           outputs,
           validity_range,
+          extra_signatories,
           ..
         } = transaction
         expect Interval {
@@ -91,6 +96,135 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
             authen_policy_id,
             treasury_hash,
           )
+
+        let order_inputs =
+          validation.get_order_inputs(
+            inputs,
+            seller_hash,
+            treasury_datum.order_hash,
+          )
+        let (total_input_amount, total_input_penalty, order_input_count) =
+          list.foldl(
+            order_inputs,
+            (0, 0, 0),
+            fn(order_input, acc) {
+              expect Input {
+                output: Output {
+                  datum: InlineDatum(raw_o_datum),
+                  value: order_value,
+                  ..
+                },
+                ..
+              } = order_input
+              let (acc_amount, acc_penalty, acc_order_amount) = acc
+              expect OrderDatum {
+                base_asset: o_base_asset,
+                raise_asset: o_raise_asset,
+                amount,
+                is_collected,
+                penalty_amount,
+                owner,
+              }: OrderDatum = raw_o_datum
+              expect Address {
+                payment_credential: VerificationKeyCredential(pub_key_hash),
+                ..
+              } = owner
+              let expected_order =
+                get_order_value(
+                  amount: amount,
+                  penalty_amount: penalty_amount,
+                  seller_policy_id: seller_hash,
+                  is_collected: False,
+                  raise_asset: treasury_datum.raise_asset,
+                )
+              // validate orders
+              expect and {
+                  list.has(extra_signatories, pub_key_hash),
+                  is_collected == is_collected,
+                  o_base_asset == treasury_datum.base_asset,
+                  o_raise_asset == treasury_datum.raise_asset,
+                  expected_order == order_value,
+                }
+              (
+                acc_amount + amount,
+                acc_penalty + penalty_amount,
+                acc_order_amount + 1,
+              )
+            },
+          )
+        let order_outputs =
+          validation.get_order_outputs(
+            outputs,
+            seller_hash,
+            treasury_datum.order_hash,
+          )
+        let (total_output_amount, total_output_penalty, order_output_count) =
+          list.foldl(
+            order_outputs,
+            (0, 0, 0),
+            fn(order_output, acc) {
+              expect Output {
+                datum: InlineDatum(raw_o_datum),
+                value: order_value,
+                ..
+              } = order_output
+              let (acc_amount, acc_penalty, acc_order_amount) = acc
+              expect OrderDatum {
+                base_asset: o_base_asset,
+                raise_asset: o_raise_asset,
+                amount,
+                is_collected,
+                penalty_amount,
+                owner,
+              }: OrderDatum = raw_o_datum
+              expect Address {
+                payment_credential: VerificationKeyCredential(pub_key_hash),
+                ..
+              } = owner
+              let expected_order =
+                get_order_value(
+                  amount: amount,
+                  penalty_amount: penalty_amount,
+                  seller_policy_id: seller_hash,
+                  is_collected: is_collected,
+                  raise_asset: treasury_datum.raise_asset,
+                )
+              // validate orders
+              expect and {
+                  list.has(extra_signatories, pub_key_hash),
+                  is_collected == False,
+                  o_base_asset == treasury_datum.base_asset,
+                  o_raise_asset == treasury_datum.raise_asset,
+                  expected_order == order_value,
+                }
+              (
+                acc_amount + amount,
+                acc_penalty + penalty_amount,
+                acc_order_amount + 1,
+              )
+            },
+          )
+        // penalty amount of this Tx
+        let penalty =
+          calculate_penalty(
+            penalty_config: treasury_datum.penalty_config,
+            start_valid_time_range: start_valid_time_range,
+            end_valid_time_range: end_valid_time_range,
+            total_input_amount: total_input_amount,
+            total_output_amount: total_output_amount,
+          )
+        let is_valid_minting =
+          if order_input_count == order_output_count {
+            value.flatten(mint_value) == []
+          } else {
+            value.flatten(mint_value) == [
+              (
+                seller_hash,
+                order_auth_an,
+                order_output_count - order_input_count,
+              ),
+            ]
+          }
         and {
           // validate LBE ID
           treasury_datum.base_asset == seller_in_datum.base_asset,
@@ -102,18 +236,17 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
           treasury_datum.end_time > end_valid_time_range,
           // validate seller value
           seller_in_value == seller_out_value,
+          // validate seller datum after apply order
+          //   - amount
+          seller_out_datum.amount == seller_in_datum.amount - total_input_amount + total_output_amount,
+          //   - penalty amount
+          seller_out_datum.penalty_amount == seller_in_datum.penalty_amount - total_input_penalty + total_output_penalty,
+          // validate penalty amount
+          total_output_penalty - total_input_penalty == penalty,
+          // validate minting
+          is_valid_minting,
         }
       }
-
-      // input: 1 seller
-      // output: 1 seller
-      // ref_input: 1 treasury
-      // validate LBE ID
-      // validate time frame
-      // validate seller in, out value
-      // validate apply orders
-      // validate minting
-      // validate seller in, out datum
       _ -> False
     }
   }

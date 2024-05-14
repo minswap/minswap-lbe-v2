@@ -6,8 +6,8 @@ use aiken/transaction.{
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  AddSeller, CloseEvent, CollectSeller, CreateAmmPool, CreateTreasury,
-  InitTreasury, PoolDatum, TreasuryDatum, TreasuryRedeemer,
+  AddSeller, CloseEvent, CollectOrders, CollectSeller, CreateAmmPool,
+  CreateTreasury, InitTreasury, PoolDatum, TreasuryDatum, TreasuryRedeemer,
 }
 use lb_v2/validation
 
@@ -95,6 +95,12 @@ validator(authen_policy_id: PolicyId) {
             treasury_policy_id: treasury_hash,
             seller_hash: seller_hash,
           )
+        expect [] =
+          validation.get_seller_inputs(
+            inputs: inputs,
+            treasury_policy_id: treasury_hash,
+            seller_hash: seller_hash,
+          )
         validation.validate_add_seller(
           add_seller_count: add_seller_count,
           treasury_output: treasury_output,
@@ -131,6 +137,27 @@ validator(authen_policy_id: PolicyId) {
           start_valid_time_range: start_valid_time_range,
         )
       }
+      CollectOrders ->
+        // let TreasuryDatum { seller_hash, order_hash, .. } = treasury_in_datum
+        // let order_inputs =
+        //   validation.get_order_inputs(inputs, seller_hash, order_hash)
+        // let order_outputs =
+        //   validation.get_order_outputs(outputs, seller_hash, order_hash)
+        // let treasury_output =
+        //   validation.get_treasury_output(
+        //     outputs,
+        //     authen_policy_id,
+        //     treasury_hash,
+        //   )
+        // validation.validate_collect_order(
+        //   order_inputs: order_inputs,
+        //   order_outputs: order_outputs,
+        //   treasury_output: treasury_output,
+        //   treasury_in_datum: treasury_in_datum,
+        //   treasury_in_value: treasury_in_value,
+        //   mint_value: mint_value,
+        // )
+        True
       CloseEvent -> False
       _ -> False
     }

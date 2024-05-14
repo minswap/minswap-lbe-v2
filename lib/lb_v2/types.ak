@@ -66,8 +66,9 @@ pub type TreasuryRedeemer {
   InitTreasury
   AddSeller { amount: Int }
   CollectSeller { amount: Int }
-  CloseEvent
+  CollectOrders
   CreateAmmPool
+  CloseEvent
 }
 
 pub type SellerTokenMintingRedeemer {

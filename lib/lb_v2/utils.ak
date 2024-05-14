@@ -1,8 +1,10 @@
 use aiken/builtin
 use aiken/bytearray
 use aiken/hash
-use aiken/transaction/value.{AssetName, PolicyId}
-use lb_v2/types.{Asset}
+use aiken/transaction/value.{
+  AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
+}
+use lb_v2/types.{Asset, PenaltyConfig}
 
 pub const factory_auth_an = #"666163746f7279"
 
@@ -63,4 +65,59 @@ pub fn compute_lp_asset_name(
     hash.sha3_256(bytearray.concat(asset_b_policy_id, asset_b_asset_name))
   let pair_ident = bytearray.concat(asset_a_ident, asset_b_ident)
   hash.sha3_256(pair_ident)
+}
+
+pub fn get_order_value(
+  amount: Int,
+  penalty_amount: Int,
+  seller_policy_id: PolicyId,
+  is_collected: Bool,
+  raise_asset: Asset,
+) -> Value {
+  value.zero()
+    |> value.add(
+        ada_policy_id,
+        ada_asset_name,
+        if is_collected {
+          // 1 fee_ada for redeem order tx
+          minimum_ada + fee_ada
+        } else {
+          // 1 fee_ada for collect order tx, 1 fee_ada for redeem order tx
+          minimum_ada + fee_ada * 2
+        },
+      )
+    |> value.add(
+        raise_asset.policy_id,
+        raise_asset.asset_name,
+        amount + penalty_amount,
+      )
+    |> value.add(seller_policy_id, order_auth_an, 1)
+}
+
+pub fn calculate_penalty(
+  penalty_config: Option<PenaltyConfig>,
+  start_valid_time_range: Int,
+  end_valid_time_range: Int,
+  total_input_amount: Int,
+  total_output_amount: Int,
+) -> Int {
+  when penalty_config is {
+    None -> 0
+    Some(PenaltyConfig { penalty_start_time, penalty_end_time, percent }) ->
+      if
+      end_valid_time_range < penalty_start_time || start_valid_time_range > penalty_end_time{
+      
+        // not in penalty time
+        0
+      } else {
+        if total_input_amount > total_output_amount {
+          // withdrawal amount of this Tx
+          let withdrawal_amount = total_input_amount - total_output_amount
+          // calculate penalty
+          withdrawal_amount * percent / 100
+        } else {
+          0
+        }
+      }
+  }
 }

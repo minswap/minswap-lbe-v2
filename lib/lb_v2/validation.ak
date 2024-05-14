@@ -11,8 +11,8 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  default_burn_liquidity, default_number_seller, factory_auth_an, seller_auth_an,
-  treasury_auth_an,
+  default_burn_liquidity, default_number_seller, factory_auth_an, order_auth_an,
+  seller_auth_an, treasury_auth_an,
 }
 
 pub fn get_value_of_minting_treasury(
@@ -298,6 +298,25 @@ pub fn get_seller_inputs(
   )
 }
 
+pub fn get_order_inputs(
+  inputs: List<Input>,
+  seller_policy_id: PolicyId,
+  order_hash: ValidatorHash,
+) -> List<Input> {
+  list.filter(
+    inputs,
+    fn(input) {
+      let Input { output: Output { address: in_addr, value: in_value, .. }, .. } =
+        input
+      let Address { payment_credential, .. } = in_addr
+      and {
+        value.quantity_of(in_value, seller_policy_id, order_auth_an) == 1,
+        payment_credential == ScriptCredential(order_hash),
+      }
+    },
+  )
+}
+
 pub fn get_treasury_input_by_out_ref(
   inputs: List<Input>,
   authen_policy_id: PolicyId,
@@ -442,6 +461,27 @@ pub fn get_seller_outputs(
   )
 }
 
+pub fn get_order_outputs(
+  outputs: List<Output>,
+  seller_policy_id: PolicyId,
+  order_hash: ValidatorHash,
+) -> List<Output> {
+  list.filter(
+    outputs,
+    fn(output) {
+      let Output {
+        address: Address { payment_credential, .. },
+        value: out_value,
+        ..
+      } = output
+      and {
+        value.quantity_of(out_value, seller_policy_id, order_auth_an) == 1,
+        payment_credential == ScriptCredential(order_hash),
+      }
+    },
+  )
+}
+
 pub fn validate_add_seller(
   add_seller_count: Int,
   treasury_output: Output,
@@ -572,3 +612,35 @@ pub fn validate_collect_seller(
     },
   }
 }
+// pub fn validate_collect_order(
+//   order_inputs: List<Input>,
+//   order_outputs: List<Output>,
+//   treasury_output: Output,
+//   treasury_in_datum: TreasuryDatum,
+//   treasury_in_value: Value,
+//   mint_value: Value,
+// ) -> Bool {
+//   // 1. validate orders. 
+//   //    - order_in_count == order_out_count
+//   //    - each order validate
+//   //      - order datum 
+//   //        - order_in.is_collected = False
+//   //        - order_out.is_collected = True
+//   //        - other field: no change
+//   //      - order value
+//   //        - value_out =  value_in - (raise_asset, amount+penalty) - fee_ada
+//   // 2. validate treasury
+//   //    - treasury_datum
+//   //      - reserve_raise: 
+//   //            datum_out.reserve_raise = datum_in.reserve_raise + (total_raise + total_penalty)
+//   //      - total_penalty: 
+//   //            datum_out.total_penalty = datum_in.total_penalty + total_penalty
+//   //      - other field: nothing change
+//   //    - treasury_value: t_value_out = t_value_in + (raise_asset, total_raise + total_penalty)
+//   // 3. validate time range
+//   //    - datum.end_time < start_valid_time_range
+//   // 4. no seller
+//   //    - datum.seller_count == 0
+//   // 5. Mint nothing
+//   todo
+// }
