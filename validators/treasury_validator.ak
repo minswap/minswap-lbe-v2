@@ -8,7 +8,8 @@ use aiken/transaction/credential.{Address, Inline, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
   AddSeller, CloseEvent, CollectOrders, CollectSeller, CreateAmmPool,
-  CreateTreasury, InitTreasury, PoolDatum, TreasuryDatum, TreasuryRedeemer,
+  CreateTreasury, InitTreasury, PoolDatum, RedeemLP, TreasuryDatum,
+  TreasuryRedeemer,
 }
 use lb_v2/utils.{factory_auth_an}
 use lb_v2/validation
@@ -65,24 +66,6 @@ validator(authen_policy_id: PolicyId) {
       },
     } = validity_range
     when redeemer is {
-      CreateAmmPool -> {
-        let treasury_output =
-          validation.get_treasury_output(
-            outputs,
-            authen_policy_id,
-            treasury_hash,
-          )
-        let pool_output = validation.get_amm_pool_output(outputs)
-        expect Output { datum: InlineDatum(pool_raw_datum), .. } = pool_output
-        expect amm_pool_datum: PoolDatum = pool_raw_datum
-        validation.validate_create_dex_pool(
-          treasury_in_datum: treasury_in_datum,
-          treasury_output: treasury_output,
-          validity_range: validity_range,
-          mint_value: mint_value,
-          amm_pool_datum: amm_pool_datum,
-        )
-      }
       AddSeller { amount: add_seller_count } -> {
         let treasury_output =
           validation.get_treasury_output(
@@ -171,11 +154,49 @@ validator(authen_policy_id: PolicyId) {
           )
         list.length(factory_inputs) == 2
       }
+      CreateAmmPool -> {
+        let treasury_output =
+          validation.get_treasury_output(
+            outputs,
+            authen_policy_id,
+            treasury_hash,
+          )
+        let pool_output = validation.get_amm_pool_output(outputs)
+        expect Output { datum: InlineDatum(pool_raw_datum), .. } = pool_output
+        expect amm_pool_datum: PoolDatum = pool_raw_datum
+        validation.validate_create_dex_pool(
+          treasury_in_datum: treasury_in_datum,
+          treasury_output: treasury_output,
+          validity_range: validity_range,
+          mint_value: mint_value,
+          amm_pool_datum: amm_pool_datum,
+        )
+      }
+      RedeemLP -> {
+        let TreasuryDatum { seller_hash, order_hash, .. } = treasury_in_datum
+        let order_inputs =
+          validation.get_order_inputs(inputs, seller_hash, order_hash)
+        let treasury_output =
+          validation.get_treasury_output(
+            outputs,
+            authen_policy_id,
+            treasury_hash,
+          )
+
+        validation.validate_redeem_lp(
+          order_inputs: order_inputs,
+          outputs: outputs,
+          treasury_output: treasury_output,
+          treasury_in_datum: treasury_in_datum,
+          treasury_in_value: treasury_in_value,
+          mint_value: mint_value,
+        )
+      }
       _ -> False
     }
   }
 
-  fn validate_treasury_minting(
+  fn validate_treasury_minting_or_withdrawal(
     redeemer: TreasuryRedeemer,
     context: ScriptContext,
   ) {
