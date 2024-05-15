@@ -6,7 +6,7 @@ use aiken/transaction.{
 use aiken/transaction/credential.{
   Address, ScriptCredential, VerificationKeyCredential,
 }
-use aiken/transaction/value.{PolicyId, Value}
+use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
 use lb_v2/types.{
   Asset, CreateTreasury, FactoryStep, OrderDatum, PenaltyConfig, PoolDatum,
   RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
@@ -14,8 +14,8 @@ use lb_v2/types.{
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
   calculate_penalty, default_burn_liquidity, default_number_seller,
-  factory_auth_an, get_order_value, order_auth_an, seller_auth_an,
-  treasury_auth_an,
+  factory_auth_an, fee_ada, get_order_value, minimum_ada, order_auth_an,
+  seller_auth_an, treasury_auth_an,
 }
 
 pub fn get_value_of_minting_treasury(
@@ -667,9 +667,6 @@ pub fn apply_order(
             o_base_asset == base_asset,
             o_raise_asset == raise_asset,
             expected_order == order_value,
-            amount >= 0,
-            penalty_amount >= 0,
-            amount + penalty_amount >= 0,
           }
         (acc_amount + amount, acc_penalty + penalty_amount)
       },
@@ -731,35 +728,139 @@ pub fn apply_order(
     total_output_penalty - total_input_penalty,
   )
 }
-// pub fn validate_collect_order(
-//   order_inputs: List<Input>,
-//   order_outputs: List<Output>,
-//   treasury_output: Output,
-//   treasury_in_datum: TreasuryDatum,
-//   treasury_in_value: Value,
-//   mint_value: Value,
-// ) -> Bool {
-//   // 1. validate orders. 
-//   //    - order_in_count == order_out_count
-//   //    - each order validate
-//   //      - order datum 
-//   //        - order_in.is_collected = False
-//   //        - order_out.is_collected = True
-//   //        - other field: no change
-//   //      - order value
-//   //        - value_out =  value_in - (raise_asset, amount+penalty) - fee_ada
-//   // 2. validate treasury
-//   //    - treasury_datum
-//   //      - reserve_raise: 
-//   //            datum_out.reserve_raise = datum_in.reserve_raise + (total_raise + total_penalty)
-//   //      - total_penalty: 
-//   //            datum_out.total_penalty = datum_in.total_penalty + total_penalty
-//   //      - other field: nothing change
-//   //    - treasury_value: t_value_out = t_value_in + (raise_asset, total_raise + total_penalty)
-//   // 3. validate time range
-//   //    - datum.end_time < start_valid_time_range
-//   // 4. no seller
-//   //    - datum.seller_count == 0
-//   // 5. Mint nothing
-//   todo
-// }
+
+pub fn validate_collect_order(
+  order_inputs: List<Input>,
+  order_outputs: List<Output>,
+  treasury_output: Output,
+  treasury_in_datum: TreasuryDatum,
+  treasury_in_value: Value,
+  mint_value: Value,
+) -> Bool {
+  let TreasuryDatum {
+    seller_count,
+    collected_fund,
+    // LBE details
+    base_asset,
+    raise_asset,
+    ..
+  } = treasury_in_datum
+  expect Output {
+    value: treasury_out_value,
+    datum: InlineDatum(raw_treasury_out_datum),
+    ..
+  } = treasury_output
+  expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
+  // 1. validate orders. 
+  //    - each order validate
+  //      - order datum 
+  //        - order_in.is_collected = False
+  //        - order_out.is_collected = True
+  //        - other field: no change
+  //      - order value
+  //        - value_out =  minimum_ada+1fee
+  //    - calculate acc amount and penalty of all order
+  //    - order length > 0 && order_ins.length ==order_outs.length
+  let delta_fund =
+    apply_collecting_orders(
+      order_inputs: order_inputs,
+      order_outputs: order_outputs,
+      base_asset: base_asset,
+      raise_asset: raise_asset,
+    )
+  let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
+    raise_asset
+  and {
+    // 2. validate treasury
+    //    - treasury_datum
+    //      - collected_fund: 
+    //            datum_out.collected_fund = datum_in.collected_fund + delta_fund
+    //      - other field: nothing change
+    //    - treasury_value: t_value_out = t_value_in + (raise_asset, delta_fund)
+    TreasuryDatum {
+      ..treasury_in_datum,
+      collected_fund: collected_fund + delta_fund,
+    } == treasury_out_datum,
+    treasury_out_value == (
+      treasury_in_value
+        |> value.add(raise_asset_pid, raise_asset_an, delta_fund)
+    ),
+    // 3. validate time range(no need to check because It must collect seller first)
+    //    - datum.end_time < start_valid_time_range
+    // 4. no seller
+    //    - datum.seller_count == 0
+    seller_count == 0,
+    // 5. Mint nothing
+    value.flatten(mint_value) == [],
+  }
+}
+
+// return (total_amount+total_penalty) of orders
+pub fn apply_collecting_orders(
+  order_inputs: List<Input>,
+  order_outputs: List<Output>,
+  base_asset: Asset,
+  raise_asset: Asset,
+) -> Int {
+  expect [order_input, ..remaining_order_inputs] = order_inputs
+  expect Input {
+    output: Output { datum: InlineDatum(raw_order_in_datum), .. },
+    ..
+  } = order_input
+  expect order_in_datum: OrderDatum = raw_order_in_datum
+  expect [order_output, ..remaining_order_outputs] = order_outputs
+  let fund_amount =
+    apply_collecting_order(
+      order_in_datum,
+      order_output,
+      base_asset,
+      raise_asset,
+    )
+  if remaining_order_inputs == [] {
+    expect remaining_order_outputs == []
+    fund_amount
+  } else {
+    let acc_fund =
+      apply_collecting_orders(
+        remaining_order_inputs,
+        remaining_order_outputs,
+        base_asset,
+        raise_asset,
+      )
+    acc_fund + fund_amount
+  }
+}
+
+pub fn apply_collecting_order(
+  order_in_datum: OrderDatum,
+  order_output: Output,
+  base_asset: Asset,
+  raise_asset: Asset,
+) -> Int {
+  let OrderDatum {
+    base_asset: o_base_asset,
+    raise_asset: o_raise_asset,
+    owner,
+    amount,
+    is_collected,
+    penalty_amount,
+  } = order_in_datum
+  expect Output {
+    datum: InlineDatum(raw_order_out_datum),
+    value: order_out_value,
+    ..
+  } = order_output
+  expect order_out_datum: OrderDatum = raw_order_out_datum
+  // validate
+  expect and {
+      order_out_value == (
+        value.zero() // fee for redeemLP
+          |> value.add(ada_policy_id, ada_asset_name, fee_ada + minimum_ada)
+      ),
+      o_base_asset == base_asset,
+      o_raise_asset == raise_asset,
+      is_collected == False,
+      OrderDatum(base_asset, raise_asset, owner, amount, True, penalty_amount) == order_out_datum,
+    }
+  amount + penalty_amount
+}

@@ -137,27 +137,27 @@ validator(authen_policy_id: PolicyId) {
           start_valid_time_range: start_valid_time_range,
         )
       }
-      CollectOrders ->
-        // let TreasuryDatum { seller_hash, order_hash, .. } = treasury_in_datum
-        // let order_inputs =
-        //   validation.get_order_inputs(inputs, seller_hash, order_hash)
-        // let order_outputs =
-        //   validation.get_order_outputs(outputs, seller_hash, order_hash)
-        // let treasury_output =
-        //   validation.get_treasury_output(
-        //     outputs,
-        //     authen_policy_id,
-        //     treasury_hash,
-        //   )
-        // validation.validate_collect_order(
-        //   order_inputs: order_inputs,
-        //   order_outputs: order_outputs,
-        //   treasury_output: treasury_output,
-        //   treasury_in_datum: treasury_in_datum,
-        //   treasury_in_value: treasury_in_value,
-        //   mint_value: mint_value,
-        // )
-        True
+      CollectOrders -> {
+        let TreasuryDatum { seller_hash, order_hash, .. } = treasury_in_datum
+        let order_inputs =
+          validation.get_order_inputs(inputs, seller_hash, order_hash)
+        let order_outputs =
+          validation.get_order_outputs(outputs, seller_hash, order_hash)
+        let treasury_output =
+          validation.get_treasury_output(
+            outputs,
+            authen_policy_id,
+            treasury_hash,
+          )
+        validation.validate_collect_order(
+          order_inputs: order_inputs,
+          order_outputs: order_outputs,
+          treasury_output: treasury_output,
+          treasury_in_datum: treasury_in_datum,
+          treasury_in_value: treasury_in_value,
+          mint_value: mint_value,
+        )
+      }
       CloseEvent -> False
       _ -> False
     }
