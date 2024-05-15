@@ -46,6 +46,7 @@ pub type TreasuryDatum {
   seller_hash: ValidatorHash,
   order_hash: ValidatorHash,
   seller_count: Int,
+  // increase when collect orders, descrease when collect LP
   collected_fund: Int,
   // LBE details
   base_asset: Asset,
@@ -54,11 +55,13 @@ pub type TreasuryDatum {
   end_time: Int,
   owner: Address,
   minimum_raise: Option<Int>,
+  // added when collect seller
   maximum_raise: Option<Int>,
   reserve_base: Int,
   reserve_raise: Int,
   total_liquidity: Int,
   penalty_config: Option<PenaltyConfig>,
+  // added when collect seller
   total_penalty: Int,
 }
 
