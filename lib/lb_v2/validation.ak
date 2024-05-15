@@ -1,23 +1,29 @@
+use aiken/builtin
+use aiken/dict.{Dict}
+use aiken/hash
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
-  InlineDatum, Input, Output, OutputReference, ValidityRange,
+  Datum, DatumHash, InlineDatum, Input, NoDatum, Output, OutputReference,
+  ValidityRange,
 }
 use aiken/transaction/credential.{
-  Address, ScriptCredential, VerificationKeyCredential,
+  Address, Inline, ScriptCredential, StakeCredential, VerificationKeyCredential,
 }
 use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
 use lb_v2/types.{
-  Asset, CreateTreasury, FactoryStep, OrderDatum, PenaltyConfig, PoolDatum,
+  AMMintScript, AMSignature, AMSpendScript, AMWithdrawScript, Asset,
+  AuthorizationMethod, CreateTreasury, EODDatumHash, EODInlineDatum, EODNoDatum,
+  ExtraOrderDatum, FactoryStep, OrderDatum, PenaltyConfig, PoolDatum, PubKeyHash,
   RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  calculate_penalty, default_burn_liquidity, default_number_seller,
-  factory_auth_an, fee_ada, get_order_value, minimum_ada, order_auth_an,
-  seller_auth_an, treasury_auth_an,
+  calculate_penalty, compute_asset_name_from_base_and_raise,
+  default_burn_liquidity, default_number_seller, factory_auth_an, fee_ada,
+  get_order_value, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
 }
 
 pub fn get_value_of_minting_treasury(
@@ -615,7 +621,7 @@ pub fn apply_order(
   seller_hash: ValidatorHash,
   base_asset: Asset,
   raise_asset: Asset,
-  extra_signatories: List<ByteArray>,
+  validate_order_authorize: fn(AuthorizationMethod) -> Bool,
 ) -> (Int, Int) {
   let (total_input_amount, total_input_penalty) =
     list.foldl(
@@ -638,11 +644,8 @@ pub fn apply_order(
           is_collected,
           penalty_amount,
           owner,
-        }: OrderDatum = raw_o_datum
-        expect Address {
-          payment_credential: VerificationKeyCredential(pub_key_hash),
           ..
-        } = owner
+        }: OrderDatum = raw_o_datum
         let expected_order =
           get_order_value(
             amount: amount,
@@ -652,7 +655,7 @@ pub fn apply_order(
           )
         // validate orders
         expect and {
-            list.has(extra_signatories, pub_key_hash),
+            validate_order_authorize(owner),
             is_collected == False,
             o_base_asset == base_asset,
             o_raise_asset == raise_asset,
@@ -678,12 +681,8 @@ pub fn apply_order(
           amount,
           is_collected,
           penalty_amount,
-          owner,
-        }: OrderDatum = raw_o_datum
-        expect Address {
-          payment_credential: VerificationKeyCredential(pub_key_hash),
           ..
-        } = owner
+        }: OrderDatum = raw_o_datum
         let expected_order =
           get_order_value(
             amount: amount,
@@ -693,7 +692,6 @@ pub fn apply_order(
           )
         // validate orders
         expect and {
-            list.has(extra_signatories, pub_key_hash),
             is_collected == False,
             o_base_asset == base_asset,
             o_raise_asset == raise_asset,
@@ -1001,7 +999,8 @@ fn apply_redeeming_lp_order(
   let OrderDatum {
     base_asset: o_base_asset,
     raise_asset: o_raise_asset,
-    owner,
+    receiver,
+    receiver_datum,
     amount,
     penalty_amount,
     ..
@@ -1016,30 +1015,104 @@ fn apply_redeeming_lp_order(
       |> value.add(ada_policy_id, ada_asset_name, minimum_ada)
       |> value.add(raise_asset_pid, raise_asset_an, o_remaining_raise_amount)
       |> value.add(amm_authen_policy_id, lp_asset_name, o_lp_amount)
-  let Output { address: owner_address, value: order_out_value, .. } =
-    order_output
   expect and {
       base_asset == o_base_asset,
       raise_asset == o_raise_asset,
-      owner_address == owner,
-      expected_order_out_value == order_out_value,
+      validate_user_output(
+        receiver,
+        receiver_datum,
+        expected_order_out_value,
+        order_output,
+      ),
     }
-  (amount + penalty_amount, 0, 0)
+  (amount + penalty_amount, o_lp_amount, o_remaining_raise_amount)
 }
 
-fn compute_asset_name_from_base_and_raise(
-  base_asset: Asset,
-  raise_asset: Asset,
-) -> AssetName {
-  let (asset_a, asset_b) = utils.sort_two_assets(base_asset, raise_asset)
-  let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
-    asset_a
-  let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
-    asset_b
-  utils.compute_lp_asset_name(
-    asset_a_policy_id,
-    asset_a_asset_name,
-    asset_b_policy_id,
-    asset_b_asset_name,
-  )
+fn validate_user_output(
+  receiver: Address,
+  receiver_datum: ExtraOrderDatum,
+  value: Value,
+  output: Output,
+) -> Bool {
+  let Output {
+    address: output_address,
+    datum: raw_order_output_datum,
+    value: output_value,
+    ..
+  } = output
+
+  let is_correct_address_and_value = and {
+      receiver == output_address,
+      value == output_value,
+    }
+  let Address { payment_credential: receiver_payment_cred, .. } = receiver
+  when receiver_payment_cred is {
+    VerificationKeyCredential(_) -> is_correct_address_and_value
+    ScriptCredential(_) -> and {
+        is_correct_address_and_value,
+        is_valid_datum(
+          raw_datum: raw_order_output_datum,
+          extra_order_datum: receiver_datum,
+        ),
+      }
+  }
+}
+
+fn is_valid_datum(raw_datum: Datum, extra_order_datum: ExtraOrderDatum) -> Bool {
+  let expect_extra_order_datum =
+    when raw_datum is {
+      NoDatum -> EODNoDatum
+      DatumHash(dh) -> EODDatumHash(dh)
+      InlineDatum(dat) ->
+        EODInlineDatum(hash.blake2b_256(builtin.serialise_data(dat)))
+    }
+  extra_order_datum == expect_extra_order_datum
+}
+
+pub fn validate_authorize(
+  auth: AuthorizationMethod,
+  inputs: List<Input>,
+  extra_signatories: List<PubKeyHash>,
+  withdrawals: Dict<StakeCredential, Int>,
+  mint_value: Value,
+) -> Bool {
+  when auth is {
+    // In case the wallet is a PubKey, its signature is required 
+    AMSignature(pub_key_hash) -> list.has(extra_signatories, pub_key_hash)
+    // In case the wallet is a Script and offer Spend method
+    // its Utxo has to present in the transaction inputs
+    AMSpendScript(script_hash) -> {
+      let canceller_credential = ScriptCredential(script_hash)
+      !builtin.null_list(
+        list.filter(
+          inputs,
+          fn(input) {
+            let Input { output, .. } = input
+            let Output { address: out_address, .. } = output
+            let Address { payment_credential: out_payment_credential, .. } =
+              out_address
+            out_payment_credential == canceller_credential
+          },
+        ),
+      )
+    }
+    // In case the wallet is a Script and offer Withdrawal method
+    // it has to make a withdrawal and present in transaction withdrawals
+    AMWithdrawScript(script_hash) -> {
+      let credential = Inline(ScriptCredential(script_hash))
+      dict.has_key(withdrawals, credential)
+    }
+    // In case the wallet is a Script and offer Minting method
+    // it has to mint tokens that has defined policy id and present in transaction minting
+    // Token's quantity must not be zero
+    AMMintScript(script_hash) -> {
+      let fst_token_quantity =
+        mint_value
+          |> value.tokens(script_hash)
+          |> dict.to_list()
+          |> builtin.head_list
+          |> builtin.snd_pair
+      fst_token_quantity != 0
+    }
+  }
 }

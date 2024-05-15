@@ -1,6 +1,8 @@
 use aiken/dict.{Dict}
 use aiken/hash.{Blake2b_224, Blake2b_256, Hash}
-use aiken/transaction/credential.{Address, Script, StakeCredential}
+use aiken/transaction/credential.{
+  Address, Script, StakeCredential, VerificationKey,
+}
 use aiken/transaction/value.{AssetName, PolicyId}
 
 pub type ValidatorHash =
@@ -8,6 +10,12 @@ pub type ValidatorHash =
 
 pub type DatumMap =
   Dict<Hash<Blake2b_256, Data>, Data>
+
+pub type PubKeyHash =
+  Hash<Blake2b_224, VerificationKey>
+
+pub type CustomDatumHash =
+  Hash<Blake2b_256, Data>
 
 pub type Asset {
   policy_id: PolicyId,
@@ -41,6 +49,13 @@ pub type PenaltyConfig {
   percent: Int,
 }
 
+pub type AuthorizationMethod {
+  AMSignature { pub_key_hash: PubKeyHash }
+  AMSpendScript { script_hash: ValidatorHash }
+  AMWithdrawScript { script_hash: ValidatorHash }
+  AMMintScript { script_hash: ValidatorHash }
+}
+
 pub type TreasuryDatum {
   // Protocol Info
   seller_hash: ValidatorHash,
@@ -53,6 +68,7 @@ pub type TreasuryDatum {
   raise_asset: Asset,
   start_time: Int,
   end_time: Int,
+  // TODO: support owner is authorize
   owner: Address,
   minimum_raise: Option<Int>,
   // added when collect seller
@@ -95,11 +111,21 @@ pub type SellerRedeemer {
   CollectOrderToken
 }
 
+pub type ExtraOrderDatum {
+  EODNoDatum
+  EODDatumHash { hash: CustomDatumHash }
+  EODInlineDatum { hash: CustomDatumHash }
+}
+
 pub type OrderDatum {
   base_asset: Asset,
   raise_asset: Asset,
-  owner: Address,
+  owner: AuthorizationMethod,
+  receiver: Address,
+  receiver_datum: ExtraOrderDatum,
   amount: Int,
+  refund: Address,
+  refund_datum: ExtraOrderDatum,
   is_collected: Bool,
   penalty_amount: Int,
 }

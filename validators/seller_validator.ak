@@ -7,8 +7,8 @@ use aiken/transaction.{
 use aiken/transaction/credential.{Address, Inline, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  CollectOrderToken, CountingSeller, SellerDatum, SellerRedeemer, TreasuryDatum,
-  UsingSeller, ValidatorHash,
+  AuthorizationMethod, CollectOrderToken, CountingSeller, SellerDatum,
+  SellerRedeemer, TreasuryDatum, UsingSeller, ValidatorHash,
 }
 use lb_v2/utils.{order_auth_an, seller_auth_an}
 use lb_v2/validation
@@ -33,6 +33,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
           outputs,
           validity_range,
           extra_signatories,
+          withdrawals,
           ..
         } = transaction
         expect Interval {
@@ -115,7 +116,15 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
             seller_hash: seller_hash,
             base_asset: treasury_datum.base_asset,
             raise_asset: treasury_datum.base_asset,
-            extra_signatories: extra_signatories,
+            validate_order_authorize: fn(order_auth: AuthorizationMethod) {
+              validation.validate_authorize(
+                order_auth,
+                inputs: inputs,
+                extra_signatories: extra_signatories,
+                withdrawals: withdrawals,
+                mint_value: mint_value,
+              )
+            },
           )
         let order_input_count = list.length(order_inputs)
         let order_output_count = list.length(order_outputs)
