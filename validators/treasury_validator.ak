@@ -10,6 +10,7 @@ use lb_v2/types.{
   AddSeller, CloseEvent, CollectOrders, CollectSeller, CreateAmmPool,
   CreateTreasury, InitTreasury, PoolDatum, TreasuryDatum, TreasuryRedeemer,
 }
+use lb_v2/utils.{factory_auth_an}
 use lb_v2/validation
 
 validator(authen_policy_id: PolicyId) {
@@ -158,7 +159,18 @@ validator(authen_policy_id: PolicyId) {
           mint_value: mint_value,
         )
       }
-      CloseEvent -> False
+      CloseEvent -> {
+        let factory_inputs =
+          list.filter(
+            inputs,
+            fn(input) {
+              let Input { output, .. } = input
+              let Output { value: out_value, .. } = output
+              value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1
+            },
+          )
+        list.length(factory_inputs) == 2
+      }
       _ -> False
     }
   }

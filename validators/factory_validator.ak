@@ -230,7 +230,7 @@ validator(
           } else {
             fail
           }
-        expect [factory_output, owner_output] = outputs
+        expect Some(factory_output) = list.head(outputs)
         expect factory_output.address == factory_address
         expect
           value.quantity_of(
@@ -260,10 +260,12 @@ validator(
           ..
         } = treasury_in
         expect treasury_datum: TreasuryDatum = treasury_datum_raw
+        let TreasuryDatum { owner, total_liquidity, collected_fund, .. } =
+          treasury_datum
         expect Address {
           payment_credential: VerificationKeyCredential(owner_pkh),
           ..
-        } = treasury_datum.owner
+        } = owner
         and {
           builtin.less_than_bytearray(new_factory_head, new_factory_tail),
           factory_out_datum == FactoryDatum {
@@ -275,8 +277,9 @@ validator(
             treasury_policy_id: treasury_hash,
             step: factory_step,
           ),
-          owner_output.address == treasury_datum.owner,
           list.has(extra_signatories, owner_pkh),
+          total_liquidity > 0,
+          collected_fund == 0,
         }
       }
     }
