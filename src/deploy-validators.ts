@@ -1,19 +1,85 @@
+import * as fs from "fs";
+import path from "path";
 import * as T from "@minswap/translucent";
-import type { Script, Translucent, Tx, UTxO } from "./types";
-import { ExampleValidateMinting, ExampleValidateSpending } from "../plutus";
+import type { MinswapValidators } from "./minswap-amm";
+import type { OutRef, Script, Translucent, Tx, UTxO } from "./types";
+import {
+  AuthenMintingPolicyValidateAuthen,
+  FactoryValidatorValidateFactory,
+  TreasuryValidatorValidateTreasurySpending,
+  OrderValidatorFeedTypeOrder,
+  SellerValidatorValidateSellerSpending,
+  OrderValidatorValidateOrder,
+} from "../plutus";
 
 export type Validators = {
-  exampleSpendValidator: Script;
-  exampleMintValidator: Script;
+  authenValidator: Script;
+  factoryValidator: Script;
+  treasuryValidator: Script;
+  sellerValidator: Script;
+  orderValidator: Script;
+  orderValidatorFeedType: Script;
 };
 
-export function collectValidators(): Validators {
-  const exampleSpendValidator = new ExampleValidateSpending();
-  const exampleMintValidator = new ExampleValidateMinting();
-  return {
-    exampleSpendValidator,
-    exampleMintValidator,
+export function collectValidators(options: {
+  t: Translucent;
+  seedOutRef?: OutRef;
+  dry: boolean;
+}): Validators {
+  let { t, seedOutRef, dry } = options;
+  if (!seedOutRef) {
+    const fileContent = fs.readFileSync(path.resolve("params.json"), "utf-8");
+    seedOutRef = JSON.parse(fileContent).seedOutRef;
   }
+  const authenValidator = new AuthenMintingPolicyValidateAuthen({
+    transactionId: { hash: seedOutRef!.txHash },
+    outputIndex: BigInt(seedOutRef!.outputIndex),
+  });
+  const authenValidatorHash = t.utils.validatorToScriptHash(authenValidator);
+  const treasuryValidator = new TreasuryValidatorValidateTreasurySpending(
+    authenValidatorHash,
+  );
+  const treasuryValidatorHash =
+    t.utils.validatorToScriptHash(treasuryValidator);
+
+  const sellerValidator = new SellerValidatorValidateSellerSpending(
+    authenValidatorHash,
+    treasuryValidatorHash,
+  );
+  const sellerValidatorHash = t.utils.validatorToScriptHash(sellerValidator);
+  const orderValidator = new OrderValidatorValidateOrder(
+    treasuryValidatorHash,
+    sellerValidatorHash,
+  );
+  const orderValidatorHash = t.utils.validatorToScriptHash(orderValidator);
+  const factoryValidator = new FactoryValidatorValidateFactory(
+    authenValidatorHash,
+    treasuryValidatorHash,
+    orderValidatorHash,
+    sellerValidatorHash,
+  );
+  const orderValidatorFeedType = new OrderValidatorFeedTypeOrder();
+  const validators = {
+    authenValidator,
+    treasuryValidator,
+    orderValidator,
+    sellerValidator,
+    factoryValidator,
+    orderValidatorFeedType,
+  };
+
+  if (!dry) {
+    const jsonData = JSON.stringify(validators, null, 2);
+    fs.writeFile("validators.json", jsonData, "utf8", (err) => {
+      if (err) {
+        console.error("Error writing JSON file:", err);
+        return;
+      }
+      console.log("validators.json file has been saved.");
+    });
+  }
+
+  return validators;
 }
 
 function buildDeployValidator(t: Translucent, validator: Script): Tx {
@@ -33,7 +99,7 @@ type PromiseFunction<T> = () => Promise<T>;
 type KeyValueTuple<T> = [string, T];
 type DeployedValidator = [string, UTxO];
 
-export async function processElement(
+async function processElement(
   t: Translucent,
   key: string,
   validator: Script,
@@ -88,8 +154,33 @@ export async function deployValidators(
   validators: Validators,
 ): Promise<DeployedValidators> {
   const deploymentsChain = [
-    () => processElement(t, "exampleSpendValidator", validators.exampleSpendValidator),
-    () => processElement(t, "exampleMintValidator", validators.exampleMintValidator),
+    () => processElement(t, "authenValidator", validators.authenValidator),
+    () => processElement(t, "treasuryValidator", validators.treasuryValidator),
+    () => processElement(t, "orderValidator", validators.orderValidator),
+    () => processElement(t, "sellerValidator", validators.sellerValidator),
+    () => processElement(t, "factoryValidator", validators.factoryValidator),
+  ];
+  let res: DeployedValidators = {};
+
+  await executePromiseFunctions(deploymentsChain)
+    .then((deployments) => {
+      res = deployments;
+    })
+    .catch((err) => {
+      throw new Error(err);
+    });
+
+  return res;
+}
+
+export async function deployMinswapValidators(
+  t: Translucent,
+  validators: MinswapValidators,
+): Promise<DeployedValidators> {
+  const deploymentsChain = [
+    () => processElement(t, "authenValidator", validators.authenValidator),
+    () => processElement(t, "poolValidator", validators.poolValidator),
+    () => processElement(t, "factoryValidator", validators.factoryValidator),
   ];
   let res: DeployedValidators = {};
 
