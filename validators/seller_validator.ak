@@ -93,7 +93,6 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
             treasury_hash,
           )
 
-
         let order_inputs =
           validation.get_order_inputs(
             inputs,

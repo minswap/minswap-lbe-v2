@@ -542,7 +542,6 @@ pub fn validate_collect_seller(
   collect_seller_count: Int,
   treasury_output: Output,
   treasury_in_datum: TreasuryDatum,
-  treasury_in_value: Value,
   seller_inputs: List<Input>,
   start_valid_time_range: Int,
   mint_value: Value,
@@ -557,11 +556,8 @@ pub fn validate_collect_seller(
     total_penalty: in_total_penalty,
     ..
   } = treasury_in_datum
-  expect Output {
-    value: treasury_out_value,
-    datum: InlineDatum(treasury_out_raw_datum),
-    ..
-  } = treasury_output
+  expect Output { datum: InlineDatum(treasury_out_raw_datum), .. } =
+    treasury_output
   expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
   // Apply sellers
   expect [reserve_raise, total_penalty] =
@@ -588,13 +584,6 @@ pub fn validate_collect_seller(
         [acc_reserve_raise + amount, acc_total_penalty + penalty_amount]
       },
     )
-  let new_treasury_value =
-    value.add(
-      treasury_in_value,
-      raise_asset.policy_id,
-      raise_asset.asset_name,
-      reserve_raise + total_penalty,
-    )
   and {
     // validate time frame
     start_valid_time_range > end_time,
@@ -606,7 +595,6 @@ pub fn validate_collect_seller(
     // validate Seller Inputs
     list.length(seller_inputs) == collect_seller_count,
     // validate treasury output
-    treasury_out_value == new_treasury_value,
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
       seller_count: seller_count - collect_seller_count,

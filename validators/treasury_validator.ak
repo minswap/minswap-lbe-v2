@@ -131,7 +131,6 @@ validator(authen_policy_id: PolicyId) {
           collect_seller_count: collect_seller_count,
           treasury_output: treasury_output,
           treasury_in_datum: treasury_in_datum,
-          treasury_in_value: treasury_in_value,
           mint_value: mint_value,
           treasury_hash: treasury_hash,
           seller_inputs: seller_inputs,
