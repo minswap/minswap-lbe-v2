@@ -1,0 +1,39 @@
+{
+  "name": "lb2",
+  "scripts": {
+    "build": "rimraf build && rollup -c rollup.config.mjs",
+    "gen-amm-plutus": "bun run blueprint.ts amm-plutus.json src/minswap-amm/plutus.ts && bun run prettier -w src/minswap-amm/plutus.ts",
+    "gen-plutus": "bun run blueprint.ts && bun run prettier -w plutus.ts",
+    "init-params": "bun run src/setup.ts init-params",
+    "collect-amm-validators": "bun run src/setup.ts collect-amm-validators",
+    "collect-validators": "bun run src/setup.ts collect-validators",
+    "check": "aiken build && bun gen-plutus && bun init-params && bun collect-validators && bun test"
+  },
+  "main": "./build/index.js",
+  "module": "./build/index.es.js",
+  "types": "./build/index.d.ts",
+  "files": [
+    "build"
+  ],
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/preset-env": "^7.22.20",
+    "@babel/preset-typescript": "^7.23.0",
+    "@types/bun": "^1.0.7",
+    "@types/jest": "^29.5.5",
+    "@typescript-eslint/eslint-plugin": "^6.11.0",
+    "@typescript-eslint/parser": "^6.11.0",
+    "eslint": "^8.50.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.4",
+    "rimraf": "^5.0.5",
+    "@rollup/plugin-json": "^6.1.0"
+  },
+  "dependencies": {
+    "@minswap/translucent": "^0.0.6-minswap.9",
+    "rollup": "^4.14.1",
+    "rollup-plugin-dts": "^6.1.0",
+    "rollup-plugin-esbuild": "^6.1.1",
+    "sha3": "^2.1.4"
+  }
+}
