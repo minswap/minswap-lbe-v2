@@ -6,7 +6,9 @@ use aiken/transaction.{
 use aiken/transaction/credential.{
   Address, ScriptCredential, VerificationKeyCredential,
 }
-use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
+use aiken/transaction/value.{
+  AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
+}
 use lb_v2/types.{
   Asset, CreateTreasury, FactoryStep, OrderDatum, PenaltyConfig, PoolDatum,
   RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
@@ -828,10 +830,10 @@ pub fn apply_collecting_order(
   let OrderDatum {
     base_asset: o_base_asset,
     raise_asset: o_raise_asset,
-    owner,
     amount,
     is_collected,
     penalty_amount,
+    ..
   } = order_in_datum
   expect Output {
     datum: InlineDatum(raw_order_out_datum),
@@ -848,7 +850,196 @@ pub fn apply_collecting_order(
       o_base_asset == base_asset,
       o_raise_asset == raise_asset,
       is_collected == False,
-      OrderDatum(base_asset, raise_asset, owner, amount, True, penalty_amount) == order_out_datum,
+      OrderDatum { ..order_in_datum, is_collected: True } == order_out_datum,
     }
   amount + penalty_amount
+}
+
+pub fn validate_redeem_lp(
+  order_inputs: List<Input>,
+  outputs: List<Output>,
+  treasury_output: Output,
+  treasury_in_datum: TreasuryDatum,
+  treasury_in_value: Value,
+  mint_value: Value,
+) -> Bool {
+  let TreasuryDatum {
+    collected_fund,
+    base_asset,
+    raise_asset,
+    reserve_raise,
+    total_liquidity,
+    maximum_raise,
+    total_penalty,
+    seller_hash,
+    ..
+  } = treasury_in_datum
+  expect Output {
+    value: treasury_out_value,
+    datum: InlineDatum(raw_treasury_out_datum),
+    ..
+  } = treasury_output
+  expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
+  let lp_asset_name =
+    compute_asset_name_from_base_and_raise(base_asset, raise_asset)
+
+  let total_remaining_raise =
+    when maximum_raise is {
+      Some(maxx) ->
+        when reserve_raise + total_penalty > maxx is {
+          True -> reserve_raise + total_penalty - maxx
+          False -> 0
+        }
+      None -> 0
+    }
+  let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
+    raise_asset
+  // 1. validate orders. 
+  //    - each order validate(n first output is n output of order)
+  //      - check id of order input
+  //      - order output 
+  //        - value_out =  minimum_ada+ LP + remaining raise asset depend on how much they provided
+  //        - address = owner of order input datum
+  //    - calculate acc amount and penalty of all order(from input datum) and total LP and remaining raise asset that users redeemed
+  let (total_o_fund, total_o_lp, total_o_remaining_raise) =
+    apply_redeeming_lp_orders(
+      order_inputs: order_inputs,
+      outputs: outputs,
+      base_asset: base_asset,
+      raise_asset: raise_asset,
+      total_lp: total_liquidity,
+      reserve_raise: reserve_raise,
+      remaing_raise: total_remaining_raise,
+      lp_asset_name: lp_asset_name,
+    )
+
+  and {
+    // 2. validate treasury.
+    //    - treasury_datum
+    //      - collected_fund: 
+    //            total_o_fund = amount+penalty(of all orders)
+    //            datum_out.collected_fund = datum_in.collected_fund - delta_fund
+    //      - other field: nothing change
+    //    - treasury_value: t_value_out = t_value_in - ((totalLP+raise asset) user redeem in this tx)
+    treasury_out_datum == TreasuryDatum {
+      ..treasury_in_datum,
+      collected_fund: collected_fund - total_o_fund,
+    },
+    treasury_out_value == (
+      treasury_in_value
+        |> value.add(amm_authen_policy_id, lp_asset_name, -total_o_lp)
+        |> value.add(raise_asset_pid, raise_asset_an, -total_o_remaining_raise)
+    ),
+    // 3. Mint: burn order NFT
+    value.flatten(mint_value) == [
+      (seller_hash, order_auth_an, -list.length(order_inputs)),
+    ],
+  }
+}
+
+// return (total fund(amount and penalty) of orders, total lp that users redeemed, total raise asset that user redeem)
+pub fn apply_redeeming_lp_orders(
+  order_inputs: List<Input>,
+  outputs: List<Output>,
+  base_asset: Asset,
+  raise_asset: Asset,
+  total_lp: Int,
+  reserve_raise: Int,
+  remaing_raise: Int,
+  lp_asset_name: AssetName,
+) -> (Int, Int, Int) {
+  expect [order_input, ..remaining_order_inputs] = order_inputs
+  expect Input {
+    output: Output { datum: InlineDatum(raw_order_in_datum), .. },
+    ..
+  } = order_input
+  expect order_in_datum: OrderDatum = raw_order_in_datum
+  expect [order_output, ..remaining_outputs] = outputs
+  let (o_fund, o_lp_amount, o_remaining_raise_amount) =
+    apply_redeeming_lp_order(
+      order_in_datum,
+      order_output,
+      base_asset,
+      raise_asset,
+      total_lp,
+      reserve_raise,
+      remaing_raise,
+      lp_asset_name,
+    )
+  if remaining_order_inputs == [] {
+    (o_fund, o_lp_amount, o_remaining_raise_amount)
+  } else {
+    let (acc_fund, acc_lp, acc_raise) =
+      apply_redeeming_lp_orders(
+        remaining_order_inputs,
+        remaining_outputs,
+        base_asset,
+        raise_asset,
+        total_lp,
+        reserve_raise,
+        remaing_raise,
+        lp_asset_name,
+      )
+    (
+      acc_fund + o_fund,
+      acc_lp + o_lp_amount,
+      acc_raise + o_remaining_raise_amount,
+    )
+  }
+}
+
+fn apply_redeeming_lp_order(
+  order_in_datum: OrderDatum,
+  order_output: Output,
+  base_asset: Asset,
+  raise_asset: Asset,
+  total_lp: Int,
+  reserve_raise: Int,
+  remaing_raise: Int,
+  lp_asset_name: AssetName,
+) -> (Int, Int, Int) {
+  let OrderDatum {
+    base_asset: o_base_asset,
+    raise_asset: o_raise_asset,
+    owner,
+    amount,
+    penalty_amount,
+    ..
+  } = order_in_datum
+  let o_lp_amount = total_lp * amount / reserve_raise
+  let o_remaining_raise_amount = remaing_raise * amount / reserve_raise
+
+  let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
+    raise_asset
+  let expected_order_out_value =
+    value.zero()
+      |> value.add(ada_policy_id, ada_asset_name, minimum_ada)
+      |> value.add(raise_asset_pid, raise_asset_an, o_remaining_raise_amount)
+      |> value.add(amm_authen_policy_id, lp_asset_name, o_lp_amount)
+  let Output { address: owner_address, value: order_out_value, .. } =
+    order_output
+  expect and {
+      base_asset == o_base_asset,
+      raise_asset == o_raise_asset,
+      owner_address == owner,
+      expected_order_out_value == order_out_value,
+    }
+  (amount + penalty_amount, 0, 0)
+}
+
+fn compute_asset_name_from_base_and_raise(
+  base_asset: Asset,
+  raise_asset: Asset,
+) -> AssetName {
+  let (asset_a, asset_b) = utils.sort_two_assets(base_asset, raise_asset)
+  let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
+    asset_a
+  let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
+    asset_b
+  utils.compute_lp_asset_name(
+    asset_a_policy_id,
+    asset_a_asset_name,
+    asset_b_policy_id,
+    asset_b_asset_name,
+  )
 }
