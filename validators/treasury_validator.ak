@@ -8,7 +8,7 @@ use aiken/transaction/credential.{Address, Inline, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
   AddSeller, CloseEvent, CollectOrders, CollectSeller, CreateAmmPool,
-  CreateTreasury, InitTreasury, PoolDatum, RedeemLP, TreasuryDatum,
+  CreateTreasury, InitTreasury, NewSeller, PoolDatum, RedeemLP, TreasuryDatum,
   TreasuryRedeemer,
 }
 use lb_v2/utils.{factory_auth_an}
@@ -73,12 +73,16 @@ validator(authen_policy_id: PolicyId) {
             authen_policy_id,
             treasury_hash,
           )
-        let TreasuryDatum { seller_hash, .. } = treasury_in_datum
+        let TreasuryDatum { seller_hash, base_asset, raise_asset, .. } =
+          treasury_in_datum
         let seller_outputs =
           validation.get_seller_outputs(
             outputs: outputs,
             treasury_policy_id: treasury_hash,
             seller_hash: seller_hash,
+            base_asset: base_asset,
+            raise_asset: raise_asset,
+            seller_output_state: NewSeller,
           )
         expect [] =
           validation.get_seller_inputs(
