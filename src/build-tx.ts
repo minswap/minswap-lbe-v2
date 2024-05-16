@@ -1,312 +1,61 @@
 import * as T from "@minswap/translucent";
 import {
+  address2PlutusAddress,
   computeLPAssetName,
 } from "./utils.ts";
 import {
   AuthenMintingPolicyValidateAuthen,
   FactoryValidatorValidateFactory,
+  OrderValidatorFeedTypeOrder,
+  SellerValidatorValidateSellerMintingOrWithdraw,
   SellerValidatorValidateSellerSpending,
   TreasuryValidatorValidateTreasuryMintingOrWithdrawal,
   TreasuryValidatorValidateTreasurySpending,
 } from "../plutus.ts";
 import type {
   Address,
+  Assets,
   Translucent,
   Tx,
   UTxO,
   UnixTime,
 } from "./types.ts";
 import {
+  DEFAULT_NUMBER_SELLER,
   FACTORY_AUTH_AN,
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
+  ORDER_AUTH_AN,
   SELLER_AUTH_AN,
   TREASURY_AUTH_AN,
 } from "./constants.ts";
+import type { DeployedValidators, Validators } from "./deploy-validators.ts";
 
-export type BaseBuildOptions = {
+export type WarehouseBuilderOptions = {
   t: Translucent;
-  tx: Tx;
-  validatorRefs: any;
+  validators: Validators;
+  deployedValidators: DeployedValidators;
 };
 
 export type BuildInitFactoryOptions = {
   seedUtxo: UTxO;
 };
 
-export function buildInitFactory({
-  validatorRefs: { validators, deployedValidators },
-  t,
-  seedUtxo,
-  tx,
-}: BaseBuildOptions & BuildInitFactoryOptions) {
-  const { toUnit, Data } = T;
-  const authenRedeemer: AuthenMintingPolicyValidateAuthen["redeemer"] = "MintFactory";
-  const factoryDatum: FactoryValidatorValidateFactory["datum"] = {
-    head: LBE_INIT_FACTORY_HEAD,
-    tail: LBE_INIT_FACTORY_TAIL,
-  };
-  const metadata = {
-    msg: [`Minswap V2: LBE Init Factory.`],
-  };
-  const factoryAddress = t.utils.validatorToAddress(
-    validators.factoryValidator,
-  );
-  const authenPolicyId = t.utils.validatorToScriptHash(
-    validators.authenValidator,
-  );
-  const factoryAuthAssets = {
-    [toUnit(authenPolicyId, FACTORY_AUTH_AN)]: 1n,
-  };
-  const txBuilder = tx
-    .readFrom([deployedValidators["authenValidator"]])
-    .collectFrom([seedUtxo])
-    .mintAssets(
-      factoryAuthAssets,
-      Data.to(authenRedeemer, AuthenMintingPolicyValidateAuthen.redeemer),
-    )
-    .payToAddressWithData(
-      factoryAddress,
-      {
-        inline: Data.to(factoryDatum, FactoryValidatorValidateFactory.datum),
-      },
-      factoryAuthAssets,
-    )
-    .attachMetadata(674, metadata);
-
-  return {
-    txBuilder,
-  };
-}
-
-export type BuildCreateTreasury = {
+export type BuildCreateTreasuryOptions = {
   factoryUtxo: UTxO;
   treasuryDatum: TreasuryValidatorValidateTreasurySpending["treasuryInDatum"];
 };
 
-export function buildCreateTreasury({
-  validatorRefs: { validators, deployedValidators },
-  t,
-  tx,
-  factoryUtxo,
-  treasuryDatum,
-}: BaseBuildOptions & BuildCreateTreasury) {
-  const { Data, toUnit } = T;
-  const authenRedeemer: AuthenMintingPolicyValidateAuthen["redeemer"] =
-    { MintTreasury: { step: "CreateTreasury" } };
-  const authenPolicyId = t.utils.validatorToScriptHash(
-    validators.authenValidator,
-  );
-  const treasuryRedeemer: TreasuryValidatorValidateTreasuryMintingOrWithdrawal["redeemer"] = "InitTreasury";
-  const treasuryPolicyId = t.utils.validatorToScriptHash(
-    validators.treasuryValidator,
-  );
-  const treasuryAddress = t.utils.validatorToAddress(
-    validators.treasuryValidator,
-  );
-  const sellerAddress = t.utils.validatorToAddress(
-    validators.sellerValidator,
-  );
-  const sellerDatum: SellerValidatorValidateSellerSpending["sellerInDatum"] = {
-    baseAsset: treasuryDatum.baseAsset,
-    raiseAsset: treasuryDatum.raiseAsset,
-    amount: 0n,
-    penaltyAmount: 0n,
-  };
-  const factoryRedeemer: FactoryValidatorValidateFactory["redeemer"] = {
-    baseAsset: treasuryDatum.baseAsset,
-    raiseAsset: treasuryDatum.raiseAsset,
-    step: "CreateTreasury",
-  };
-  const lpAssetName = computeLPAssetName(
-    factoryRedeemer.baseAsset.policyId + factoryRedeemer.baseAsset.assetName,
-    factoryRedeemer.raiseAsset.policyId + factoryRedeemer.raiseAsset.assetName,
-  );
-  const factoryDatum = Data.from(
-    factoryUtxo.datum as string,
-    FactoryValidatorValidateFactory.datum,
-  );
-  const newFactoryHeadDatum: FactoryValidatorValidateFactory["datum"] = {
-    head: factoryDatum.head,
-    tail: lpAssetName,
-  };
-  const newFactoryTailDatum: FactoryValidatorValidateFactory["datum"] = {
-    head: lpAssetName,
-    tail: factoryDatum.tail,
-  };
-
-  const treasuryAuthAssets = {
-    [toUnit(authenPolicyId, TREASURY_AUTH_AN)]: 1n,
-  };
-  const factoryAuthAssets = {
-    [toUnit(authenPolicyId, FACTORY_AUTH_AN)]: 1n,
-  };
-  const sellerAuthAssets = {
-    [toUnit(treasuryPolicyId, SELLER_AUTH_AN)]: treasuryDatum.sellerCount,
-  };
-  const metadata = {
-    msg: [`Minswap V2: LBE Create Treasury.`],
-  };
-  const txBuilder = tx
-    .readFrom([
-      deployedValidators["authenValidator"],
-      deployedValidators["factoryValidator"],
-      deployedValidators["sellerValidator"],
-      deployedValidators["treasuryValidator"],
-    ])
-    .collectFrom(
-      [factoryUtxo],
-      Data.to(factoryRedeemer, FactoryValidatorValidateFactory.redeemer),
-    )
-    .mintAssets(
-      {
-        ...treasuryAuthAssets,
-        ...factoryAuthAssets,
-      },
-      Data.to(authenRedeemer, AuthenMintingPolicyValidateAuthen.redeemer),
-    )
-    .mintAssets(
-      { ...sellerAuthAssets },
-      Data.to(treasuryRedeemer, TreasuryValidatorValidateTreasuryMintingOrWithdrawal.redeemer),
-    )
-    .payToAddressWithData(
-      factoryUtxo.address,
-      {
-        inline: Data.to(
-          newFactoryHeadDatum,
-          FactoryValidatorValidateFactory.datum,
-        ),
-      },
-      factoryAuthAssets,
-    )
-    .payToAddressWithData(
-      factoryUtxo.address,
-      {
-        inline: Data.to(
-          newFactoryTailDatum,
-          FactoryValidatorValidateFactory.datum,
-        ),
-      },
-      factoryAuthAssets,
-    )
-    .payToAddressWithData(
-      treasuryAddress,
-      {
-        inline: Data.to(treasuryDatum, TreasuryValidatorValidateTreasurySpending.treasuryInDatum),
-      },
-      {
-        ...treasuryAuthAssets,
-        [toUnit(
-          treasuryDatum.baseAsset.policyId,
-          treasuryDatum.baseAsset.assetName,
-        )]: treasuryDatum.reserveBase,
-      },
-    )
-    .attachMetadata(674, metadata);
-
-  for (let i = 0; i < treasuryDatum.sellerCount; i++) {
-    txBuilder.payToAddressWithData(
-      sellerAddress,
-      {
-        inline: Data.to(sellerDatum, SellerValidatorValidateSellerSpending.sellerInDatum),
-      },
-      { [toUnit(treasuryPolicyId, SELLER_AUTH_AN)]: 1n, },
-    );
-  }
-
-  return {
-    txBuilder: txBuilder,
-  };
-}
-
-export type BuildAddSellers = {
+export type BuildAddSellersOptions = {
   treasuryUtxo: UTxO;
   addSellerCount: bigint;
   validFrom: UnixTime;
   validTo: UnixTime;
-}
-
-export function buildAddSellers({
-  validatorRefs: { validators, deployedValidators },
-  t,
-  tx,
-  treasuryUtxo,
-  addSellerCount,
-  validFrom,
-  validTo,
-}: BaseBuildOptions & BuildAddSellers) {
-  const { Data, toUnit } = T;
-  const treasuryDatum = Data.from(treasuryUtxo.datum!, TreasuryValidatorValidateTreasurySpending.treasuryInDatum);
-
-  const sellerAddress = t.utils.validatorToAddress(
-    validators.sellerValidator,
-  );
-  const sellerDatum: SellerValidatorValidateSellerSpending["sellerInDatum"] = {
-    baseAsset: treasuryDatum.baseAsset,
-    raiseAsset: treasuryDatum.raiseAsset,
-    amount: 0n,
-    penaltyAmount: 0n,
-  };
-  const treasuryPolicyId = t.utils.validatorToScriptHash(
-    validators.treasuryValidator,
-  );
-  const treasuryMintRedeemer: TreasuryValidatorValidateTreasuryMintingOrWithdrawal["redeemer"] = "AddSeller";
-  const treasurySpendRedeemer: TreasuryValidatorValidateTreasurySpending["redeemer"] = {
-    wrapper: "AddSeller",
-  };
-  const sellerAuthAssets = {
-    [toUnit(treasuryPolicyId, SELLER_AUTH_AN)]: addSellerCount,
-  };
-  const treasuryAddress = t.utils.validatorToAddress(
-    validators.treasuryValidator,
-  );
-  const treasuryOutDatum: TreasuryValidatorValidateTreasurySpending["treasuryInDatum"] = {
-    ...treasuryDatum,
-    sellerCount: treasuryDatum.sellerCount + addSellerCount,
-  };
-  console.log({
-    treasuryDatum,
-    treasuryOutDatum,
-  })
-  const txBuilder = tx
-    .readFrom([
-      deployedValidators["treasuryValidator"],
-    ])
-    .collectFrom(
-      [treasuryUtxo],
-      Data.to(treasurySpendRedeemer, TreasuryValidatorValidateTreasurySpending.redeemer),
-    )
-    .mintAssets(
-      { ...sellerAuthAssets },
-      Data.to(treasuryMintRedeemer, TreasuryValidatorValidateTreasuryMintingOrWithdrawal.redeemer),
-    )
-    .payToAddressWithData(
-      treasuryAddress,
-      {
-        inline: Data.to(treasuryOutDatum, TreasuryValidatorValidateTreasurySpending.treasuryInDatum),
-      },
-      {
-        ...treasuryUtxo.assets,
-      },
-    )
-    .validFrom(validFrom)
-    .validTo(validTo);
-
-  for (let i = 0; i < addSellerCount; i++) {
-    txBuilder.payToAddressWithData(
-      sellerAddress,
-      {
-        inline: Data.to(sellerDatum, SellerValidatorValidateSellerSpending.sellerInDatum),
-      },
-      { [toUnit(treasuryPolicyId, SELLER_AUTH_AN)]: 1n, },
-    );
-  }
-  return {
-    txBuilder: txBuilder,
-  };
-}
+};
 
 export type BuildDepositOptions = {
+  treasuryRefInput: UTxO;
+  sellerUtxo: UTxO;
   owner: Address;
   baseAsset: {
     policyId: string;
@@ -317,54 +66,500 @@ export type BuildDepositOptions = {
     assetName: string;
   };
   amount: bigint;
+  validFrom: UnixTime;
+  validTo: UnixTime;
 };
 
+export type BuildCollectSellersOptions = {
+  treasuryInput: UTxO;
+  sellerInputs: UTxO[];
+  validFrom: UnixTime;
+  validTo: UnixTime;
+};
+
+export type BuildCollectOrdersOptions = {
+
+};
+
+export class WarehouseBuilder {
+  t: Translucent;
+  validators: Validators;
+  deployedValidators: DeployedValidators;
+  tx: Tx | undefined = undefined;
+  tasks: Array<() => void> = [];
+
+  // Validator Hash
+  authenHash: string;
+  factoryHash: string;
+  treasuryHash: string;
+  sellerHash: string;
+  orderHash: string;
+
+  // Validator Address
+  authenAddress: Address;
+  factoryAddress: Address;
+  treasuryAddress: Address;
+  sellerAddress: Address;
+  orderAddress: Address;
+
+  // Auth Token
+  factoryToken: string;
+  treasuryToken: string;
+  orderToken: string;
+  sellerToken: string;
+
+  // Reference Input
+  treasuryRefInput: UTxO | undefined;
+
+  // Inputs
+  treasuryInputs: UTxO[] = [];
+  factoryInputs: UTxO[] = [];
+  orderInputs: UTxO[] = [];
+  sellerInputs: UTxO[] = [];
+
+  // Redeemer
+  factoryRedeemer: FactoryValidatorValidateFactory["redeemer"] | undefined;
+  treasurySpendRedeemer: TreasuryValidatorValidateTreasurySpending["redeemer"] | undefined;
+  treasuryMintRedeemer: TreasuryValidatorValidateTreasuryMintingOrWithdrawal["redeemer"] | undefined;
+  sellerSpendRedeemer: SellerValidatorValidateSellerSpending["redeemer"] | undefined;
+  sellerMintRedeemer: SellerValidatorValidateSellerMintingOrWithdraw["redeemer"] | undefined;
+  orderSpendRedeemer: OrderValidatorFeedTypeOrder["_redeemer"] | undefined;
+
+
+  constructor(options: WarehouseBuilderOptions) {
+    const { t, validators, deployedValidators } = options;
+    this.t = t;
+    this.validators = validators;
+    this.deployedValidators = deployedValidators;
+
+    this.authenHash = t.utils.validatorToScriptHash(validators.authenValidator);
+    this.factoryHash = t.utils.validatorToScriptHash(validators.factoryValidator);
+    this.treasuryHash = t.utils.validatorToScriptHash(validators.treasuryValidator);
+    this.sellerHash = t.utils.validatorToScriptHash(validators.sellerValidator);
+    this.orderHash = t.utils.validatorToScriptHash(validators.orderValidator);
+
+    this.authenAddress = t.utils.validatorToAddress(validators.authenValidator);
+    this.factoryAddress = t.utils.validatorToAddress(validators.factoryValidator);
+    this.treasuryAddress = t.utils.validatorToAddress(validators.treasuryValidator);
+    this.sellerAddress = t.utils.validatorToAddress(validators.sellerValidator);
+    this.orderAddress = t.utils.validatorToAddress(validators.orderValidator);
+
+    this.factoryToken = T.toUnit(this.authenHash, FACTORY_AUTH_AN);
+    this.treasuryToken = T.toUnit(this.authenHash, TREASURY_AUTH_AN);
+    this.sellerToken = T.toUnit(this.treasuryHash, SELLER_AUTH_AN);
+    this.orderToken = T.toUnit(this.sellerHash, ORDER_AUTH_AN);
+  }
+
+  public complete(): Tx {
+    this.tx = this.t.newTx();
+    for (const task of this.tasks) {
+      task();
+    }
+    return this.tx!;
+  }
+
+  public buildInitFactory(options: BuildInitFactoryOptions) {
+    this.tasks.push(
+      () => { this.tx!.collectFrom([options.seedUtxo]) },
+      () => { this.mintingFactoryToken() },
+      () => { this.payingFactoryOutput() },
+    );
+  }
+
+  public buildCreateTreasury(options: BuildCreateTreasuryOptions) {
+    this.tasks.push(
+      () => {
+        this.factoryInputs = [options.factoryUtxo];
+        this.factoryRedeemer = {
+          baseAsset: options.treasuryDatum.baseAsset,
+          raiseAsset: options.treasuryDatum.raiseAsset,
+          step: "CreateTreasury",
+        };
+        this.treasuryMintRedeemer = "InitTreasury";
+      },
+      () => { this.spendingFactoryInput(); },
+      () => { this.mintingFactoryToken(); },
+      () => { this.mintingTreasuryToken(); },
+      () => { this.mintingSellerToken(); },
+      () => { this.payingFactoryOutput(); },
+      () => { this.payingTreasuryOutput(options.treasuryDatum); },
+      () => { this.payingSellerOutput(); },
+    );
+  }
+
+  public buildAddSeller(options: BuildAddSellersOptions) {
+    const treasuryInDatum = T.Data.from(
+      options.treasuryUtxo.datum!,
+      TreasuryValidatorValidateTreasurySpending.treasuryInDatum
+    );
+    const treasuryOutDatum = {
+      ...treasuryInDatum,
+      sellerCount: treasuryInDatum.sellerCount + options.addSellerCount,
+    }
+
+    this.tasks.push(
+      () => {
+        this.treasuryInputs = [options.treasuryUtxo];
+        this.treasurySpendRedeemer = { wrapper: "AddSeller" };
+        this.treasuryMintRedeemer = "AddSeller";
+      },
+      () => { this.spendingTreasuryInput(); },
+      () => { this.mintingSellerToken(options.addSellerCount); },
+      () => { this.payingTreasuryOutput(treasuryOutDatum); },
+      () => { this.payingSellerOutput(options.addSellerCount); },
+      () => {
+        this.tx!
+          .validFrom(options.validFrom)
+          .validTo(options.validTo);
+      },
+    );
+  }
+
+  /************************* PARSER  *************************/
+  private fromDatumTreasury(rawDatum: string): TreasuryValidatorValidateTreasurySpending["treasuryInDatum"] {
+    return T.Data.from(rawDatum, TreasuryValidatorValidateTreasurySpending.treasuryInDatum);
+  }
+
+  private fromDatumFactory(rawDatum: string): FactoryValidatorValidateFactory["datum"] {
+    return T.Data.from(rawDatum, FactoryValidatorValidateFactory.datum);
+  }
+
+  /************************* SPENDING  *************************/
+  private spendingSellerInput() {
+    this.tx!
+      .readFrom([this.deployedValidators["sellerValidator"]])
+      .collectFrom(
+        this.sellerInputs,
+        T.Data.to(this.sellerSpendRedeemer!, SellerValidatorValidateSellerSpending.redeemer),
+      );
+  }
+
+  private spendingFactoryInput() {
+    this.tx!
+      .readFrom([this.deployedValidators["factoryValidator"]])
+      .collectFrom(
+        this.factoryInputs,
+        T.Data.to(this.factoryRedeemer!, FactoryValidatorValidateFactory.redeemer),
+      );
+  }
+
+  private spendingOrderInput() {
+    this.tx!
+      .readFrom([this.deployedValidators["orderValidator"]])
+      .collectFrom(
+        this.orderInputs,
+        T.Data.to(this.orderSpendRedeemer!, OrderValidatorFeedTypeOrder._redeemer),
+      );
+  }
+
+  private spendingTreasuryInput() {
+    this.tx!
+      .readFrom([this.deployedValidators["treasuryValidator"]])
+      .collectFrom(
+        this.treasuryInputs,
+        T.Data.to(this.treasurySpendRedeemer!, TreasuryValidatorValidateTreasurySpending.redeemer),
+      );
+  }
+
+
+  /************************* PAYING  *************************/
+  private payingTreasuryOutput(treasuryDatum: TreasuryValidatorValidateTreasurySpending["treasuryInDatum"]) {
+    const innerPay = (assets: Assets) => {
+      this.tx!
+        .payToAddressWithData(
+          this.treasuryAddress,
+          {
+            inline: T.Data.to(treasuryDatum, TreasuryValidatorValidateTreasurySpending.treasuryInDatum),
+          },
+          assets,
+        );
+    };
+    const cases: Record<string, () => void> = {
+      // Create Treasury
+      "None": () => {
+        const assets = {
+          [this.treasuryToken]: 1n,
+          [T.toUnit(
+            treasuryDatum.baseAsset.policyId,
+            treasuryDatum.baseAsset.assetName,
+          )]: treasuryDatum.reserveBase,
+        };
+        innerPay(assets);
+      },
+      "AddSeller": () => {
+        const assets = { ...this.treasuryInputs[0]!.assets };
+        innerPay(assets);
+      },
+    }
+    const key = this.treasurySpendRedeemer ? this.treasurySpendRedeemer.wrapper : "None";
+    cases[key]();
+  }
+
+  private payingSellerOutput(addSellerCount?: bigint) {
+    const innerPay = (datum: SellerValidatorValidateSellerSpending["sellerInDatum"]) => {
+      this.tx!
+        .payToAddressWithData(
+          this.sellerAddress,
+          {
+            inline: T.Data.to(datum, SellerValidatorValidateSellerSpending.sellerInDatum),
+          },
+          {
+            [this.sellerToken]: 1n,
+          },
+        );
+    };
+    if (this.sellerInputs.length) {
+      // FIX ME!
+      throw Error("FIX ME!")
+    } else {
+      const cases: Record<number, () => void> = {
+        // Create Treasury
+        0: () => {
+          const baseAsset = this.factoryRedeemer!.baseAsset;
+          const raiseAsset = this.factoryRedeemer!.raiseAsset;
+          const sellerDatum: SellerValidatorValidateSellerSpending["sellerInDatum"] = {
+            baseAsset,
+            raiseAsset,
+            amount: 0n,
+            penaltyAmount: 0n,
+          };
+          for (let i = 0; i < DEFAULT_NUMBER_SELLER; i++) {
+            innerPay(sellerDatum);
+          }
+        },
+        // Add Sellers
+        1: () => {
+          const treasuryDatum = this.fromDatumTreasury(this.treasuryInputs[0]!.datum!);
+          const sellerDatum: SellerValidatorValidateSellerSpending["sellerInDatum"] = {
+            baseAsset: treasuryDatum.baseAsset,
+            raiseAsset: treasuryDatum.raiseAsset,
+            amount: 0n,
+            penaltyAmount: 0n,
+          };
+          for (let i = 0n; i < addSellerCount!; i++) {
+            innerPay(sellerDatum);
+          }
+        },
+      };
+      cases[this.treasuryInputs.length]();
+    }
+  }
+
+  private payingFactoryOutput() {
+    const innerPay = (datum: FactoryValidatorValidateFactory["datum"]) => {
+      this.tx!
+        .payToAddressWithData(
+          this.factoryAddress,
+          {
+            inline: T.Data.to(datum, FactoryValidatorValidateFactory.datum),
+          },
+          {
+            [this.factoryToken]: 1n,
+          },
+        );
+    }
+
+    const cases: Record<number, () => void> = {
+      // Init System
+      0: () => {
+        const factoryDatum: FactoryValidatorValidateFactory["datum"] = {
+          head: LBE_INIT_FACTORY_HEAD,
+          tail: LBE_INIT_FACTORY_TAIL,
+        };
+        innerPay(factoryDatum);
+      },
+      // Create Treasury
+      1: () => {
+        const baseAsset = this.factoryRedeemer!.baseAsset;
+        const raiseAsset = this.factoryRedeemer!.raiseAsset;
+        const lpAssetName = computeLPAssetName(
+          baseAsset.policyId + baseAsset.assetName,
+          raiseAsset.policyId + raiseAsset.assetName,
+        );
+        const factoryDatum = this.fromDatumFactory(this.factoryInputs[0]!.datum!);
+        const newFactoryHeadDatum: FactoryValidatorValidateFactory["datum"] = {
+          head: factoryDatum.head,
+          tail: lpAssetName,
+        };
+        const newFactoryTailDatum: FactoryValidatorValidateFactory["datum"] = {
+          head: lpAssetName,
+          tail: factoryDatum.tail,
+        };
+        innerPay(newFactoryHeadDatum);
+        innerPay(newFactoryTailDatum);
+      },
+      // Remove Treasury
+      2: () => {
+        const factoryDatum1 = this.fromDatumFactory(this.factoryInputs[0]!.datum!);
+        const factoryDatum2 = this.fromDatumFactory(this.factoryInputs[1]!.datum!);
+        const newFactoryDatum = { ...factoryDatum1 };
+        if (factoryDatum1.head == factoryDatum2.tail) {
+          newFactoryDatum.head = factoryDatum1.head;
+          newFactoryDatum.tail = factoryDatum2.tail;
+        } else {
+          newFactoryDatum.head = factoryDatum2.head;
+          newFactoryDatum.tail = factoryDatum1.tail;
+        }
+        innerPay(newFactoryDatum);
+      },
+    };
+
+    cases[this.factoryInputs.length]();
+  }
+
+  /************************* MINTING *************************/
+  private mintingTreasuryToken() {
+    const cases: Record<number, { amount: bigint; redeemer: AuthenMintingPolicyValidateAuthen["redeemer"] }> = {
+      1: {
+        amount: 1n,
+        redeemer: { MintTreasury: { step: "CreateTreasury" } },
+      },
+      2: {
+        amount: -1n,
+        redeemer: { MintTreasury: { step: "RemoveTreasury" } },
+      },
+    };
+    const { amount, redeemer } = cases[this.factoryInputs.length];
+    this.tx!
+      .readFrom([this.deployedValidators["authenValidator"]])
+      .mintAssets(
+        {
+          [this.treasuryToken]: amount,
+        },
+        T.Data.to(redeemer, AuthenMintingPolicyValidateAuthen.redeemer),
+      )
+  }
+
+  private mintingSellerToken(addSellerCount?: bigint) {
+    const cases: Record<string, bigint> = {
+      "InitTreasury": DEFAULT_NUMBER_SELLER,
+      "CollectSeller": -1n * BigInt(this.sellerInputs.length),
+      "AddSeller": addSellerCount!,
+    };
+    const amount = cases[this.treasuryMintRedeemer!];
+    this.tx!
+      .readFrom([this.deployedValidators["treasuryValidator"]])
+      .mintAssets(
+        {
+          [this.sellerToken]: amount,
+        },
+        T.Data.to(this.treasuryMintRedeemer!, TreasuryValidatorValidateTreasuryMintingOrWithdrawal.redeemer)
+      );
+  }
+
+  private mintingOrderToken() {
+    const cases: Record<string, bigint> = {
+      "UsingSeller": 0n, // FIX ME!
+      "CollectOrderToken": -1n * BigInt(this.orderInputs.length),
+    };
+    const amount = cases[this.treasuryMintRedeemer!];
+    this.tx!
+      .readFrom([this.deployedValidators["sellerValidator"]])
+      .mintAssets(
+        {
+          [this.orderToken]: amount,
+        },
+        T.Data.to(this.sellerMintRedeemer!, SellerValidatorValidateSellerMintingOrWithdraw.redeemer)
+      );
+  }
+
+  private mintingFactoryToken() {
+    const cases: Record<number, { amount: bigint; redeemer: AuthenMintingPolicyValidateAuthen["redeemer"] }> = {
+      0: {
+        amount: 1n,
+        redeemer: "MintFactory",
+      },
+      1: {
+        amount: 1n,
+        redeemer: { MintTreasury: { step: "CreateTreasury" } },
+      },
+      2: {
+        amount: -1n,
+        redeemer: { MintTreasury: { step: "RemoveTreasury" } },
+      },
+    };
+    const { amount, redeemer } = cases[this.factoryInputs.length];
+    this.tx!
+      .readFrom([this.deployedValidators["authenValidator"]])
+      .mintAssets(
+        {
+          [this.factoryToken]: amount,
+        },
+        T.Data.to(redeemer, AuthenMintingPolicyValidateAuthen.redeemer),
+      );
+  }
+}
+
 // export function buildDeposit({
-//   validatorRefs: { validators },
+//   validatorRefs: { validators, deployedValidators },
 //   t,
 //   tx,
 //   owner,
 //   baseAsset,
 //   raiseAsset,
 //   amount,
+//   sellerUtxo,
+//   validFrom,
+//   validTo,
+//   treasuryRefInput,
 // }: BaseBuildOptions & BuildDepositOptions) {
 //   const { toUnit, Data } = T;
-//   const lpAssetName = computeLPAssetName(
-//     baseAsset.policyId + baseAsset.assetName,
-//     raiseAsset.policyId + raiseAsset.assetName,
-//   );
-//   const datum: OrderValidatorFeedType["_datum"] = {
+//   const orderDatum: OrderValidatorFeedTypeOrder["_datum"] = {
+//     baseAsset,
+//     raiseAsset,
+//     amount: amount,
+//     penaltyAmount: 0n,
+//     isCollected: false,
 //     owner: address2PlutusAddress(owner),
-//     lpAssetName,
-//     expectOutputAsset: {
-//       policyId: t.utils.validatorToScriptHash(validators!.authenValidator),
-//       assetName: lpAssetName,
-//     },
-//     minimumReceive: amount,
-//     step: "Deposit",
 //   };
 //   const orderValue: Assets =
 //     raiseAsset.policyId === "" && raiseAsset.assetName === ""
 //       ? {
-//         lovelace: amount + 2000000n,
+//         lovelace: amount + 5000000n,
 //       }
 //       : {
-//         lovelace: 2000000n,
+//         lovelace: 5000000n,
 //         [toUnit(raiseAsset.policyId, raiseAsset.assetName)]: amount,
 //       };
 //   const metadata = {
 //     msg: [`Minswap V2: LBE Deposit.`],
 //   };
-//   const orderAddress = t.utils.validatorToAddress(validators!.orderValidator);
+//   const orderAddress = t.utils.validatorToAddress(validators.orderValidator);
+//   const sellerAddress = t.utils.validatorToAddress(validators.sellerValidator);
+//   const sellerDatumIn = Data.from(sellerUtxo.datum!, SellerValidatorValidateSellerSpending.sellerInDatum);
+//   const sellerDatumOut = {
+//     ...sellerDatumIn,
+//     amount: sellerDatumIn.amount + amount,
+//   }
+//   const sellerMintingRedeemer: SellerValidatorValidateSellerMintingOrWithdraw["redeemer"] = "UsingSeller";
+
 //   const txBuilder = tx
+//     .readFrom([
+//       treasuryRefInput,
+//       deployedValidators["sellerValidator"],
+//     ])
+//     .mintAssets(
+//       {},
+//       Data.to(sellerMintingRedeemer, SellerValidatorValidateSellerMintingOrWithdraw.redeemer),
+//     )
 //     .payToAddressWithData(
 //       orderAddress,
 //       {
-//         inline: Data.to(datum, OrderValidatorFeedType._datum),
+//         inline: Data.to(orderDatum, OrderValidatorFeedTypeOrder._datum),
 //       },
 //       orderValue,
 //     )
+//     .payToAddressWithData(
+//       sellerAddress,
+//       {
+//         inline: Data.to(sellerDatumOut, SellerValidatorValidateSellerSpending.sellerInDatum),
+//       },
+//       sellerUtxo.assets,
+//     )
+//     .validFrom(validFrom)
+//     .validTo(validTo)
 //     .attachMetadata(674, metadata);
+
 //   return {
 //     txBuilder: txBuilder,
 //   };
