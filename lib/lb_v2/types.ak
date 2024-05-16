@@ -80,7 +80,7 @@ pub type CancelLBEReason {
 pub type TreasuryRedeemer {
   // Normal flow
   InitTreasury
-  AddSeller { amount: Int }
+  AddSeller
   CollectSeller { amount: Int }
   CollectOrders
   CreateAmmPool

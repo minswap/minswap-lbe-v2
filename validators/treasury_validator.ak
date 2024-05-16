@@ -73,7 +73,7 @@ validator(authen_policy_id: PolicyId) {
       },
     } = validity_range
     when redeemer is {
-      AddSeller { amount: add_seller_count } -> {
+      AddSeller -> {
         let treasury_output =
           validation.get_treasury_output(
             outputs,
@@ -94,7 +94,6 @@ validator(authen_policy_id: PolicyId) {
             seller_hash: seller_hash,
           )
         validation.validate_add_seller(
-          add_seller_count: add_seller_count,
           treasury_output: treasury_output,
           treasury_in_datum: treasury_in_datum,
           treasury_in_value: treasury_in_value,
@@ -241,18 +240,13 @@ validator(authen_policy_id: PolicyId) {
               treasury_policy_id: treasury_policy_id,
               step: CreateTreasury,
             )
-          AddSeller { amount: add_seller_count } -> and {
-              mint_value == validation.get_mint_value_of_add_sellers(
-                treasury_policy_id,
-                add_seller_count,
-              ),
-              // foward logic to spending treasury
-              validation.has_spend_treasury(
-                inputs,
-                authen_policy_id,
-                treasury_policy_id,
-              ),
-            }
+          AddSeller ->
+            // foward logic to spending treasury
+            validation.has_spend_treasury(
+              inputs,
+              authen_policy_id,
+              treasury_policy_id,
+            )
           CollectSeller { amount: collect_seller_count } -> and {
               mint_value == validation.get_mint_value_of_collect_sellers(
                 treasury_policy_id,

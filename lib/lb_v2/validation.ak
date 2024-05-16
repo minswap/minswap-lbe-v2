@@ -520,7 +520,6 @@ pub fn get_order_outputs(
 }
 
 pub fn validate_add_seller(
-  add_seller_count: Int,
   treasury_output: Output,
   treasury_in_datum: TreasuryDatum,
   treasury_in_value: Value,
@@ -529,6 +528,7 @@ pub fn validate_add_seller(
   seller_outputs: List<Output>,
   end_valid_time_range: Int,
 ) -> Bool {
+  let add_seller_count = list.length(seller_outputs)
   let TreasuryDatum { base_asset, raise_asset, seller_count, end_time, .. } =
     treasury_in_datum
   expect Output {
@@ -541,7 +541,12 @@ pub fn validate_add_seller(
     // validate time frame
     end_valid_time_range < end_time,
     // validate Mint Amount
-    mint_value == get_mint_value_of_add_sellers(treasury_hash, add_seller_count),
+    add_seller_count > 0,
+    mint_value == value.from_asset(
+      treasury_hash,
+      seller_auth_an,
+      add_seller_count,
+    ),
     // validate seller outputs
     list.length(seller_outputs) == add_seller_count,
     list.all(
