@@ -87,11 +87,6 @@ pub type SellerTokenMintingRedeemer {
   SellerMintingCollectSeller
 }
 
-pub type SellerOutputState {
-  NewSeller
-  OldSeller { amount: Int, penalty_amount: Int }
-}
-
 pub type SellerDatum {
   base_asset: Asset,
   raise_asset: Asset,

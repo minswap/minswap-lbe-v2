@@ -10,9 +10,8 @@ use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
 use lb_v2/types.{
-  Asset, CreateTreasury, FactoryStep, NewSeller, OldSeller, OrderDatum,
-  PenaltyConfig, PoolDatum, PubKeyHash, RemoveTreasury, SellerDatum,
-  SellerOutputState, TreasuryDatum, ValidatorHash,
+  Asset, CreateTreasury, FactoryStep, OrderDatum, PenaltyConfig, PoolDatum,
+  PubKeyHash, RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
@@ -447,9 +446,7 @@ pub fn get_seller_outputs(
   outputs: List<Output>,
   treasury_policy_id: PolicyId,
   seller_hash: ValidatorHash,
-  base_asset: Asset,
-  raise_asset: Asset,
-  seller_output_state: SellerOutputState,
+  seller_datum: Data,
 ) -> List<Output> {
   list.filter(
     outputs,
@@ -461,28 +458,9 @@ pub fn get_seller_outputs(
         ..
       } = output
       if payment_credential == ScriptCredential(seller_hash) {
-        expect InlineDatum(out_raw_datum) = out_datum
-        expect seller_datum: SellerDatum = out_raw_datum
-        let SellerDatum {
-          base_asset: s_base_asset,
-          raise_asset: s_raise_asset,
-          amount: s_amount,
-          penalty_amount: s_penalty_amount,
-        } = seller_datum
         expect and {
             value.quantity_of(out_value, treasury_policy_id, seller_auth_an) == 1,
-            base_asset == s_base_asset,
-            raise_asset == s_raise_asset,
-            when seller_output_state is {
-              NewSeller -> and {
-                  s_amount == 0,
-                  s_penalty_amount == 0,
-                }
-              OldSeller { amount, penalty_amount } -> and {
-                  s_amount == amount,
-                  s_penalty_amount == penalty_amount,
-                }
-            },
+            InlineDatum(seller_datum) == out_datum,
           }
         True
       } else {
@@ -695,9 +673,9 @@ pub fn validate_using_seller(
       outputs: outputs,
       treasury_policy_id: treasury_hash,
       seller_hash: seller_hash,
-      base_asset: treasury_datum.base_asset,
-      raise_asset: treasury_datum.raise_asset,
-      seller_output_state: OldSeller {
+      seller_datum: SellerDatum {
+        base_asset: treasury_datum.base_asset,
+        raise_asset: treasury_datum.raise_asset,
         amount: seller_in_datum.amount + delta_amount,
         penalty_amount: seller_in_datum.penalty_amount + delta_penalty,
       },
