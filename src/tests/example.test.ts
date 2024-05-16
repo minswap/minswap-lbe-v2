@@ -1,6 +1,7 @@
 import { beforeEach, expect, test } from "bun:test";
 import * as T from "@minswap/translucent";
 import {
+  buildAddSellers,
   buildCreateTreasury,
   buildInitFactory,
 } from "../build-tx";
@@ -142,10 +143,36 @@ test("happy case - full flow", async () => {
   });
   const createTreasuryTx = await quickSubmitBuilder(emulator)({
     txBuilder: createFactoryBuilder.txBuilder,
-    debug: true,
   });
   expect(createTreasuryTx).toBeTruthy();
   console.info("create treasury done");
+
+  let treasuryUtxo = (
+    await emulator.getUtxos(
+      t.utils.validatorToAddress(validators.treasuryValidator),
+    )
+  ).find((u) => u.scriptRef === undefined)!;
+  let validFrom = t.utils.slotToUnixTime(emulator.slot);
+  let validTo = t.utils.slotToUnixTime(emulator.slot + 60 * 10);
+  console.log({validFrom, validTo, treasuryUtxo})
+  const addSellerBuilder = buildAddSellers({
+    t: t,
+    tx: t.newTx(),
+    validatorRefs: {
+      validators,
+      deployedValidators,
+    },
+    treasuryUtxo,
+    addSellerCount: 1n,
+    validFrom,
+    validTo,
+  });
+  const addSellersTx = await quickSubmitBuilder(emulator)({
+    txBuilder: addSellerBuilder.txBuilder,
+    debug: true,
+  });
+  expect(addSellersTx).toBeTruthy();
+  console.info("Add Sellers done");
 
   // // Step 3: Deposit Orders
   // const pendingOrderTxIds: string[] = [];

@@ -14,6 +14,7 @@ import type {
   Translucent,
   Tx,
   UTxO,
+  UnixTime,
 } from "./types.ts";
 import {
   FACTORY_AUTH_AN,
@@ -134,12 +135,6 @@ export function buildCreateTreasury({
     tail: factoryDatum.tail,
   };
 
-  console.log({
-    auth: authenPolicyId, name: TREASURY_AUTH_AN, debug: toUnit(authenPolicyId, TREASURY_AUTH_AN),
-    datum: Data.to(authenRedeemer, AuthenMintingPolicyValidateAuthen.redeemer),
-    treasuryDatum: Data.to(treasuryDatum, TreasuryValidatorValidateTreasurySpending.treasuryInDatum),
-  });
-
   const treasuryAuthAssets = {
     [toUnit(authenPolicyId, TREASURY_AUTH_AN)]: 1n,
   };
@@ -219,6 +214,93 @@ export function buildCreateTreasury({
     );
   }
 
+  return {
+    txBuilder: txBuilder,
+  };
+}
+
+export type BuildAddSellers = {
+  treasuryUtxo: UTxO;
+  addSellerCount: bigint;
+  validFrom: UnixTime;
+  validTo: UnixTime;
+}
+
+export function buildAddSellers({
+  validatorRefs: { validators, deployedValidators },
+  t,
+  tx,
+  treasuryUtxo,
+  addSellerCount,
+  validFrom,
+  validTo,
+}: BaseBuildOptions & BuildAddSellers) {
+  const { Data, toUnit } = T;
+  const treasuryDatum = Data.from(treasuryUtxo.datum!, TreasuryValidatorValidateTreasurySpending.treasuryInDatum);
+
+  const sellerAddress = t.utils.validatorToAddress(
+    validators.sellerValidator,
+  );
+  const sellerDatum: SellerValidatorValidateSellerSpending["sellerInDatum"] = {
+    baseAsset: treasuryDatum.baseAsset,
+    raiseAsset: treasuryDatum.raiseAsset,
+    amount: 0n,
+    penaltyAmount: 0n,
+  };
+  const treasuryPolicyId = t.utils.validatorToScriptHash(
+    validators.treasuryValidator,
+  );
+  const treasuryMintRedeemer: TreasuryValidatorValidateTreasuryMintingOrWithdrawal["redeemer"] = "AddSeller";
+  const treasurySpendRedeemer: TreasuryValidatorValidateTreasurySpending["redeemer"] = {
+    wrapper: "AddSeller",
+  };
+  const sellerAuthAssets = {
+    [toUnit(treasuryPolicyId, SELLER_AUTH_AN)]: addSellerCount,
+  };
+  const treasuryAddress = t.utils.validatorToAddress(
+    validators.treasuryValidator,
+  );
+  const treasuryOutDatum: TreasuryValidatorValidateTreasurySpending["treasuryInDatum"] = {
+    ...treasuryDatum,
+    sellerCount: treasuryDatum.sellerCount + addSellerCount,
+  };
+  console.log({
+    treasuryDatum,
+    treasuryOutDatum,
+  })
+  const txBuilder = tx
+    .readFrom([
+      deployedValidators["treasuryValidator"],
+    ])
+    .collectFrom(
+      [treasuryUtxo],
+      Data.to(treasurySpendRedeemer, TreasuryValidatorValidateTreasurySpending.redeemer),
+    )
+    .mintAssets(
+      { ...sellerAuthAssets },
+      Data.to(treasuryMintRedeemer, TreasuryValidatorValidateTreasuryMintingOrWithdrawal.redeemer),
+    )
+    .payToAddressWithData(
+      treasuryAddress,
+      {
+        inline: Data.to(treasuryOutDatum, TreasuryValidatorValidateTreasurySpending.treasuryInDatum),
+      },
+      {
+        ...treasuryUtxo.assets,
+      },
+    )
+    .validFrom(validFrom)
+    .validTo(validTo);
+
+  for (let i = 0; i < addSellerCount; i++) {
+    txBuilder.payToAddressWithData(
+      sellerAddress,
+      {
+        inline: Data.to(sellerDatum, SellerValidatorValidateSellerSpending.sellerInDatum),
+      },
+      { [toUnit(treasuryPolicyId, SELLER_AUTH_AN)]: 1n, },
+    );
+  }
   return {
     txBuilder: txBuilder,
   };
