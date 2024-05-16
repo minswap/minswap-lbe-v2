@@ -500,14 +500,15 @@ pub fn validate_add_seller(
     // validate time frame
     end_valid_time_range < end_time,
     // validate Mint Amount
-    add_seller_count > 0,
     mint_value == value.from_asset(
       treasury_hash,
       seller_auth_an,
       add_seller_count,
     ),
-    // validate treasury output
-    treasury_in_value == treasury_out_value,
+    // // validate treasury output
+    value.without_lovelace(treasury_in_value) == value.without_lovelace(
+      treasury_out_value,
+    ),
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
       seller_count: seller_count + add_seller_count,
