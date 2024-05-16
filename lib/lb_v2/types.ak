@@ -51,7 +51,7 @@ pub type TreasuryDatum {
   seller_hash: ValidatorHash,
   order_hash: ValidatorHash,
   seller_count: Int,
-  // increase when collect orders, descrease when collect LP
+  // increase when collect orders, descrease when collect LP or refund
   collected_fund: Int,
   // LBE details
   base_asset: Asset,

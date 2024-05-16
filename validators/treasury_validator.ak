@@ -8,7 +8,7 @@ use aiken/transaction/credential.{Address, Inline, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
   AddSeller, CancelLBE, CloseEvent, CollectOrders, CollectSeller, CreateAmmPool,
-  CreateTreasury, InitTreasury, PoolDatum, RedeemLP, TreasuryDatum,
+  CreateTreasury, InitTreasury, PoolDatum, RedeemLP, Refund, TreasuryDatum,
   TreasuryRedeemer,
 }
 use lb_v2/utils.{factory_auth_an}
@@ -212,6 +212,25 @@ validator(authen_policy_id: PolicyId) {
           treasury_in_value: treasury_in_value,
           treasury_output: treasury_output,
           pool_ref_input: pool_ref_input,
+        )
+      }
+      Refund -> {
+        let TreasuryDatum { seller_hash, order_hash, .. } = treasury_in_datum
+        let order_inputs =
+          validation.get_order_inputs(inputs, seller_hash, order_hash)
+        let treasury_output =
+          validation.get_treasury_output(
+            outputs,
+            authen_policy_id,
+            treasury_hash,
+          )
+        validation.validate_refund(
+          order_inputs: order_inputs,
+          outputs: outputs,
+          treasury_output: treasury_output,
+          treasury_in_datum: treasury_in_datum,
+          treasury_in_value: treasury_in_value,
+          mint_value: mint_value,
         )
       }
       _ -> False
