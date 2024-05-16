@@ -505,7 +505,7 @@ pub fn validate_add_seller(
       seller_auth_an,
       add_seller_count,
     ),
-    // // validate treasury output
+    // validate treasury output
     value.without_lovelace(treasury_in_value) == value.without_lovelace(
       treasury_out_value,
     ),
