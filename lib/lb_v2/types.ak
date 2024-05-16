@@ -71,20 +71,13 @@ pub type TreasuryDatum {
 }
 
 pub type TreasuryRedeemer {
-  // Normal flow
   InitTreasury
   AddSeller
-  CollectSeller { amount: Int }
+  CollectSeller
   CollectOrders
   CreateAmmPool
   RedeemLP
   CloseEvent
-}
-
-pub type SellerTokenMintingRedeemer {
-  SellerMintingCreateLBE
-  SellerMintingCreateSeller
-  SellerMintingCollectSeller
 }
 
 pub type SellerDatum {
