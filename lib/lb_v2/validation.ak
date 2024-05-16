@@ -448,26 +448,26 @@ pub fn get_seller_outputs(
   seller_hash: ValidatorHash,
   seller_datum: Data,
 ) -> List<Output> {
-  list.filter(
-    outputs,
-    fn(output) {
-      let Output {
-        address: Address { payment_credential, .. },
-        value: out_value,
-        datum: out_datum,
-        ..
-      } = output
-      if payment_credential == ScriptCredential(seller_hash) {
-        expect and {
-            value.quantity_of(out_value, treasury_policy_id, seller_auth_an) == 1,
-            InlineDatum(seller_datum) == out_datum,
-          }
-        True
-      } else {
-        False
-      }
-    },
-  )
+  let seller_outputs =
+    list.filter(
+      outputs,
+      fn(output) {
+        let Output { address: Address { payment_credential, .. }, .. } = output
+        payment_credential == ScriptCredential(seller_hash)
+      },
+    )
+  expect
+    list.all(
+      seller_outputs,
+      fn(output) {
+        let Output { value: out_value, datum: out_datum, .. } = output
+        and {
+          value.quantity_of(out_value, treasury_policy_id, seller_auth_an) == 1,
+          InlineDatum(seller_datum) == out_datum,
+        }
+      },
+    )
+  seller_outputs
 }
 
 pub fn get_order_outputs(
