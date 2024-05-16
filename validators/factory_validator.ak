@@ -1,4 +1,5 @@
 use aiken/builtin
+use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Output, ScriptContext, Spend, Transaction,
@@ -34,8 +35,14 @@ validator(
   ) {
     let ScriptContext { transaction, purpose } = context
     expect Spend(factory_ref) = purpose
-    let Transaction { inputs, mint, outputs, extra_signatories, .. } =
-      transaction
+    let Transaction {
+      inputs,
+      mint,
+      outputs,
+      extra_signatories,
+      validity_range,
+      ..
+    } = transaction
     let FactoryRedeemer { base_asset, raise_asset, step: factory_step } =
       redeemer
     let FactoryDatum { head: current_head, tail: current_tail } = datum
@@ -260,12 +267,26 @@ validator(
           ..
         } = treasury_in
         expect treasury_datum: TreasuryDatum = treasury_datum_raw
-        let TreasuryDatum { owner, total_liquidity, collected_fund, .. } =
-          treasury_datum
+        let TreasuryDatum {
+          owner,
+          collected_fund,
+          is_cancelled,
+          start_time,
+          seller_count,
+          ..
+        } = treasury_datum
         expect Address {
           payment_credential: VerificationKeyCredential(owner_pkh),
           ..
         } = owner
+
+        expect Interval {
+          upper_bound: IntervalBound {
+            bound_type: Finite(end_valid_time_range),
+            ..
+          },
+          ..
+        } = validity_range
         and {
           builtin.less_than_bytearray(new_factory_head, new_factory_tail),
           factory_out_datum == FactoryDatum {
@@ -278,8 +299,17 @@ validator(
             step: factory_step,
           ),
           list.has(extra_signatories, owner_pkh),
-          total_liquidity > 0,
-          collected_fund == 0,
+          if end_valid_time_range < start_time {
+            // cancel before LBE
+            True
+          } else {
+            // cancel beacause fail
+            and {
+              seller_count == 0,
+              is_cancelled == True,
+              collected_fund == 0,
+            }
+          },
         }
       }
     }
