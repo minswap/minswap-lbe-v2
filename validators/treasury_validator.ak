@@ -7,7 +7,7 @@ use aiken/transaction.{
 use aiken/transaction/credential.{Address, Inline, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  AddSeller, CloseEvent, CollectOrders, CollectSeller, CreateAmmPool,
+  AddSeller, CancelLBE, CloseEvent, CollectOrders, CollectSeller, CreateAmmPool,
   CreateTreasury, InitTreasury, PoolDatum, RedeemLP, TreasuryDatum,
   TreasuryRedeemer,
 }
@@ -21,7 +21,14 @@ validator(authen_policy_id: PolicyId) {
     context: ScriptContext,
   ) {
     expect ScriptContext { purpose: Spend(out_ref), transaction } = context
-    let Transaction { inputs, outputs, mint, validity_range, .. } = transaction
+    let Transaction {
+      inputs,
+      outputs,
+      mint,
+      validity_range,
+      reference_inputs,
+      ..
+    } = transaction
     let treasury_input =
       validation.get_treasury_input_by_out_ref(
         inputs,
@@ -190,6 +197,22 @@ validator(authen_policy_id: PolicyId) {
           treasury_in_datum: treasury_in_datum,
           treasury_in_value: treasury_in_value,
           mint_value: mint_value,
+        )
+      }
+      CancelLBE(reason) -> {
+        let treasury_output =
+          validation.get_treasury_output(
+            outputs,
+            authen_policy_id,
+            treasury_hash,
+          )
+        let pool_ref_input = validation.get_amm_pool_ref_input(reference_inputs)
+        validation.validate_cancel_lbe(
+          reason: reason,
+          treasury_in_datum: treasury_in_datum,
+          treasury_in_value: treasury_in_value,
+          treasury_output: treasury_output,
+          pool_ref_input: pool_ref_input,
         )
       }
       _ -> False

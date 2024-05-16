@@ -68,6 +68,13 @@ pub type TreasuryDatum {
   penalty_config: Option<PenaltyConfig>,
   // added when collect seller
   total_penalty: Int,
+  // status: just support CancelLBE
+  is_cancelled: Bool,
+}
+
+pub type CancelLBEReason {
+  ExistedPool
+  NotReachMinimumRaise
 }
 
 pub type TreasuryRedeemer {
@@ -79,12 +86,10 @@ pub type TreasuryRedeemer {
   CreateAmmPool
   RedeemLP
   CloseEvent
-}
-
-pub type SellerTokenMintingRedeemer {
-  SellerMintingCreateLBE
-  SellerMintingCreateSeller
-  SellerMintingCollectSeller
+  // Cancel flow
+  // ... -> CollectOrders -> CancelLBE(less than minimum raise or pool is created) change is_cancelled to True -> Refund -> CloseEvent
+  CancelLBE { reason: CancelLBEReason }
+  Refund
 }
 
 pub type SellerDatum {
