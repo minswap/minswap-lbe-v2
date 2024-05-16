@@ -446,6 +446,7 @@ pub fn get_seller_outputs(
   outputs: List<Output>,
   treasury_policy_id: PolicyId,
   seller_hash: ValidatorHash,
+  seller_datum: Data,
 ) -> List<Output> {
   list.filter(
     outputs,
@@ -453,14 +454,17 @@ pub fn get_seller_outputs(
       let Output {
         address: Address { payment_credential, .. },
         value: out_value,
+        datum: out_datum,
         ..
       } = output
-      and {
-        value.quantity_of(out_value, treasury_policy_id, seller_auth_an) == 1,
-        when payment_credential is {
-          ScriptCredential(hash) -> hash == seller_hash
-          _ -> False
-        },
+      if payment_credential == ScriptCredential(seller_hash) {
+        expect and {
+            value.quantity_of(out_value, treasury_policy_id, seller_auth_an) == 1,
+            InlineDatum(seller_datum) == out_datum,
+          }
+        True
+      } else {
+        False
       }
     },
   )
@@ -497,8 +501,7 @@ pub fn validate_add_seller(
   end_valid_time_range: Int,
 ) -> Bool {
   let add_seller_count = list.length(seller_outputs)
-  let TreasuryDatum { base_asset, raise_asset, seller_count, end_time, .. } =
-    treasury_in_datum
+  let TreasuryDatum { seller_count, end_time, .. } = treasury_in_datum
   expect Output {
     value: treasury_out_value,
     datum: InlineDatum(treasury_out_raw_datum),
@@ -514,27 +517,6 @@ pub fn validate_add_seller(
       treasury_hash,
       seller_auth_an,
       add_seller_count,
-    ),
-    // validate seller outputs
-    list.length(seller_outputs) == add_seller_count,
-    list.all(
-      seller_outputs,
-      fn(output) {
-        expect Output { datum: InlineDatum(seller_raw_datum), .. } = output
-        expect seller_datum: SellerDatum = seller_raw_datum
-        let SellerDatum {
-          base_asset: s_base_asset,
-          raise_asset: s_raise_asset,
-          amount: s_amount,
-          penalty_amount: s_penalty_amount,
-        } = seller_datum
-        and {
-          s_base_asset == base_asset,
-          s_raise_asset == raise_asset,
-          s_amount == 0,
-          s_penalty_amount == 0,
-        }
-      },
     ),
     // validate treasury output
     treasury_in_value == treasury_out_value,
@@ -635,7 +617,6 @@ pub fn validate_using_seller(
   expect Input {
     output: Output {
       address: Address { payment_credential: ScriptCredential(seller_hash), .. },
-      value: seller_in_value,
       ..
     },
     ..
@@ -654,15 +635,6 @@ pub fn validate_using_seller(
         }
       },
     )
-  // Validate always pay 1 Seller UTxO
-  expect [
-    Output {
-      value: seller_out_value,
-      datum: InlineDatum(seller_out_raw_datum),
-      ..
-    },
-  ] = get_seller_outputs(outputs, treasury_hash, seller_hash)
-  expect seller_out_datum: SellerDatum = seller_out_raw_datum
   // Validate Datums
   let treasury_datum =
     get_treasury_ref_input_datum(
@@ -670,7 +642,6 @@ pub fn validate_using_seller(
       authen_policy_id,
       treasury_hash,
     )
-
   let order_inputs =
     get_order_inputs(inputs, seller_hash, treasury_datum.order_hash)
   let order_outputs =
@@ -697,22 +668,25 @@ pub fn validate_using_seller(
         (seller_hash, order_auth_an, order_output_count - order_input_count),
       ]
     }
+  expect [_] =
+    get_seller_outputs(
+      outputs: outputs,
+      treasury_policy_id: treasury_hash,
+      seller_hash: seller_hash,
+      seller_datum: SellerDatum {
+        base_asset: treasury_datum.base_asset,
+        raise_asset: treasury_datum.raise_asset,
+        amount: seller_in_datum.amount + delta_amount,
+        penalty_amount: seller_in_datum.penalty_amount + delta_penalty,
+      },
+    )
   and {
     // validate LBE ID
     treasury_datum.base_asset == seller_in_datum.base_asset,
     treasury_datum.raise_asset == seller_in_datum.raise_asset,
-    treasury_datum.base_asset == seller_out_datum.base_asset,
-    treasury_datum.raise_asset == seller_out_datum.raise_asset,
     // validate time frame
     treasury_datum.start_time < start_valid_time_range,
     treasury_datum.end_time > end_valid_time_range,
-    // validate seller value
-    seller_in_value == seller_out_value,
-    // validate seller datum after apply order
-    //   - amount
-    seller_out_datum.amount == seller_in_datum.amount + delta_amount,
-    //   - penalty amount
-    seller_out_datum.penalty_amount == seller_in_datum.penalty_amount + delta_penalty,
     // validate minting
     is_valid_minting,
   }
