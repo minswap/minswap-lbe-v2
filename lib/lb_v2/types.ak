@@ -1,6 +1,8 @@
 use aiken/dict.{Dict}
 use aiken/hash.{Blake2b_224, Blake2b_256, Hash}
-use aiken/transaction/credential.{Address, Script, StakeCredential}
+use aiken/transaction/credential.{
+  Address, Script, StakeCredential, VerificationKey,
+}
 use aiken/transaction/value.{AssetName, PolicyId}
 
 pub type ValidatorHash =
@@ -8,6 +10,9 @@ pub type ValidatorHash =
 
 pub type DatumMap =
   Dict<Hash<Blake2b_256, Data>, Data>
+
+pub type PubKeyHash =
+  Hash<Blake2b_224, VerificationKey>
 
 pub type Asset {
   policy_id: PolicyId,

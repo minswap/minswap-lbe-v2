@@ -11,7 +11,7 @@ use aiken/transaction/value.{
 }
 use lb_v2/types.{
   Asset, CreateTreasury, FactoryStep, OrderDatum, PenaltyConfig, PoolDatum,
-  RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
+  PubKeyHash, RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
@@ -606,6 +606,113 @@ pub fn validate_collect_seller(
   }
 }
 
+pub fn validate_using_seller(
+  authen_policy_id: PolicyId,
+  treasury_hash: ValidatorHash,
+  out_ref: OutputReference,
+  seller_in_datum: SellerDatum,
+  inputs: List<Input>,
+  reference_inputs: List<Input>,
+  outputs: List<Output>,
+  validity_range: ValidityRange,
+  extra_signatories: List<PubKeyHash>,
+  mint_value: Value,
+) -> Bool {
+  expect Interval {
+    upper_bound: IntervalBound { bound_type: Finite(end_valid_time_range), .. },
+    lower_bound: IntervalBound {
+      bound_type: Finite(start_valid_time_range),
+      ..
+    },
+  } = validity_range
+  // Validate always spend exactly 1 Seller UTxO
+  let seller_input = get_seller_input_by_out_ref(inputs, treasury_hash, out_ref)
+  expect Input {
+    output: Output {
+      address: Address { payment_credential: ScriptCredential(seller_hash), .. },
+      value: seller_in_value,
+      ..
+    },
+    ..
+  } = seller_input
+  expect [_] =
+    list.filter(
+      inputs,
+      fn(input) {
+        let Input {
+          output: Output { address: Address { payment_credential, .. }, .. },
+          ..
+        } = input
+        when payment_credential is {
+          ScriptCredential(hash) -> hash == seller_hash
+          _ -> False
+        }
+      },
+    )
+  // Validate always pay 1 Seller UTxO
+  expect [
+    Output {
+      value: seller_out_value,
+      datum: InlineDatum(seller_out_raw_datum),
+      ..
+    },
+  ] = get_seller_outputs(outputs, treasury_hash, seller_hash)
+  expect seller_out_datum: SellerDatum = seller_out_raw_datum
+  // Validate Datums
+  let treasury_datum =
+    get_treasury_ref_input_datum(
+      reference_inputs,
+      authen_policy_id,
+      treasury_hash,
+    )
+
+  let order_inputs =
+    get_order_inputs(inputs, seller_hash, treasury_datum.order_hash)
+  let order_outputs =
+    get_order_outputs(outputs, seller_hash, treasury_datum.order_hash)
+  let (delta_amount, delta_penalty) =
+    apply_order(
+      order_inputs: order_inputs,
+      order_outputs: order_outputs,
+      penalty_config: treasury_datum.penalty_config,
+      start_valid_time_range: start_valid_time_range,
+      end_valid_time_range: end_valid_time_range,
+      seller_hash: seller_hash,
+      base_asset: treasury_datum.base_asset,
+      raise_asset: treasury_datum.base_asset,
+      extra_signatories: extra_signatories,
+    )
+  let order_input_count = list.length(order_inputs)
+  let order_output_count = list.length(order_outputs)
+  let is_valid_minting =
+    if order_input_count == order_output_count {
+      value.flatten(mint_value) == []
+    } else {
+      value.flatten(mint_value) == [
+        (seller_hash, order_auth_an, order_output_count - order_input_count),
+      ]
+    }
+  and {
+    // validate LBE ID
+    treasury_datum.base_asset == seller_in_datum.base_asset,
+    treasury_datum.raise_asset == seller_in_datum.raise_asset,
+    treasury_datum.base_asset == seller_out_datum.base_asset,
+    treasury_datum.raise_asset == seller_out_datum.raise_asset,
+    // validate time frame
+    treasury_datum.start_time < start_valid_time_range,
+    treasury_datum.end_time > end_valid_time_range,
+    // validate seller value
+    seller_in_value == seller_out_value,
+    // validate seller datum after apply order
+    //   - amount
+    seller_out_datum.amount == seller_in_datum.amount + delta_amount,
+    //   - penalty amount
+    seller_out_datum.penalty_amount == seller_in_datum.penalty_amount + delta_penalty,
+    // validate minting
+    is_valid_minting,
+  }
+}
+
 pub fn apply_order(
   order_inputs: List<Input>,
   order_outputs: List<Output>,
@@ -678,12 +785,8 @@ pub fn apply_order(
           amount,
           is_collected,
           penalty_amount,
-          owner,
-        }: OrderDatum = raw_o_datum
-        expect Address {
-          payment_credential: VerificationKeyCredential(pub_key_hash),
           ..
-        } = owner
+        }: OrderDatum = raw_o_datum
         let expected_order =
           get_order_value(
             amount: amount,
@@ -693,7 +796,6 @@ pub fn apply_order(
           )
         // validate orders
         expect and {
-            list.has(extra_signatories, pub_key_hash),
             is_collected == False,
             o_base_asset == base_asset,
             o_raise_asset == raise_asset,
@@ -1024,7 +1126,7 @@ fn apply_redeeming_lp_order(
       owner_address == owner,
       expected_order_out_value == order_out_value,
     }
-  (amount + penalty_amount, 0, 0)
+  (amount + penalty_amount, o_lp_amount, o_remaining_raise_amount)
 }
 
 fn compute_asset_name_from_base_and_raise(
