@@ -10,14 +10,15 @@ use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
 use lb_v2/types.{
-  Asset, CreateTreasury, FactoryStep, OrderDatum, PenaltyConfig, PoolDatum,
-  PubKeyHash, RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
+  Asset, CancelLBEReason, CreateTreasury, ExistedPool, FactoryStep,
+  NotReachMinimumRaise, OrderDatum, PenaltyConfig, PoolDatum, PubKeyHash,
+  RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  calculate_penalty, default_burn_liquidity, default_number_seller,
-  factory_auth_an, fee_ada, get_order_value, minimum_ada, order_auth_an,
-  seller_auth_an, treasury_auth_an,
+  calculate_penalty, compute_asset_name_from_base_and_raise,
+  default_burn_liquidity, default_number_seller, factory_auth_an, fee_ada,
+  get_order_value, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
 }
 
 pub fn get_value_of_minting_treasury(
@@ -69,6 +70,7 @@ pub fn validate_creating_treasury_out(
     total_liquidity,
     penalty_config,
     total_penalty,
+    is_cancelled,
     ..
   } = treasury_out_datum
   let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
@@ -115,6 +117,7 @@ pub fn validate_creating_treasury_out(
       _ -> True
     },
     total_penalty == 0,
+    is_cancelled == False,
   }
 }
 
@@ -388,6 +391,35 @@ pub fn get_amm_pool_output(outputs: List<Output>) -> Output {
       fn(output) {
         let Output { address: Address { payment_credential, .. }, value, .. } =
           output
+        when payment_credential is {
+          ScriptCredential(hash) -> and {
+              hash == amm_pool_validation_hash,
+              value.quantity_of(
+                value,
+                amm_authen_policy_id,
+                amm_pool_auth_asset_name,
+              ) == 1,
+            }
+          _ -> False
+        }
+      },
+    )
+  pool_output
+}
+
+pub fn get_amm_pool_ref_input(outputs: List<Input>) -> Input {
+  expect [pool_output] =
+    list.filter(
+      outputs,
+      fn(output) {
+        let Input {
+          output: Output {
+            address: Address { payment_credential, .. },
+            value,
+            ..
+          },
+          ..
+        } = output
         when payment_credential is {
           ScriptCredential(hash) -> and {
               hash == amm_pool_validation_hash,
@@ -1096,19 +1128,191 @@ fn apply_redeeming_lp_order(
   (amount + penalty_amount, o_lp_amount, o_remaining_raise_amount)
 }
 
-fn compute_asset_name_from_base_and_raise(
+pub fn validate_cancel_lbe(
+  reason: CancelLBEReason,
+  treasury_in_datum: TreasuryDatum,
+  treasury_in_value: Value,
+  treasury_output: Output,
+  pool_ref_input: Input,
+) -> Bool {
+  let TreasuryDatum {
+    collected_fund,
+    base_asset,
+    raise_asset,
+    reserve_raise,
+    minimum_raise,
+    total_penalty,
+    seller_count,
+    is_cancelled,
+    ..
+  } = treasury_in_datum
+  expect Output {
+    value: treasury_out_value,
+    datum: InlineDatum(raw_treasury_out_datum),
+    ..
+  } = treasury_output
+  expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
+  expect Input { output: Output { datum: InlineDatum(raw_pool_datum), .. }, .. } =
+    pool_ref_input
+  expect PoolDatum { asset_a, asset_b, .. }: PoolDatum = raw_pool_datum
+  and {
+    // 1. collected_fund == reserve_raise+penalty(collected all orders) 
+    //          && seller == 0(because when collected_fund == reserve_raise+penalty == 0, it can be Counting phase when trreasury havent collected any seller)
+    collected_fund == reserve_raise + total_penalty,
+    seller_count == 0,
+    // 2. reason is
+    when reason is {
+      //    - ExistedPool: ref_input having pool that LBE need
+      ExistedPool ->
+        utils.sort_two_assets(base_asset, raise_asset) == (asset_a, asset_b)
+      //    - NotReachMinimumRaise: collected_fund < min_raise
+      NotReachMinimumRaise -> {
+        let min_raise =
+          when minimum_raise is {
+            None -> 1
+            Some(min_raise) -> min_raise
+          }
+        collected_fund < min_raise
+      }
+    },
+    // 3. Treasury
+    //    - Datum: 
+    //      - is_cancelled: 
+    //        - Input: False
+    //        - Output: True
+    //      - other field no changes
+    is_cancelled == False,
+    treasury_out_datum == TreasuryDatum {
+      ..treasury_in_datum,
+      is_cancelled: True,
+    },
+    //    - Value: no change
+    treasury_in_value == treasury_out_value,
+  }
+}
+
+pub fn validate_refund(
+  order_inputs: List<Input>,
+  outputs: List<Output>,
+  treasury_output: Output,
+  treasury_in_datum: TreasuryDatum,
+  treasury_in_value: Value,
+  mint_value: Value,
+) -> Bool {
+  let TreasuryDatum {
+    collected_fund,
+    base_asset,
+    raise_asset,
+    seller_hash,
+    is_cancelled,
+    ..
+  } = treasury_in_datum
+  expect Output {
+    value: treasury_out_value,
+    datum: InlineDatum(raw_treasury_out_datum),
+    ..
+  } = treasury_output
+  expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
+
+  let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
+    raise_asset
+  // 1. validate orders. 
+  //    - each order validate(n first output is n output of order)
+  //      - check lbe id of order input
+  //      - order output 
+  //        - value_out =  minimum_ada+ refund_amount(refund_amount= amount+penalty )
+  //        - address = owner of order input datum
+  //    - calculate all order fund
+  let total_order_fund =
+    apply_refund_orders(
+      order_inputs: order_inputs,
+      outputs: outputs,
+      base_asset: base_asset,
+      raise_asset: raise_asset,
+    )
+
+  and {
+    // 2. validate treasury.
+    //    - treasury_datum
+    //      - is_cancelled = True
+    //      - collected_fund: 
+    //            datum_out.collected_fund = datum_in.collected_fund - total_order_fund
+    //      - other field: nothing change
+    //    - treasury_value: t_value_out = t_value_in - (total_order_fund)
+    is_cancelled == True,
+    treasury_out_datum == TreasuryDatum {
+      ..treasury_in_datum,
+      collected_fund: collected_fund - total_order_fund,
+    },
+    treasury_out_value == (
+      treasury_in_value
+        |> value.add(raise_asset_pid, raise_asset_an, -total_order_fund)
+    ),
+    // 3. Mint: burn order NFT
+    value.flatten(mint_value) == [
+      (seller_hash, order_auth_an, -list.length(order_inputs)),
+    ],
+  }
+}
+
+// return (total fund(amount and penalty) of orders, total lp that users redeemed, total raise asset that user redeem)
+pub fn apply_refund_orders(
+  order_inputs: List<Input>,
+  outputs: List<Output>,
   base_asset: Asset,
   raise_asset: Asset,
-) -> AssetName {
-  let (asset_a, asset_b) = utils.sort_two_assets(base_asset, raise_asset)
-  let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
-    asset_a
-  let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
-    asset_b
-  utils.compute_lp_asset_name(
-    asset_a_policy_id,
-    asset_a_asset_name,
-    asset_b_policy_id,
-    asset_b_asset_name,
-  )
+) -> Int {
+  expect [order_input, ..remaining_order_inputs] = order_inputs
+  expect Input {
+    output: Output { datum: InlineDatum(raw_order_in_datum), .. },
+    ..
+  } = order_input
+  expect order_in_datum: OrderDatum = raw_order_in_datum
+  expect [order_output, ..remaining_outputs] = outputs
+  let order_fund_amount =
+    apply_refund_order(order_in_datum, order_output, base_asset, raise_asset)
+  if remaining_order_inputs == [] {
+    order_fund_amount
+  } else {
+    let acc_fund_amount =
+      apply_refund_orders(
+        remaining_order_inputs,
+        remaining_outputs,
+        base_asset,
+        raise_asset,
+      )
+    acc_fund_amount + order_fund_amount
+  }
+}
+
+fn apply_refund_order(
+  order_in_datum: OrderDatum,
+  order_output: Output,
+  base_asset: Asset,
+  raise_asset: Asset,
+) -> Int {
+  let OrderDatum {
+    base_asset: o_base_asset,
+    raise_asset: o_raise_asset,
+    owner,
+    amount,
+    penalty_amount,
+    ..
+  } = order_in_datum
+
+  let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
+    raise_asset
+  let expected_order_out_value =
+    value.zero()
+      |> value.add(ada_policy_id, ada_asset_name, minimum_ada)
+      |> value.add(raise_asset_pid, raise_asset_an, amount + penalty_amount)
+  let Output { address: owner_address, value: order_out_value, .. } =
+    order_output
+  expect and {
+      base_asset == o_base_asset,
+      raise_asset == o_raise_asset,
+      owner_address == owner,
+      expected_order_out_value == order_out_value,
+    }
+  amount + penalty_amount
 }

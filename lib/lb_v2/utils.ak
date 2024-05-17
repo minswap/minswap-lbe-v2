@@ -113,3 +113,20 @@ pub fn calculate_penalty(
       }
   }
 }
+
+pub fn compute_asset_name_from_base_and_raise(
+  base_asset: Asset,
+  raise_asset: Asset,
+) -> AssetName {
+  let (asset_a, asset_b) = sort_two_assets(base_asset, raise_asset)
+  let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
+    asset_a
+  let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
+    asset_b
+  compute_lp_asset_name(
+    asset_a_policy_id,
+    asset_a_asset_name,
+    asset_b_policy_id,
+    asset_b_asset_name,
+  )
+}
