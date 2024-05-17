@@ -35,6 +35,8 @@ import {
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
   LBE_MIN_OUTPUT_ADA,
+  LP_COLATERAL,
+  MINSWAP_V2_DEFAULT_POOL_ADA,
   MINSWAP_V2_FACTORY_AUTH_AN,
   MINSWAP_V2_MAX_LIQUIDITY,
   MINSWAP_V2_POOL_AUTH_AN,
@@ -43,6 +45,8 @@ import {
   TREASURY_AUTH_AN,
 } from "./constants.ts";
 import type { DeployedValidators, MinswapValidators, Validators } from "./deploy-validators.ts";
+import pool from "undici-types/pool";
+import { calculateInitialLiquidity } from "./minswap-amm/utils.ts";
 
 export type WarehouseBuilderOptions = {
   t: Translucent;
@@ -158,7 +162,6 @@ export class WarehouseBuilder {
   ammFactoryHash: string;
   ammPoolToken: string;
   ammFactoryToken: string;
-  ammFactoryInputs: UTxO[] = [];
 
   constructor(options: WarehouseBuilderOptions) {
     const { t, validators, deployedValidators, ammValidators, ammDeployedValidators } = options;
@@ -697,41 +700,83 @@ export class WarehouseBuilder {
   }
   /************************* AMM *************************/
   private _buildCreateAmmPool(options: { poolDatum: FeedTypeAmmPool["_datum"], factoryInput: UTxO }) {
-    // const { poolDatum, factoryInput } = options;
-    // TODO
-    // const treasuryDatum = this.fromDatumTreasury(this.treasuryInputs[0]!.datum!);
-    // const [assetA, assetB] = normalizedPair(treasuryDatum.baseAsset, treasuryDatum.raiseAsset);
-    // const factoryRedeemer: AmmValidateFactory["redeemer"] = { assetA, assetB };
-    // const lpAssetName = computeLPAssetName(
-    //   treasuryDatum.baseAsset.policyId + treasuryDatum.baseAsset.assetName,
-    //   treasuryDatum.raiseAsset.policyId + treasuryDatum.raiseAsset.assetName,
-    // );
-    // const mintAssets: Assets = {
-    //   [this.ammFactoryToken]: 1n,
-    //   [this.ammPoolToken]: 1n,
-    //   [T.toUnit(this.ammPoolHash, lpAssetName)]: MINSWAP_V2_MAX_LIQUIDITY,
-    // };
-    // const headFactoryDatum: AmmValidateFactory["datum"] = {
-    //   head: this.ammFactoryInputs.dat
-    // }
-    // this.tx!
-    //   .readFrom([
-    //     this.ammDeployedValidators["authenValidator"],
-    //     this.ammDeployedValidators["factoryValidator"],
-    //   ])
-    //   .collectFrom(
-    //     this.ammFactoryInputs,
-    //     T.Data.to(factoryRedeemer, AmmValidateFactory.redeemer),
-    //   )
-    //   .mintAssets(
-    //     mintAssets,
-    //     T.Data.to("CreatePool", AmmValidateAuthen.redeemer),
-    //   )
-    //   .payToAddressWithData(
-    //     this.ammFactoryAddress,
-    //     {
-    //       inline: 
-    //     }
-    //   );
+    const { poolDatum, factoryInput } = options;
+    const factoryDatum = T.Data.from(factoryInput.datum!, AmmValidateFactory.datum);
+    const factoryRedeemer: AmmValidateFactory["redeemer"] = { 
+      assetA: poolDatum.assetA, 
+      assetB: poolDatum.assetB,
+    };
+    const lpAssetName = computeLPAssetName(
+      poolDatum.assetA.policyId + poolDatum.assetA.assetName,
+      poolDatum.assetB.policyId + poolDatum.assetB.assetName,
+    );
+    const lpToken = T.toUnit(this.ammPoolHash, lpAssetName);
+    const mintAssets: Assets = {
+      [this.ammFactoryToken]: 1n,
+      [this.ammPoolToken]: 1n,
+      [lpToken]: MINSWAP_V2_MAX_LIQUIDITY,
+    };
+    const headFactoryDatum: AmmValidateFactory["datum"] = {
+      head: factoryDatum.head,
+      tail: lpAssetName,
+    };
+    const tailFactoryDatum: AmmValidateFactory["datum"] = {
+      head: lpAssetName,
+      tail: factoryDatum.tail,
+    };
+    const initialLiquidity = calculateInitialLiquidity(
+      poolDatum.reserveA,
+      poolDatum.reserveB,
+    );
+    const remainingLiquidity =
+      MINSWAP_V2_MAX_LIQUIDITY - (initialLiquidity - LP_COLATERAL);
+    const poolAssets = {
+      lovelace: MINSWAP_V2_DEFAULT_POOL_ADA,
+      [this.ammPoolToken]: 1n,
+      [lpToken]: remainingLiquidity,
+    };
+    const unitA = T.toUnit(poolDatum.assetA.policyId, poolDatum.assetA.assetName);
+    const unitB = T.toUnit(poolDatum.assetB.policyId, poolDatum.assetB.assetName);
+    poolAssets[unitA] = (poolAssets[unitA] ?? 0n) + poolDatum.reserveA;
+    poolAssets[unitB] = (poolAssets[unitB] ?? 0n) + poolDatum.reserveB;
+    
+    this.tx!
+      .readFrom([
+        this.ammDeployedValidators["authenValidator"],
+        this.ammDeployedValidators["factoryValidator"],
+      ])
+      .collectFrom(
+        [factoryInput],
+        T.Data.to(factoryRedeemer, AmmValidateFactory.redeemer),
+      )
+      .mintAssets(
+        mintAssets,
+        T.Data.to("CreatePool", AmmValidateAuthen.redeemer),
+      )
+      .payToAddressWithData(
+        this.ammFactoryAddress,
+        {
+          inline: T.Data.to(headFactoryDatum, AmmValidateFactory.datum),
+        },
+        {
+          [this.ammFactoryToken]: 1n,
+        }
+      )
+      .payToAddressWithData(
+        this.ammFactoryAddress,
+        {
+          inline: T.Data.to(tailFactoryDatum, AmmValidateFactory.datum),
+        },
+        {
+          [this.ammFactoryToken]: 1n,
+        }
+      )
+      .payToAddressWithData(
+        this.ammPoolAddress,
+        {
+          inline: T.Data.to(poolDatum, FeedTypeAmmPool._datum),
+        },
+        poolAssets,
+      )
   }
 }
