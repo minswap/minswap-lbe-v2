@@ -23,8 +23,10 @@ import type {
 import {
   DEFAULT_NUMBER_SELLER,
   FACTORY_AUTH_AN,
+  LBE_FEE,
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
+  LBE_MIN_OUTPUT_ADA,
   ORDER_AUTH_AN,
   SELLER_AUTH_AN,
   TREASURY_AUTH_AN,
@@ -53,21 +55,14 @@ export type BuildAddSellersOptions = {
   validTo: UnixTime;
 };
 
-export type BuildDepositOptions = {
+export type BuildUsingSellerOptions = {
   treasuryRefInput: UTxO;
   sellerUtxo: UTxO;
-  owner: Address;
-  baseAsset: {
-    policyId: string;
-    assetName: string;
-  };
-  raiseAsset: {
-    policyId: string;
-    assetName: string;
-  };
-  amount: bigint;
   validFrom: UnixTime;
   validTo: UnixTime;
+  owners: Address[];
+  orderInputs: UTxO[];
+  orderOutputDatums: OrderValidatorFeedTypeOrder["_datum"][];
 };
 
 export type BuildCollectSellersOptions = {
@@ -122,7 +117,6 @@ export class WarehouseBuilder {
   treasurySpendRedeemer: TreasuryValidatorValidateTreasurySpending["redeemer"] | undefined;
   treasuryMintRedeemer: TreasuryValidatorValidateTreasuryMintingOrWithdrawal["redeemer"] | undefined;
   sellerSpendRedeemer: SellerValidatorValidateSellerSpending["redeemer"] | undefined;
-  sellerMintRedeemer: SellerValidatorValidateSellerMintingOrWithdraw["redeemer"] | undefined;
   orderSpendRedeemer: OrderValidatorFeedTypeOrder["_redeemer"] | undefined;
 
 
@@ -159,20 +153,22 @@ export class WarehouseBuilder {
   }
 
   public buildInitFactory(options: BuildInitFactoryOptions) {
+    const { seedUtxo } = options;
     this.tasks.push(
-      () => { this.tx!.collectFrom([options.seedUtxo]) },
+      () => { this.tx!.collectFrom([seedUtxo]) },
       () => { this.mintingFactoryToken() },
       () => { this.payingFactoryOutput() },
     );
   }
 
   public buildCreateTreasury(options: BuildCreateTreasuryOptions) {
+    const { factoryUtxo, treasuryDatum } = options;
     this.tasks.push(
       () => {
-        this.factoryInputs = [options.factoryUtxo];
+        this.factoryInputs = [factoryUtxo];
         this.factoryRedeemer = {
-          baseAsset: options.treasuryDatum.baseAsset,
-          raiseAsset: options.treasuryDatum.raiseAsset,
+          baseAsset: treasuryDatum.baseAsset,
+          raiseAsset: treasuryDatum.raiseAsset,
           step: "CreateTreasury",
         };
         this.treasuryMintRedeemer = "InitTreasury";
@@ -182,35 +178,88 @@ export class WarehouseBuilder {
       () => { this.mintingTreasuryToken(); },
       () => { this.mintingSellerToken(); },
       () => { this.payingFactoryOutput(); },
-      () => { this.payingTreasuryOutput(options.treasuryDatum); },
+      () => { this.payingTreasuryOutput(treasuryDatum); },
       () => { this.payingSellerOutput(); },
     );
   }
 
   public buildAddSeller(options: BuildAddSellersOptions) {
+    const { addSellerCount, validFrom, validTo, treasuryUtxo } = options;
     const treasuryInDatum = T.Data.from(
-      options.treasuryUtxo.datum!,
+      treasuryUtxo.datum!,
       TreasuryValidatorValidateTreasurySpending.treasuryInDatum
     );
     const treasuryOutDatum = {
       ...treasuryInDatum,
-      sellerCount: treasuryInDatum.sellerCount + options.addSellerCount,
+      sellerCount: treasuryInDatum.sellerCount + addSellerCount,
     }
 
     this.tasks.push(
       () => {
-        this.treasuryInputs = [options.treasuryUtxo];
+        this.treasuryInputs = [treasuryUtxo];
         this.treasurySpendRedeemer = { wrapper: "AddSeller" };
         this.treasuryMintRedeemer = "AddSeller";
       },
       () => { this.spendingTreasuryInput(); },
-      () => { this.mintingSellerToken(options.addSellerCount); },
+      () => { this.mintingSellerToken(addSellerCount); },
       () => { this.payingTreasuryOutput(treasuryOutDatum); },
-      () => { this.payingSellerOutput(options.addSellerCount); },
+      () => { this.payingSellerOutput({ addSellerCount }); },
       () => {
         this.tx!
-          .validFrom(options.validFrom)
-          .validTo(options.validTo);
+          .validFrom(validFrom)
+          .validTo(validTo);
+      },
+    );
+  }
+
+  public buildUsingSeller(options: BuildUsingSellerOptions) {
+    const { treasuryRefInput, sellerUtxo, validFrom, validTo, owners, orderInputs, orderOutputDatums } = options;
+    const sellerInDatum = T.Data.from(
+      sellerUtxo.datum!,
+      SellerValidatorValidateSellerSpending.sellerInDatum,
+    );
+    let inputAmount = 0n;
+    let inputPenaltyAmount = 0n;
+    let outputAmount = 0n;
+    let outputPenaltyAmount = 0n;
+    for (const o of orderInputs) {
+      const datum = T.Data.from(o.datum!, OrderValidatorFeedTypeOrder._datum);
+      inputAmount += datum.amount;
+      inputPenaltyAmount += datum.penaltyAmount;
+    }
+    for (const datum of orderOutputDatums) {
+      outputAmount += datum.amount;
+      outputPenaltyAmount += datum.penaltyAmount;
+    }
+    const detalAmount = outputAmount - inputAmount;
+    const deltaPenaltyAmount = outputPenaltyAmount - inputPenaltyAmount;
+    const sellerOutDatum: SellerValidatorValidateSellerSpending["sellerInDatum"] = {
+      ...sellerInDatum,
+      amount: sellerInDatum.amount + detalAmount,
+      penaltyAmount: sellerInDatum.penaltyAmount + deltaPenaltyAmount,
+    }
+    const mintingSellerCount = BigInt(orderOutputDatums.length - orderInputs.length);
+
+    this.tasks.push(
+      () => {
+        this.sellerInputs = [sellerUtxo];
+        this.sellerSpendRedeemer = { wrapper: "UsingSeller" };
+        this.treasuryRefInput = treasuryRefInput;
+        this.orderInputs = orderInputs;
+        this.orderSpendRedeemer = "UpdateOrder";
+        for (const owner of owners) {
+          this.tx!.addSigner(owner);
+        }
+      },
+      () => { this.spendingSellerInput(); },
+      () => { this.spendingOrderInput(); },
+      () => { this.mintingOrderToken(mintingSellerCount); },
+      () => { this.payingSellerOutput({ outDatum: sellerOutDatum }); },
+      () => { this.payingOrderOutput(...orderOutputDatums); },
+      () => {
+        this.tx!
+          .validFrom(validFrom)
+          .validTo(validTo);
       },
     );
   }
@@ -226,6 +275,12 @@ export class WarehouseBuilder {
 
   /************************* SPENDING  *************************/
   private spendingSellerInput() {
+    if (!this.sellerInputs.length) {
+      return;
+    }
+    if (this.sellerSpendRedeemer && this.sellerSpendRedeemer.wrapper === "UsingSeller") {
+      this.tx!.readFrom([this.treasuryRefInput!]);
+    }
     this.tx!
       .readFrom([this.deployedValidators["sellerValidator"]])
       .collectFrom(
@@ -235,6 +290,9 @@ export class WarehouseBuilder {
   }
 
   private spendingFactoryInput() {
+    if (!this.factoryInputs) {
+      return;
+    }
     this.tx!
       .readFrom([this.deployedValidators["factoryValidator"]])
       .collectFrom(
@@ -244,6 +302,9 @@ export class WarehouseBuilder {
   }
 
   private spendingOrderInput() {
+    if (!this.orderInputs.length) {
+      return;
+    }
     this.tx!
       .readFrom([this.deployedValidators["orderValidator"]])
       .collectFrom(
@@ -253,6 +314,9 @@ export class WarehouseBuilder {
   }
 
   private spendingTreasuryInput() {
+    if (!this.treasuryInputs) {
+      return;
+    }
     this.tx!
       .readFrom([this.deployedValidators["treasuryValidator"]])
       .collectFrom(
@@ -295,7 +359,34 @@ export class WarehouseBuilder {
     cases[key]();
   }
 
-  private payingSellerOutput(addSellerCount?: bigint) {
+  private payingOrderOutput(...orderDatums: OrderValidatorFeedTypeOrder["_datum"][]) {
+    const innerPay = (datum: OrderValidatorFeedTypeOrder["_datum"]) => {
+      const assets = {
+        [this.orderToken]: 1n,
+        "lovelace": LBE_MIN_OUTPUT_ADA + (datum.isCollected ? LBE_FEE : LBE_FEE * 2n),
+      };
+      const raiseAsset = T.toUnit(datum.raiseAsset.policyId, datum.raiseAsset.assetName);
+      assets[raiseAsset] = (assets[raiseAsset] ?? 0n) + datum.amount + datum.penaltyAmount;
+
+      this.tx!
+        .payToAddressWithData(
+          this.orderAddress,
+          {
+            inline: T.Data.to(datum, OrderValidatorFeedTypeOrder._datum),
+          },
+          assets,
+        );
+    }
+    for (const datum of orderDatums) {
+      innerPay(datum);
+    }
+  }
+
+  private payingSellerOutput(
+    option?: {
+      addSellerCount?: bigint,
+      outDatum?: SellerValidatorValidateSellerSpending["sellerInDatum"]
+    }) {
     const innerPay = (datum: SellerValidatorValidateSellerSpending["sellerInDatum"]) => {
       this.tx!
         .payToAddressWithData(
@@ -309,8 +400,7 @@ export class WarehouseBuilder {
         );
     };
     if (this.sellerInputs.length) {
-      // FIX ME!
-      throw Error("FIX ME!")
+      innerPay(option!.outDatum!);
     } else {
       const cases: Record<number, () => void> = {
         // Create Treasury
@@ -336,7 +426,7 @@ export class WarehouseBuilder {
             amount: 0n,
             penaltyAmount: 0n,
           };
-          for (let i = 0n; i < addSellerCount!; i++) {
+          for (let i = 0n; i < option!.addSellerCount!; i++) {
             innerPay(sellerDatum);
           }
         },
@@ -447,19 +537,19 @@ export class WarehouseBuilder {
       );
   }
 
-  private mintingOrderToken() {
-    const cases: Record<string, bigint> = {
-      "UsingSeller": 0n, // FIX ME!
-      "CollectOrderToken": -1n * BigInt(this.orderInputs.length),
+  private mintingOrderToken(count?: bigint) {
+    const cases: Record<string, { amount: bigint, redeemer: SellerValidatorValidateSellerMintingOrWithdraw["redeemer"] }> = {
+      "UsingSeller": { amount: count!, redeemer: "UsingSeller", },
+      "CollectOrderToken": { amount: -1n * BigInt(this.orderInputs.length), redeemer: "CollectOrderToken" },
     };
-    const amount = cases[this.treasuryMintRedeemer!];
+    const { amount, redeemer } = cases[this.treasuryMintRedeemer!];
     this.tx!
       .readFrom([this.deployedValidators["sellerValidator"]])
       .mintAssets(
         {
           [this.orderToken]: amount,
         },
-        T.Data.to(this.sellerMintRedeemer!, SellerValidatorValidateSellerMintingOrWithdraw.redeemer)
+        T.Data.to(redeemer, SellerValidatorValidateSellerMintingOrWithdraw.redeemer)
       );
   }
 
