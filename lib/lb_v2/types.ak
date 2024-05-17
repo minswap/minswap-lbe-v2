@@ -78,10 +78,9 @@ pub type CancelLBEReason {
 }
 
 pub type TreasuryRedeemer {
-  // Normal flow
   InitTreasury
   AddSeller
-  CollectSeller { amount: Int }
+  CollectSeller
   CollectOrders
   CreateAmmPool
   RedeemLP
@@ -116,7 +115,6 @@ pub type OrderDatum {
 
 pub type OrderRedeemer {
   UpdateOrder
-  WithdrawOrder
   CollectOrder
   RedeemOrder
 }

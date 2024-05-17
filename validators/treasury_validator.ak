@@ -110,7 +110,7 @@ validator(authen_policy_id: PolicyId) {
           end_valid_time_range: end_valid_time_range,
         )
       }
-      CollectSeller { amount: collect_seller_count } -> {
+      CollectSeller -> {
         let treasury_output =
           validation.get_treasury_output(
             outputs,
@@ -125,7 +125,6 @@ validator(authen_policy_id: PolicyId) {
             seller_hash: seller_hash,
           )
         validation.validate_collect_seller(
-          collect_seller_count: collect_seller_count,
           treasury_output: treasury_output,
           treasury_in_datum: treasury_in_datum,
           mint_value: mint_value,
@@ -273,18 +272,13 @@ validator(authen_policy_id: PolicyId) {
               authen_policy_id,
               treasury_policy_id,
             )
-          CollectSeller { amount: collect_seller_count } -> and {
-              mint_value == validation.get_mint_value_of_collect_sellers(
-                treasury_policy_id,
-                collect_seller_count,
-              ),
-              // foward logic to spending treasury
-              validation.has_spend_treasury(
-                inputs,
-                authen_policy_id,
-                treasury_policy_id,
-              ),
-            }
+          CollectSeller ->
+            // foward logic to spending treasury
+            validation.has_spend_treasury(
+              inputs,
+              authen_policy_id,
+              treasury_policy_id,
+            )
           _ -> False
         }
       }

@@ -45,18 +45,6 @@ pub fn get_mint_value_of_add_sellers(
   value.from_asset(treasury_policy_id, seller_auth_an, add_seller_count)
 }
 
-pub fn get_mint_value_of_collect_sellers(
-  treasury_policy_id: PolicyId,
-  collect_seller_count: Int,
-) -> Value {
-  expect collect_seller_count > 0
-  value.from_asset(
-    treasury_policy_id,
-    seller_auth_an,
-    -1 * collect_seller_count,
-  )
-}
-
 pub fn validate_creating_treasury_out(
   treasury_out_value: Value,
   treasury_out_datum: TreasuryDatum,
@@ -544,14 +532,15 @@ pub fn validate_add_seller(
     // validate time frame
     end_valid_time_range < end_time,
     // validate Mint Amount
-    add_seller_count > 0,
     mint_value == value.from_asset(
       treasury_hash,
       seller_auth_an,
       add_seller_count,
     ),
     // validate treasury output
-    treasury_in_value == treasury_out_value,
+    value.without_lovelace(treasury_in_value) == value.without_lovelace(
+      treasury_out_value,
+    ),
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
       seller_count: seller_count + add_seller_count,
@@ -560,7 +549,6 @@ pub fn validate_add_seller(
 }
 
 pub fn validate_collect_seller(
-  collect_seller_count: Int,
   treasury_output: Output,
   treasury_in_datum: TreasuryDatum,
   seller_inputs: List<Input>,
@@ -568,6 +556,7 @@ pub fn validate_collect_seller(
   mint_value: Value,
   treasury_hash: ValidatorHash,
 ) -> Bool {
+  let collect_seller_count = list.length(seller_inputs)
   let TreasuryDatum {
     base_asset,
     raise_asset,
@@ -609,12 +598,11 @@ pub fn validate_collect_seller(
     // validate time frame
     start_valid_time_range > end_time,
     // validate Mint Amount
-    mint_value == get_mint_value_of_collect_sellers(
+    mint_value == value.from_asset(
       treasury_hash,
-      collect_seller_count,
+      seller_auth_an,
+      -1 * collect_seller_count,
     ),
-    // validate Seller Inputs
-    list.length(seller_inputs) == collect_seller_count,
     // validate treasury output
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
