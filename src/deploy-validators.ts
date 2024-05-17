@@ -1,7 +1,6 @@
 import * as fs from "fs";
 import path from "path";
 import * as T from "@minswap/translucent";
-import type { MinswapValidators } from "./minswap-amm";
 import type { OutRef, Script, Translucent, Tx, UTxO } from "./types";
 import {
   AuthenMintingPolicyValidateAuthen,
@@ -20,6 +19,12 @@ export type Validators = {
   orderValidator: Script;
   orderValidatorFeedType: Script;
 };
+
+export type MinswapValidators = {
+  authenValidator: Script;
+  factoryValidator: Script;
+  poolValidator: Script;
+}
 
 export function collectValidators(options: {
   t: Translucent;

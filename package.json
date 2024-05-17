@@ -2,7 +2,7 @@
   "name": "lb2",
   "scripts": {
     "build": "rimraf build && rollup -c rollup.config.mjs",
-    "gen-amm-plutus": "bun run blueprint.ts amm-plutus.json src/minswap-amm/plutus.ts && bun run prettier -w src/minswap-amm/plutus.ts",
+    "gen-amm-plutus": "bun run blueprint.ts amm-plutus.json amm-plutus.ts && bun run prettier -w amm-plutus.ts",
     "gen-plutus": "bun run blueprint.ts && bun run prettier -w plutus.ts",
     "init-params": "bun run src/setup.ts init-params",
     "collect-amm-validators": "bun run src/setup.ts collect-amm-validators",

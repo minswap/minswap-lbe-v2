@@ -40,6 +40,15 @@ export function sha3(hex: string): string {
   return hash.digest("hex");
 }
 
+export function normalizedPair(asset1: { policyId: string; assetName: string; }, asset2: { policyId: string; assetName: string; }) {
+  let [assetA, assetB] = [asset1, asset2];
+  if (asset2.policyId < asset1.policyId || (asset2.policyId == asset1.policyId && asset2.assetName < asset1.assetName)) {
+    assetA = asset2;
+    assetB = asset1;
+  }
+  return [assetA, assetB];
+}
+
 export function computeLPAssetName(a: string, b: string): string {
   const normalizedPair = [a, b].sort();
   return sha3(sha3(normalizedPair[0]) + sha3(normalizedPair[1]));
