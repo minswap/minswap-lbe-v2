@@ -1,8 +1,6 @@
 use aiken/dict.{Dict}
 use aiken/hash.{Blake2b_224, Blake2b_256, Hash}
-use aiken/transaction/credential.{
-  Address, Script, StakeCredential, VerificationKey,
-}
+use aiken/transaction/credential.{Address, Script, VerificationKey}
 use aiken/transaction/value.{AssetName, PolicyId}
 
 pub type ValidatorHash =
@@ -60,13 +58,13 @@ pub type TreasuryDatum {
   end_time: Int,
   owner: Address,
   minimum_raise: Option<Int>,
-  // added when collect seller
+  // added when collect seller, descrease when refund
   maximum_raise: Option<Int>,
   reserve_base: Int,
   reserve_raise: Int,
   total_liquidity: Int,
   penalty_config: Option<PenaltyConfig>,
-  // added when collect seller
+  // added when collect seller, descrease when refund
   total_penalty: Int,
   // status: just support CancelLBE
   is_cancelled: Bool,
@@ -78,12 +76,14 @@ pub type TreasuryRedeemer {
   CollectSeller
   CollectOrders
   CreateAmmPool
-  RedeemLP
+  // handle refund in redeem
+  RedeemOrders
   CloseEvent
   // Cancel flow
-  // ... -> CollectOrders -> CancelLBE(less than minimum raise or pool is created) change is_cancelled to True -> Refund -> CloseEvent
+  // ... -> CollectOrders 
+  // -> CancelLBE(less than minimum raise or pool is created) change is_cancelled to True 
+  // -> RedeemOrders(refund) -> CloseEvent
   CancelLBE
-  Refund
 }
 
 pub type SellerDatum {
@@ -114,15 +114,17 @@ pub type OrderRedeemer {
   RedeemOrder
 }
 
+// Profit Sharing Numerator & Denominator
+pub type ProfitSharing =
+  (Int, Int)
+
 pub type PoolDatum {
-  pool_batching_stake_credential: StakeCredential,
   asset_a: Asset,
   asset_b: Asset,
   total_liquidity: Int,
   reserve_a: Int,
   reserve_b: Int,
-  base_fee_a_numerator: Int,
-  base_fee_b_numerator: Int,
-  fee_sharing_numerator_opt: Option<Int>,
-  allow_dynamic_fee: Bool,
+  trading_fee_numerator: Int,
+  trading_fee_denominator: Int,
+  profit_sharing_opt: Option<ProfitSharing>,
 }
