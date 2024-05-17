@@ -51,7 +51,7 @@ pub type TreasuryDatum {
   seller_hash: ValidatorHash,
   order_hash: ValidatorHash,
   seller_count: Int,
-  // increase when collect orders, descrease when collect LP
+  // increase when collect orders, descrease when collect LP or refund
   collected_fund: Int,
   // LBE details
   base_asset: Asset,
@@ -68,6 +68,13 @@ pub type TreasuryDatum {
   penalty_config: Option<PenaltyConfig>,
   // added when collect seller
   total_penalty: Int,
+  // status: just support CancelLBE
+  is_cancelled: Bool,
+}
+
+pub type CancelLBEReason {
+  ExistedPool
+  NotReachMinimumRaise
 }
 
 pub type TreasuryRedeemer {
@@ -78,6 +85,10 @@ pub type TreasuryRedeemer {
   CreateAmmPool
   RedeemLP
   CloseEvent
+  // Cancel flow
+  // ... -> CollectOrders -> CancelLBE(less than minimum raise or pool is created) change is_cancelled to True -> Refund -> CloseEvent
+  CancelLBE { reason: CancelLBEReason }
+  Refund
 }
 
 pub type SellerDatum {
