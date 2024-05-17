@@ -98,11 +98,12 @@ test("example flow", async () => {
     owner: address2PlutusAddress(ACCOUNT_0.address),
     minimumRaise: null,
     maximumRaise: null,
-    reserveBase: 69_000_000_000_000n,
+    reserveBase: 69000000000000n,
     reserveRaise: 0n,
     totalLiquidity: 0n,
     penaltyConfig: null,
     totalPenalty: 0n,
+    isCancelled: false,
   };
   builder = new WarehouseBuilder({ t, validators, deployedValidators });
   let factoryUtxo: UTxO = (
