@@ -13,6 +13,7 @@ import {
   SellerValidatorValidateSellerSpending,
   TreasuryValidatorValidateTreasuryMintingOrWithdrawal,
   TreasuryValidatorValidateTreasurySpending,
+  FeedTypeAmmPool,
 } from "../plutus.ts";
 import {
   FactoryValidatorValidateFactory as AmmValidateFactory,
@@ -92,6 +93,17 @@ export type BuildCancelLBEOptions = {
   treasuryInput: UTxO;
   ammFactoryRefInput?: UTxO;
   validTo?: UnixTime;
+};
+
+export type BuildCreateAmmPoolOptions = {
+  treasuryInput: UTxO;
+  ammFactoryInput: UTxO;
+  ammPoolDatum: FeedTypeAmmPool["_datum"];
+};
+
+export type BuildCloseEventOptions = {
+  treasuryInput: UTxO;
+  factoryInputs: UTxO[];
 }
 
 export class WarehouseBuilder {
@@ -324,6 +336,45 @@ export class WarehouseBuilder {
       },
       () => { this.spendingTreasuryInput(); },
       () => { this.payingTreasuryOutput(treasuryOutDatum); },
+    );
+  }
+
+  public buildCreateAmmPool(options: BuildCreateAmmPoolOptions) {
+    const { treasuryInput, ammFactoryInput, ammPoolDatum } = options;
+    let treasuryOutDatum: TreasuryValidatorValidateTreasurySpending["treasuryInDatum"];
+
+    this.tasks.push(
+      () => {
+        this.treasuryInputs = [treasuryInput];
+        this.treasurySpendRedeemer = { wrapper: "CreateAmmPool" };
+      },
+      () => { this.spendingTreasuryInput(); },
+      () => { this._buildCreateAmmPool({ poolDatum: ammPoolDatum, factoryInput: ammFactoryInput }); },
+      () => { this.payingTreasuryOutput(treasuryOutDatum); },
+    );
+  }
+
+  public buildCloseEvent(options: BuildCloseEventOptions) {
+    const { treasuryInput, factoryInputs } = options;
+    this.tasks.push(
+      () => {
+        this.treasuryInputs = [treasuryInput];
+        this.treasurySpendRedeemer = { wrapper: "CloseEvent" };
+        const treasuryDatum = this.fromDatumTreasury(treasuryInput.datum!);
+
+        this.factoryInputs = factoryInputs;
+        this.factoryRedeemer = {
+          baseAsset: treasuryDatum.baseAsset,
+          raiseAsset: treasuryDatum.raiseAsset,
+          step: "RemoveTreasury",
+        };
+        this.tx!.addSigner(plutusAddress2Address(this.t.network, treasuryDatum.owner));
+      },
+      () => { this.spendingTreasuryInput(); },
+      () => { this.spendingFactoryInput(); },
+      () => { this.mintingTreasuryToken(); },
+      () => { this.mintingFactoryToken(); },
+      () => { this.payingFactoryOutput(); },
     );
   }
 
@@ -645,40 +696,42 @@ export class WarehouseBuilder {
       );
   }
   /************************* AMM *************************/
-  // private buildCreateAmmPool(ammPoolDatum: ) {
-  //   const treasuryDatum = this.fromDatumTreasury(this.treasuryInputs[0]!.datum!);
-  //   const [assetA, assetB] = normalizedPair(treasuryDatum.baseAsset, treasuryDatum.raiseAsset);
-  //   const factoryRedeemer: AmmValidateFactory["redeemer"] = { assetA, assetB };
-  //   const lpAssetName = computeLPAssetName(
-  //     treasuryDatum.baseAsset.policyId + treasuryDatum.baseAsset.assetName,
-  //     treasuryDatum.raiseAsset.policyId + treasuryDatum.raiseAsset.assetName,
-  //   );
-  //   const mintAssets: Assets = {
-  //     [this.ammFactoryToken]: 1n,
-  //     [this.ammPoolToken]: 1n,
-  //     [T.toUnit(this.ammPoolHash, lpAssetName)]: MINSWAP_V2_MAX_LIQUIDITY,
-  //   };
-  //   const headFactoryDatum: AmmValidateFactory["datum"] = {
-  //     head: this.ammFactoryInputs.dat
-  //   }
-  //   this.tx!
-  //     .readFrom([
-  //       this.ammDeployedValidators["authenValidator"],
-  //       this.ammDeployedValidators["factoryValidator"],
-  //     ])
-  //     .collectFrom(
-  //       this.ammFactoryInputs,
-  //       T.Data.to(factoryRedeemer, AmmValidateFactory.redeemer),
-  //     )
-  //     .mintAssets(
-  //       mintAssets,
-  //       T.Data.to("CreatePool", AmmValidateAuthen.redeemer),
-  //     )
-  //     .payToAddressWithData(
-  //       this.ammFactoryAddress,
-  //       {
-  //         inline: 
-  //       }
-  //     );
-  // }
+  private _buildCreateAmmPool(options: { poolDatum: FeedTypeAmmPool["_datum"], factoryInput: UTxO }) {
+    // const { poolDatum, factoryInput } = options;
+    // TODO
+    // const treasuryDatum = this.fromDatumTreasury(this.treasuryInputs[0]!.datum!);
+    // const [assetA, assetB] = normalizedPair(treasuryDatum.baseAsset, treasuryDatum.raiseAsset);
+    // const factoryRedeemer: AmmValidateFactory["redeemer"] = { assetA, assetB };
+    // const lpAssetName = computeLPAssetName(
+    //   treasuryDatum.baseAsset.policyId + treasuryDatum.baseAsset.assetName,
+    //   treasuryDatum.raiseAsset.policyId + treasuryDatum.raiseAsset.assetName,
+    // );
+    // const mintAssets: Assets = {
+    //   [this.ammFactoryToken]: 1n,
+    //   [this.ammPoolToken]: 1n,
+    //   [T.toUnit(this.ammPoolHash, lpAssetName)]: MINSWAP_V2_MAX_LIQUIDITY,
+    // };
+    // const headFactoryDatum: AmmValidateFactory["datum"] = {
+    //   head: this.ammFactoryInputs.dat
+    // }
+    // this.tx!
+    //   .readFrom([
+    //     this.ammDeployedValidators["authenValidator"],
+    //     this.ammDeployedValidators["factoryValidator"],
+    //   ])
+    //   .collectFrom(
+    //     this.ammFactoryInputs,
+    //     T.Data.to(factoryRedeemer, AmmValidateFactory.redeemer),
+    //   )
+    //   .mintAssets(
+    //     mintAssets,
+    //     T.Data.to("CreatePool", AmmValidateAuthen.redeemer),
+    //   )
+    //   .payToAddressWithData(
+    //     this.ammFactoryAddress,
+    //     {
+    //       inline: 
+    //     }
+    //   );
+  }
 }
