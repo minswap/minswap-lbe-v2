@@ -4,13 +4,11 @@ use aiken/transaction/credential.{Inline, ScriptCredential}
 use aiken/transaction/value
 use lb_v2/types.{
   CollectOrder, OrderDatum, OrderRedeemer, RedeemOrder, UpdateOrder,
-  ValidatorHash, WithdrawOrder,
+  ValidatorHash,
 }
 use lb_v2/utils.{order_auth_an}
 
 validator(
-  // // The PolicyID of Authen Minting Policy
-  // authen_policy_id: PolicyId,
   // ValidatorHash of Treasury Contract
   treasury_hash: ValidatorHash,
   // ValidatorHash of Saller Contract
@@ -27,12 +25,6 @@ validator(
     } = context
     expect redeemer: OrderRedeemer = raw_redeemer
     when redeemer is {
-      WithdrawOrder ->
-        value.quantity_of(
-          value.from_minted_value(mint),
-          seller_hash,
-          order_auth_an,
-        ) < 0
       CollectOrder ->
         dict.has_key(withdrawals, Inline(ScriptCredential(treasury_hash)))
       UpdateOrder ->
