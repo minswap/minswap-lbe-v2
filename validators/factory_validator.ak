@@ -269,10 +269,11 @@ validator(
         expect treasury_datum: TreasuryDatum = treasury_datum_raw
         let TreasuryDatum {
           owner,
-          collected_fund,
           is_cancelled,
           start_time,
           seller_count,
+          reserve_raise,
+          total_penalty,
           ..
         } = treasury_datum
         expect Address {
@@ -307,7 +308,8 @@ validator(
             and {
               seller_count == 0,
               is_cancelled == True,
-              collected_fund == 0,
+              reserve_raise == 0,
+              total_penalty == 0,
             }
           },
         }

@@ -8,7 +8,7 @@ use aiken/transaction/credential.{Address, Inline, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
   AddSeller, CancelLBE, CloseEvent, CollectOrders, CollectSeller, CreateAmmPool,
-  CreateTreasury, InitTreasury, PoolDatum, RedeemLP, Refund, SellerDatum,
+  CreateTreasury, InitTreasury, PoolDatum, RedeemOrders, SellerDatum,
   TreasuryDatum, TreasuryRedeemer,
 }
 use lb_v2/utils.{factory_auth_an}
@@ -155,7 +155,7 @@ validator(authen_policy_id: PolicyId) {
         )
       }
       CloseEvent -> {
-        let factory_inputs =
+        expect [_, _] =
           list.filter(
             inputs,
             fn(input) {
@@ -164,7 +164,7 @@ validator(authen_policy_id: PolicyId) {
               value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1
             },
           )
-        list.length(factory_inputs) == 2
+        True
       }
       CreateAmmPool -> {
         let treasury_output =
@@ -184,8 +184,9 @@ validator(authen_policy_id: PolicyId) {
           amm_pool_datum: amm_pool_datum,
         )
       }
-      RedeemLP -> {
-        let TreasuryDatum { seller_hash, order_hash, .. } = treasury_in_datum
+      RedeemOrders -> {
+        let TreasuryDatum { seller_hash, order_hash, total_liquidity, .. } =
+          treasury_in_datum
         let order_inputs =
           validation.get_order_inputs(inputs, seller_hash, order_hash)
         let treasury_output =
@@ -195,14 +196,25 @@ validator(authen_policy_id: PolicyId) {
             treasury_hash,
           )
 
-        validation.validate_redeem_lp(
-          order_inputs: order_inputs,
-          outputs: outputs,
-          treasury_output: treasury_output,
-          treasury_in_datum: treasury_in_datum,
-          treasury_in_value: treasury_in_value,
-          mint_value: mint_value,
-        )
+        if total_liquidity != 0 {
+          validation.validate_redeem_lp(
+            order_inputs: order_inputs,
+            outputs: outputs,
+            treasury_output: treasury_output,
+            treasury_in_datum: treasury_in_datum,
+            treasury_in_value: treasury_in_value,
+            mint_value: mint_value,
+          )
+        } else {
+          validation.validate_refund(
+            order_inputs: order_inputs,
+            outputs: outputs,
+            treasury_output: treasury_output,
+            treasury_in_datum: treasury_in_datum,
+            treasury_in_value: treasury_in_value,
+            mint_value: mint_value,
+          )
+        }
       }
       CancelLBE -> {
         let treasury_output =
@@ -216,25 +228,6 @@ validator(authen_policy_id: PolicyId) {
           treasury_in_value: treasury_in_value,
           treasury_output: treasury_output,
           ref_inputs: reference_inputs,
-        )
-      }
-      Refund -> {
-        let TreasuryDatum { seller_hash, order_hash, .. } = treasury_in_datum
-        let order_inputs =
-          validation.get_order_inputs(inputs, seller_hash, order_hash)
-        let treasury_output =
-          validation.get_treasury_output(
-            outputs,
-            authen_policy_id,
-            treasury_hash,
-          )
-        validation.validate_refund(
-          order_inputs: order_inputs,
-          outputs: outputs,
-          treasury_output: treasury_output,
-          treasury_in_datum: treasury_in_datum,
-          treasury_in_value: treasury_in_value,
-          mint_value: mint_value,
         )
       }
       _ -> False
