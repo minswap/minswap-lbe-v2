@@ -11,6 +11,12 @@ import {
   OrderValidatorValidateOrder,
 } from "../plutus";
 
+import {
+  AuthenMintingPolicyValidateAuthen as MinswapAuthen,
+  PoolValidatorValidatePool as MinswapPool,
+  FactoryValidatorValidateFactory as MinswapFactory,
+} from "../amm-plutus";
+
 export type Validators = {
   authenValidator: Script;
   factoryValidator: Script;
@@ -24,6 +30,30 @@ export type MinswapValidators = {
   authenValidator: Script;
   factoryValidator: Script;
   poolValidator: Script;
+}
+
+export function collectMinswapValidators(options: { t: Translucent, seedOutRef: OutRef }): MinswapValidators {
+  const { t, seedOutRef } = options;
+
+  const authenValidator = new MinswapAuthen({
+    transactionId: { hash: seedOutRef.txHash },
+    outputIndex: BigInt(seedOutRef.outputIndex),
+  });
+  const authenValidatorHash = t.utils.validatorToScriptHash(authenValidator);
+
+  const poolValidator = new MinswapPool(authenValidatorHash);
+  const poolValidatorHash = t.utils.validatorToScriptHash(poolValidator);
+
+  const factoryValidator = new MinswapFactory(
+    authenValidatorHash,
+    poolValidatorHash,
+  );
+
+  return {
+    authenValidator,
+    factoryValidator,
+    poolValidator,
+  };
 }
 
 export function collectValidators(options: {

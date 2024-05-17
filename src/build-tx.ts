@@ -391,26 +391,27 @@ export class WarehouseBuilder {
 
   /************************* PAYING  *************************/
   private payingTreasuryOutput(treasuryDatum: TreasuryValidatorValidateTreasurySpending["treasuryInDatum"]) {
-    const cases: Record<string, Assets> = {
+    const treasuryInputs = [...this.treasuryInputs];
+    const cases: Record<string, () => Assets> = {
       // Create Treasury
-      "None": {
+      "None": () => ({
         [this.treasuryToken]: 1n,
         [T.toUnit(
           treasuryDatum.baseAsset.policyId,
           treasuryDatum.baseAsset.assetName,
         )]: treasuryDatum.reserveBase,
-      },
-      "AddSeller": { ...this.treasuryInputs[0]!.assets },
-      "CancelLBE": { ...this.treasuryInputs[0]!.assets },
-      "CollectSeller": { ...this.treasuryInputs[0]!.assets },
-      "CollectOrders": {}, // increase raise asset
-      "CreateAmmPool": {}, // FIX ME!
+      }),
+      "AddSeller": () => ({ ...treasuryInputs[0]!.assets }),
+      "CancelLBE": () => ({ ...treasuryInputs[0]!.assets }),
+      "CollectSeller": () => ({ ...treasuryInputs[0]!.assets }),
+      "CollectOrders": () => ({}), // increase raise asset
+      "CreateAmmPool": () => ({}), // FIX ME!
       // wait onchain to merge redeemLP and Refund
-      "RedeemLP": {},
-      "Refund": {},
+      "RedeemLP": () => ({}),
+      "Refund": () => ({}),
     }
     const key = this.treasurySpendRedeemer ? this.treasurySpendRedeemer.wrapper : "None";
-    const assets = cases[key];
+    const assets = cases[key]();
     this.tx!
       .payToAddressWithData(
         this.treasuryAddress,
@@ -644,40 +645,40 @@ export class WarehouseBuilder {
       );
   }
   /************************* AMM *************************/
-  private buildCreateAmmPool(ammPoolDatum: ) {
-    const treasuryDatum = this.fromDatumTreasury(this.treasuryInputs[0]!.datum!);
-    const [assetA, assetB] = normalizedPair(treasuryDatum.baseAsset, treasuryDatum.raiseAsset);
-    const factoryRedeemer: AmmValidateFactory["redeemer"] = { assetA, assetB };
-    const lpAssetName = computeLPAssetName(
-      treasuryDatum.baseAsset.policyId + treasuryDatum.baseAsset.assetName,
-      treasuryDatum.raiseAsset.policyId + treasuryDatum.raiseAsset.assetName,
-    );
-    const mintAssets: Assets = {
-      [this.ammFactoryToken]: 1n,
-      [this.ammPoolToken]: 1n,
-      [T.toUnit(this.ammPoolHash, lpAssetName)]: MINSWAP_V2_MAX_LIQUIDITY,
-    };
-    const headFactoryDatum: AmmValidateFactory["datum"] = {
-      head: this.ammFactoryInputs.dat
-    }
-    this.tx!
-      .readFrom([
-        this.ammDeployedValidators["authenValidator"],
-        this.ammDeployedValidators["factoryValidator"],
-      ])
-      .collectFrom(
-        this.ammFactoryInputs,
-        T.Data.to(factoryRedeemer, AmmValidateFactory.redeemer),
-      )
-      .mintAssets(
-        mintAssets,
-        T.Data.to("CreatePool", AmmValidateAuthen.redeemer),
-      )
-      .payToAddressWithData(
-        this.ammFactoryAddress,
-        {
-          inline: 
-        }
-      );
-  }
+  // private buildCreateAmmPool(ammPoolDatum: ) {
+  //   const treasuryDatum = this.fromDatumTreasury(this.treasuryInputs[0]!.datum!);
+  //   const [assetA, assetB] = normalizedPair(treasuryDatum.baseAsset, treasuryDatum.raiseAsset);
+  //   const factoryRedeemer: AmmValidateFactory["redeemer"] = { assetA, assetB };
+  //   const lpAssetName = computeLPAssetName(
+  //     treasuryDatum.baseAsset.policyId + treasuryDatum.baseAsset.assetName,
+  //     treasuryDatum.raiseAsset.policyId + treasuryDatum.raiseAsset.assetName,
+  //   );
+  //   const mintAssets: Assets = {
+  //     [this.ammFactoryToken]: 1n,
+  //     [this.ammPoolToken]: 1n,
+  //     [T.toUnit(this.ammPoolHash, lpAssetName)]: MINSWAP_V2_MAX_LIQUIDITY,
+  //   };
+  //   const headFactoryDatum: AmmValidateFactory["datum"] = {
+  //     head: this.ammFactoryInputs.dat
+  //   }
+  //   this.tx!
+  //     .readFrom([
+  //       this.ammDeployedValidators["authenValidator"],
+  //       this.ammDeployedValidators["factoryValidator"],
+  //     ])
+  //     .collectFrom(
+  //       this.ammFactoryInputs,
+  //       T.Data.to(factoryRedeemer, AmmValidateFactory.redeemer),
+  //     )
+  //     .mintAssets(
+  //       mintAssets,
+  //       T.Data.to("CreatePool", AmmValidateAuthen.redeemer),
+  //     )
+  //     .payToAddressWithData(
+  //       this.ammFactoryAddress,
+  //       {
+  //         inline: 
+  //       }
+  //     );
+  // }
 }

@@ -102,6 +102,23 @@
       "hash": "35ab1c695d27291f7eab5875526848558b9e67b5d5f02a8e68a75b44"
     },
     {
+      "title": "feed_type.amm_pool",
+      "datum": {
+        "title": "_datum",
+        "schema": {
+          "$ref": "#/definitions/lb_v2~1types~1PoolDatum"
+        }
+      },
+      "redeemer": {
+        "title": "_redeemer",
+        "schema": {
+          "$ref": "#/definitions/Data"
+        }
+      },
+      "compiledCode": "5901290100003232323232322322253330054a029309b2b19192999802180118029baa003132323232323232323232323232323232533301730190021323232498c94ccc05cc0540044c8c94ccc070c0780084c92632375a60380046eb4c06800458c94ccc070c078c0780044cdd8180e800980e980f0008b1bac301c001301937540082a66602e66e1d20020011533301a301937540082930b0b180b9baa003301200e301100f1630170013017002375a602a002602a0046eb4c04c004c04c008dd6980880098088011bad300f001300f002375a601a002601a004601600260160046012002600c6ea800c5894ccc010c008c014dd5000899191919299980598068010a4c2c6eb8c02c004c02c008dd7180480098031baa00116370e90002b9a5573aaae7955cfaba157441",
+      "hash": "06b10a81266fca4498b4b674b6dd9c3721e939bfb3e0263267cb0719"
+    },
+    {
       "title": "order_validator.feed_type_order",
       "datum": {
         "title": "_datum",
@@ -301,6 +318,29 @@
         }
       ]
     },
+    "Option$Tuple$Int_Int": {
+      "title": "Optional",
+      "anyOf": [
+        {
+          "title": "Some",
+          "description": "An optional value.",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "$ref": "#/definitions/Tuple$Int_Int"
+            }
+          ]
+        },
+        {
+          "title": "None",
+          "description": "Nothing.",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        }
+      ]
+    },
     "Option$aiken/transaction/credential/Referenced$aiken/transaction/credential/Credential": {
       "title": "Optional",
       "anyOf": [
@@ -389,6 +429,18 @@
               "$ref": "#/definitions/lb_v2~1types~1TreasuryRedeemer"
             }
           ]
+        }
+      ]
+    },
+    "Tuple$Int_Int": {
+      "title": "Tuple",
+      "dataType": "list",
+      "items": [
+        {
+          "$ref": "#/definitions/Int"
+        },
+        {
+          "$ref": "#/definitions/Int"
         }
       ]
     },
@@ -710,6 +762,50 @@
             {
               "title": "percent",
               "$ref": "#/definitions/Int"
+            }
+          ]
+        }
+      ]
+    },
+    "lb_v2/types/PoolDatum": {
+      "title": "PoolDatum",
+      "anyOf": [
+        {
+          "title": "PoolDatum",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "asset_a",
+              "$ref": "#/definitions/lb_v2~1types~1Asset"
+            },
+            {
+              "title": "asset_b",
+              "$ref": "#/definitions/lb_v2~1types~1Asset"
+            },
+            {
+              "title": "total_liquidity",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "reserve_a",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "reserve_b",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "trading_fee_numerator",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "trading_fee_denominator",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "profit_sharing_opt",
+              "$ref": "#/definitions/Option$Tuple$Int_Int"
             }
           ]
         }

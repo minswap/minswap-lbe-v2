@@ -2,12 +2,16 @@ import { beforeEach, expect, test } from "bun:test";
 import * as T from "@minswap/translucent";
 import {
   WarehouseBuilder,
+  type WarehouseBuilderOptions,
 } from "../build-tx";
 import {
   deployValidators,
   type DeployedValidators,
   type Validators,
   collectValidators,
+  type MinswapValidators,
+  deployMinswapValidators,
+  collectMinswapValidators,
 } from "../deploy-validators";
 import {
   generateAccount,
@@ -28,7 +32,9 @@ let ACCOUNT_1: GeneratedAccount;
 let emulator: Emulator;
 let t: Translucent;
 let validators: Validators;
+let ammValidators: MinswapValidators;
 let deployedValidators: DeployedValidators;
+let ammDeployedValidators: DeployedValidators;
 let seedUtxo: UTxO;
 let baseAsset: {
   policyId: string;
@@ -54,7 +60,7 @@ beforeEach(async () => {
   t = await T.Translucent.new(emulator);
   emulator.awaitBlock(10_000); // For validity ranges to be valid
   t.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
-  const utxos = await emulator.getUtxos(ACCOUNT_1.address);
+  let utxos = await emulator.getUtxos(ACCOUNT_1.address);
   seedUtxo = utxos[utxos.length - 1];
   validators = collectValidators({
     t: t,
@@ -65,12 +71,30 @@ beforeEach(async () => {
     dry: true,
   });
   deployedValidators = await deployValidators(t, validators);
-  emulator.awaitBlock(1);
+  emulator.awaitBlock(10);
+
+  let ammSeedUtxo = (await emulator.getUtxos(ACCOUNT_1.address))[utxos.length - 1];
+
+  ammValidators = collectMinswapValidators({
+    t,
+    seedOutRef: {
+      txHash: ammSeedUtxo.txHash,
+      outputIndex: ammSeedUtxo.outputIndex,
+    },
+  });
+  ammDeployedValidators = await deployMinswapValidators(t, ammValidators);
 });
 
 
 test("example flow", async () => {
-  let builder = new WarehouseBuilder({ t, validators, deployedValidators });
+  const options: WarehouseBuilderOptions = {
+    t,
+    validators,
+    deployedValidators,
+    ammValidators,
+    ammDeployedValidators,
+  };
+  let builder = new WarehouseBuilder(options);
   builder.buildInitFactory({ seedUtxo });
   const tx = builder.complete();
 
@@ -105,7 +129,7 @@ test("example flow", async () => {
     totalPenalty: 0n,
     isCancelled: false,
   };
-  builder = new WarehouseBuilder({ t, validators, deployedValidators });
+  builder = new WarehouseBuilder(options);
   let factoryUtxo: UTxO = (
     await emulator.getUtxos(
       t.utils.validatorToAddress(validators.factoryValidator),
@@ -125,7 +149,7 @@ test("example flow", async () => {
   ).find((u) => u.scriptRef === undefined)!;
   let validFrom = t.utils.slotToUnixTime(emulator.slot);
   let validTo = t.utils.slotToUnixTime(emulator.slot + 60 * 10);
-  builder = new WarehouseBuilder({ t, validators, deployedValidators });
+  builder = new WarehouseBuilder(options);
   builder.buildAddSeller({
     treasuryUtxo,
     addSellerCount: 5n,
