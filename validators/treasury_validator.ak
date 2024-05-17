@@ -204,20 +204,18 @@ validator(authen_policy_id: PolicyId) {
           mint_value: mint_value,
         )
       }
-      CancelLBE(reason) -> {
+      CancelLBE -> {
         let treasury_output =
           validation.get_treasury_output(
             outputs,
             authen_policy_id,
             treasury_hash,
           )
-        let pool_ref_input = validation.get_amm_pool_ref_input(reference_inputs)
         validation.validate_cancel_lbe(
-          reason: reason,
           treasury_in_datum: treasury_in_datum,
           treasury_in_value: treasury_in_value,
           treasury_output: treasury_output,
-          pool_ref_input: pool_ref_input,
+          ref_inputs: reference_inputs,
         )
       }
       Refund -> {

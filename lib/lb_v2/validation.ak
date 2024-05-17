@@ -10,9 +10,8 @@ use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
 use lb_v2/types.{
-  Asset, CancelLBEReason, CreateTreasury, ExistedPool, FactoryStep,
-  NotReachMinimumRaise, OrderDatum, PenaltyConfig, PoolDatum, PubKeyHash,
-  RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
+  Asset, CreateTreasury, FactoryStep, OrderDatum, PenaltyConfig, PoolDatum,
+  PubKeyHash, RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
@@ -407,11 +406,11 @@ pub fn get_amm_pool_output(outputs: List<Output>) -> Output {
   pool_output
 }
 
-pub fn get_amm_pool_ref_input(outputs: List<Input>) -> Input {
-  expect [pool_output] =
+pub fn get_amm_pool_ref_inputs(ref_inputs: List<Input>) -> List<Input> {
+  let pool_ref_inputs =
     list.filter(
-      outputs,
-      fn(output) {
+      ref_inputs,
+      fn(ref_input) {
         let Input {
           output: Output {
             address: Address { payment_credential, .. },
@@ -419,7 +418,7 @@ pub fn get_amm_pool_ref_input(outputs: List<Input>) -> Input {
             ..
           },
           ..
-        } = output
+        } = ref_input
         when payment_credential is {
           ScriptCredential(hash) -> and {
               hash == amm_pool_validation_hash,
@@ -433,7 +432,7 @@ pub fn get_amm_pool_ref_input(outputs: List<Input>) -> Input {
         }
       },
     )
-  pool_output
+  pool_ref_inputs
 }
 
 pub fn get_treasury_output(
@@ -1129,11 +1128,10 @@ fn apply_redeeming_lp_order(
 }
 
 pub fn validate_cancel_lbe(
-  reason: CancelLBEReason,
   treasury_in_datum: TreasuryDatum,
   treasury_in_value: Value,
   treasury_output: Output,
-  pool_ref_input: Input,
+  ref_inputs: List<Input>,
 ) -> Bool {
   let TreasuryDatum {
     collected_fund,
@@ -1152,28 +1150,27 @@ pub fn validate_cancel_lbe(
     ..
   } = treasury_output
   expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
-  expect Input { output: Output { datum: InlineDatum(raw_pool_datum), .. }, .. } =
-    pool_ref_input
-  expect PoolDatum { asset_a, asset_b, .. }: PoolDatum = raw_pool_datum
+  let min_raise =
+    when minimum_raise is {
+      None -> 1
+      Some(min_raise) -> min_raise
+    }
   and {
     // 1. collected_fund == reserve_raise+penalty(collected all orders) 
     //          && seller == 0(because when collected_fund == reserve_raise+penalty == 0, it can be Counting phase when trreasury havent collected any seller)
     collected_fund == reserve_raise + total_penalty,
     seller_count == 0,
-    // 2. reason is
-    when reason is {
-      //    - ExistedPool: ref_input having pool that LBE need
-      ExistedPool ->
-        utils.sort_two_assets(base_asset, raise_asset) == (asset_a, asset_b)
-      //    - NotReachMinimumRaise: collected_fund < min_raise
-      NotReachMinimumRaise -> {
-        let min_raise =
-          when minimum_raise is {
-            None -> 1
-            Some(min_raise) -> min_raise
-          }
-        collected_fund < min_raise
-      }
+    // 2. reason
+    if collected_fund < min_raise {
+      True
+    } else {
+      expect [pool_ref_input] = get_amm_pool_ref_inputs(ref_inputs)
+      expect Input {
+        output: Output { datum: InlineDatum(raw_pool_datum), .. },
+        ..
+      } = pool_ref_input
+      expect PoolDatum { asset_a, asset_b, .. }: PoolDatum = raw_pool_datum
+      utils.sort_two_assets(base_asset, raise_asset) == (asset_a, asset_b)
     },
     // 3. Treasury
     //    - Datum: 
