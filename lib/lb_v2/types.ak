@@ -72,11 +72,6 @@ pub type TreasuryDatum {
   is_cancelled: Bool,
 }
 
-pub type CancelLBEReason {
-  ExistedPool
-  NotReachMinimumRaise
-}
-
 pub type TreasuryRedeemer {
   InitTreasury
   AddSeller
@@ -87,7 +82,7 @@ pub type TreasuryRedeemer {
   CloseEvent
   // Cancel flow
   // ... -> CollectOrders -> CancelLBE(less than minimum raise or pool is created) change is_cancelled to True -> Refund -> CloseEvent
-  CancelLBE { reason: CancelLBEReason }
+  CancelLBE
   Refund
 }
 
