@@ -4,7 +4,7 @@ use aiken/transaction/credential.{Inline, ScriptCredential}
 use aiken/transaction/value
 use lb_v2/types.{
   CollectOrder, OrderDatum, OrderRedeemer, RedeemOrder, UpdateOrder,
-  ValidatorHash, WithdrawOrder,
+  ValidatorHash,
 }
 use lb_v2/utils.{order_auth_an}
 
