@@ -104,7 +104,6 @@ pub type OrderDatum {
 
 pub type OrderRedeemer {
   UpdateOrder
-  WithdrawOrder
   CollectOrder
   RedeemOrder
 }
