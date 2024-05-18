@@ -30,6 +30,7 @@
     "@rollup/plugin-json": "^6.1.0"
   },
   "dependencies": {
+    "@minswap/tiny-invariant": "^1.2.0",
     "@minswap/translucent": "link:@minswap/translucent",
     "rollup": "^4.14.1",
     "rollup-plugin-dts": "^6.1.0",

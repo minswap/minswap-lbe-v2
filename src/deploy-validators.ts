@@ -62,7 +62,7 @@ export function collectValidators(options: {
   dry: boolean;
 }): Validators {
   let { t, seedOutRef, dry } = options;
-  if (!seedOutRef) {
+  if (seedOutRef === undefined) {
     const fileContent = fs.readFileSync(path.resolve("params.json"), "utf-8");
     seedOutRef = JSON.parse(fileContent).seedOutRef;
   }
