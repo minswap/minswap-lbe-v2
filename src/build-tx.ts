@@ -87,7 +87,8 @@ export type BuildCollectSellersOptions = {
 };
 
 export type BuildCollectOrdersOptions = {
-  
+  treasuryInput: UTxO;
+  orderInputs: UTxO[];
 };
 
 export type BuildCancelLBEOptions = {
@@ -229,7 +230,7 @@ export class WarehouseBuilder {
       () => { this.mintingTreasuryToken(); },
       () => { this.mintingSellerToken(); },
       () => { this.payingFactoryOutput(); },
-      () => { this.payingTreasuryOutput(treasuryDatum); },
+      () => { this.payingTreasuryOutput({treasuryOutDatum: treasuryDatum}); },
       () => { this.payingSellerOutput(); },
     );
   }
@@ -250,7 +251,7 @@ export class WarehouseBuilder {
       },
       () => { this.spendingTreasuryInput(); },
       () => { this.mintingSellerToken(addSellerCount); },
-      () => { this.payingTreasuryOutput(treasuryOutDatum); },
+      () => { this.payingTreasuryOutput({treasuryOutDatum}); },
       () => { this.payingSellerOutput({ addSellerCount }); },
       () => {
         this.tx
@@ -333,7 +334,7 @@ export class WarehouseBuilder {
         }
       },
       () => { this.spendingTreasuryInput(); },
-      () => { this.payingTreasuryOutput(treasuryOutDatum); },
+      () => { this.payingTreasuryOutput({treasuryOutDatum}); },
     );
   }
 
@@ -348,7 +349,7 @@ export class WarehouseBuilder {
       },
       () => { this.spendingTreasuryInput(); },
       () => { this._buildCreateAmmPool({ poolDatum: ammPoolDatum, factoryInput: ammFactoryInput }); },
-      () => { this.payingTreasuryOutput(treasuryOutDatum); },
+      () => { this.payingTreasuryOutput({treasuryOutDatum}); },
     );
   }
 
@@ -377,6 +378,46 @@ export class WarehouseBuilder {
     );
   }
 
+  public buildCollectOrder(options: BuildCollectOrdersOptions) {
+    const { treasuryInput, orderInputs } = options;
+    invariant(treasuryInput.datum);
+    const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
+    const treasuryOutDatum: TreasuryValidatorValidateTreasurySpending["treasuryInDatum"] = {
+      ...treasuryInDatum,
+    };
+    const orderOutDatums: OrderValidatorFeedTypeOrder["_datum"][] = [];
+    let deltaCollectedFund = 0n;
+
+    for (const o of orderInputs) {
+      invariant(o.datum);
+      const datum: OrderValidatorFeedTypeOrder["_datum"] = {
+        ...this.fromDatumOrder(o.datum),
+        isCollected: true,
+      };
+      orderOutDatums.push(datum);
+      deltaCollectedFund += datum.amount + datum.penaltyAmount;
+    }
+    treasuryOutDatum.collectedFund += deltaCollectedFund;
+
+    this.tasks.push(
+      () => {
+        this.treasuryInputs = [treasuryInput];
+        this.treasurySpendRedeemer = { wrapper: "CollectOrders" };
+        this.orderInputs = orderInputs;
+        this.orderSpendRedeemer = "CollectOrder";
+
+      },
+      () => { this.spendingTreasuryInput() },
+      () => { this.spendingOrderInput() },
+      () => { this.payingTreasuryOutput({treasuryOutDatum, deltaCollectedFund}) },
+      () => { this.payingOrderOutput(...orderOutDatums) },
+    );
+  }
+
+  public buildCollectSeller(options: BuildCollectSellersOptions) {
+
+  }
+
   /************************* PARSER  *************************/
   private fromDatumTreasury(rawDatum: string): TreasuryValidatorValidateTreasurySpending["treasuryInDatum"] {
     return T.Data.from(rawDatum, TreasuryValidatorValidateTreasurySpending.treasuryInDatum);
@@ -400,6 +441,10 @@ export class WarehouseBuilder {
 
   private toDatumSeller(datum: SellerValidatorValidateSellerSpending["sellerInDatum"]): string {
     return T.Data.to(datum, SellerValidatorValidateSellerSpending.sellerInDatum);
+  }
+
+  private fromDatumOrder(rawDatum: string): OrderValidatorFeedTypeOrder["_datum"] {
+    return T.Data.from(rawDatum, OrderValidatorFeedTypeOrder._datum);
   }
 
   private toDatumOrder(datum: OrderValidatorFeedTypeOrder["_datum"]): string {
@@ -465,13 +510,18 @@ export class WarehouseBuilder {
 
 
   /************************* PAYING  *************************/
-  private payingTreasuryOutput(treasuryDatum: TreasuryValidatorValidateTreasurySpending["treasuryInDatum"]) {
+  private payingTreasuryOutput(
+    options: {
+      treasuryOutDatum: TreasuryValidatorValidateTreasurySpending["treasuryInDatum"],
+      deltaCollectedFund?: bigint
+    }) {
+    const { treasuryOutDatum, deltaCollectedFund } = options;
     const innerPay = (assets: Assets) => {
       this.tx
         .payToAddressWithData(
           this.treasuryAddress,
           {
-            inline: this.toDatumTreasury(treasuryDatum),
+            inline: this.toDatumTreasury(treasuryOutDatum),
           },
           assets,
         );
@@ -481,15 +531,20 @@ export class WarehouseBuilder {
       const assets = {
         [this.treasuryToken]: 1n,
         [T.toUnit(
-          treasuryDatum.baseAsset.policyId,
-          treasuryDatum.baseAsset.assetName,
-        )]: treasuryDatum.reserveBase,
+          treasuryOutDatum.baseAsset.policyId,
+          treasuryOutDatum.baseAsset.assetName,
+        )]: treasuryOutDatum.reserveBase,
       };
-      innerPay(assets);      
+      innerPay(assets);
     } else {
       invariant(this.treasuryInputs.length > 0);
-      const assets = {...this.treasuryInputs[0].assets};
-      innerPay(assets);   
+      const assets = { ...this.treasuryInputs[0].assets };
+      if (this.treasurySpendRedeemer.wrapper === "CollectOrders") {
+        invariant(deltaCollectedFund);
+        const raiseAsset = T.toUnit(treasuryOutDatum.raiseAsset.policyId, treasuryOutDatum.raiseAsset.assetName);
+        assets[raiseAsset] = (assets[raiseAsset] ?? 0n) + deltaCollectedFund;
+      }
+      innerPay(assets);
     }
   }
 
@@ -520,8 +575,8 @@ export class WarehouseBuilder {
     option: {
       addSellerCount?: bigint,
       outDatum?: SellerValidatorValidateSellerSpending["sellerInDatum"]
-    } = {addSellerCount: undefined, outDatum: undefined}) {
-    const {addSellerCount, outDatum} = option;
+    } = { addSellerCount: undefined, outDatum: undefined }) {
+    const { addSellerCount, outDatum } = option;
     const innerPay = (datum: SellerValidatorValidateSellerSpending["sellerInDatum"]) => {
       this.tx
         .payToAddressWithData(
@@ -734,8 +789,8 @@ export class WarehouseBuilder {
     const { poolDatum, factoryInput } = options;
     invariant(factoryInput.datum);
     const factoryDatum = T.Data.from(factoryInput.datum, AmmValidateFactory.datum);
-    const factoryRedeemer: AmmValidateFactory["redeemer"] = { 
-      assetA: poolDatum.assetA, 
+    const factoryRedeemer: AmmValidateFactory["redeemer"] = {
+      assetA: poolDatum.assetA,
       assetB: poolDatum.assetB,
     };
     const lpAssetName = computeLPAssetName(
