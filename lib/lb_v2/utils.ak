@@ -57,18 +57,6 @@ pub fn sort_two_assets(asset_a: Asset, asset_b: Asset) -> (Asset, Asset) {
   }
 }
 
-pub fn sorted_asset(asset_a: Asset, asset_b: Asset) -> Bool {
-  let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
-    asset_a
-  let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
-    asset_b
-  if asset_a_policy_id == asset_b_policy_id {
-    builtin.less_than_bytearray(asset_a_asset_name, asset_b_asset_name)
-  } else {
-    builtin.less_than_bytearray(asset_a_policy_id, asset_b_policy_id)
-  }
-}
-
 pub fn compute_lp_asset_name(
   asset_a_policy_id: PolicyId,
   asset_a_asset_name: AssetName,

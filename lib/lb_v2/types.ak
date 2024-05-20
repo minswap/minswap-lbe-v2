@@ -33,8 +33,8 @@ pub type FactoryDatum {
 }
 
 pub type FactoryRedeemer {
-  asset_a: Asset,
-  asset_b: Asset,
+  base_asset: Asset,
+  raise_asset: Asset,
 }
 
 pub type PenaltyConfig {

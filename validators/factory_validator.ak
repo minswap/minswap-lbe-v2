@@ -46,14 +46,14 @@ validator(
       },
       purpose: Spend(factory_ref),
     } = context
-    let FactoryRedeemer { asset_a, asset_b } = redeemer
+    let FactoryRedeemer { base_asset, raise_asset } =
+      redeemer
     let FactoryDatum { head: current_head, tail: current_tail } = datum
+    let (asset_a, asset_b) = sort_two_assets(base_asset, raise_asset)
     let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
       asset_a
     let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
       asset_b
-    // validate that Asset A and Asset B must be sorted
-    expect utils.sorted_asset(asset_a, asset_b)
     let lp_asset_name =
       compute_lp_asset_name(
         asset_a_policy_id,
@@ -158,7 +158,6 @@ validator(
             treasury_auth_an,
           ) == 1
         expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
-        let TreasuryDatum { base_asset, raise_asset, .. } = treasury_out_datum
         // validate that there's default_number_seller Seller UTxOs in the Transaction Outputs
         // Each Seller UTxO must cointain seller_token in the value
         let default_seller_datum =
