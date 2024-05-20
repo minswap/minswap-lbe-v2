@@ -4,7 +4,7 @@ use aiken/hash
 use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
-use lb_v2/types.{Asset, FactoryDatum, PenaltyConfig}
+use lb_v2/types.{Asset, PenaltyConfig}
 
 pub const factory_auth_an = #"666163746f7279"
 
@@ -137,7 +137,9 @@ pub fn sort_two_consecutive_factory_datum(
   datum_a: Data,
   datum_b: Data,
 ) -> (Data, Data) {
-  if builtin.less_than_bytearray(datum_a, datum_b) {
+  let data_a = builtin.serialise_data(datum_a)
+  let data_b = builtin.serialise_data(datum_b)
+  if builtin.less_than_bytearray(data_a, data_b) {
     (datum_a, datum_b)
   } else {
     (datum_b, datum_a)

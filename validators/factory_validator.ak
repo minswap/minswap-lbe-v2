@@ -46,10 +46,9 @@ validator(
       },
       purpose: Spend(factory_ref),
     } = context
-    let FactoryRedeemer { base_asset, raise_asset } =
-      redeemer
+    let FactoryRedeemer { base_asset, raise_asset } = redeemer
     let FactoryDatum { head: current_head, tail: current_tail } = datum
-    let (asset_a, asset_b) = sort_two_assets(base_asset, raise_asset)
+    let (asset_a, asset_b) = utils.sort_two_assets(base_asset, raise_asset)
     let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
       asset_a
     let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
@@ -206,7 +205,7 @@ validator(
       [factory_input_1, factory_input_2] -> {
         expect Input {
           output: Output {
-            datum: factory_input_1_datum,
+            datum: InlineDatum(factory_input_1_raw_datum),
             value: factory_input_1_value,
             ..
           },
@@ -214,26 +213,23 @@ validator(
         } = factory_input_1
         expect Input {
           output: Output {
-            datum: factory_input_2_datum,
+            datum: InlineDatum(factory_input_2_raw_datum),
             value: factory_input_2_value,
             ..
           },
           ..
         } = factory_input_2
-        expect (
-          InlineDatum(FactoryDatum {
-            head: new_f_datum_head,
-            tail: f_datum_tail_lp,
-          }),
-          InlineDatum(FactoryDatum {
-            head: f_datum_head_lp,
-            tail: new_f_datum_tail,
-          }),
-        ) =
+        let (f_in_head_raw_datum, f_in_tail_raw_datum) =
           utils.sort_two_consecutive_factory_datum(
-            factory_input_1_datum,
-            factory_input_2_datum,
+            factory_input_1_raw_datum,
+            factory_input_2_raw_datum,
           )
+        expect f_in_head_datum: FactoryDatum = f_in_head_raw_datum
+        expect f_in_tail_datum: FactoryDatum = f_in_tail_raw_datum
+        let FactoryDatum { head: new_f_datum_head, tail: f_datum_tail_lp } =
+          f_in_head_datum
+        let FactoryDatum { head: f_datum_head_lp, tail: new_f_datum_tail } =
+          f_in_tail_datum
         expect and {
             value.quantity_of(
               factory_input_1_value,
@@ -253,6 +249,7 @@ validator(
           value: f_out_value,
           address: Address { payment_credential: f_out_pc, .. },
           datum: f_out_datum,
+          ..
         } = factory_output
         expect and {
             value.quantity_of(f_out_value, authen_policy_id, factory_auth_an) == 1,
