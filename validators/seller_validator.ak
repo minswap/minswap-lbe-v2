@@ -31,7 +31,6 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
           ..
         } = transaction
         validation.validate_using_seller(
-          authen_policy_id: authen_policy_id,
           treasury_hash: treasury_hash,
           out_ref: out_ref,
           seller_in_datum: seller_in_datum,

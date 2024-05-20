@@ -14,7 +14,7 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   compute_lp_asset_name, default_number_seller, factory_auth_an, seller_auth_an,
-  sort_two_assets, treasury_auth_an,
+  treasury_auth_an,
 }
 use lb_v2/validation
 
@@ -27,30 +27,33 @@ validator(
   order_hash: ValidatorHash,
   // ValidatorHash of Seller Contract
   seller_hash: ValidatorHash,
+  // ValidatorHash of Config Contract
+  config_hash: ValidatorHash,
 ) {
   fn validate_factory(
     datum: FactoryDatum,
     redeemer: FactoryRedeemer,
     context: ScriptContext,
   ) {
-    let ScriptContext { transaction, purpose } = context
-    expect Spend(factory_ref) = purpose
-    let Transaction {
-      inputs,
-      mint,
-      outputs,
-      extra_signatories,
-      validity_range,
-      ..
-    } = transaction
-    let FactoryRedeemer { base_asset, raise_asset, step: factory_step } =
-      redeemer
+    expect ScriptContext {
+      transaction: Transaction {
+        inputs,
+        mint,
+        outputs,
+        extra_signatories,
+        validity_range,
+        ..
+      },
+      purpose: Spend(factory_ref),
+    } = context
+    let FactoryRedeemer { asset_a, asset_b } = redeemer
     let FactoryDatum { head: current_head, tail: current_tail } = datum
-    let (asset_a, asset_b) = sort_two_assets(base_asset, raise_asset)
     let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
       asset_a
     let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
       asset_b
+    // validate that Asset A and Asset B must be sorted
+    expect utils.sorted_asset(asset_a, asset_b)
     let lp_asset_name =
       compute_lp_asset_name(
         asset_a_policy_id,
@@ -58,110 +61,88 @@ validator(
         asset_b_policy_id,
         asset_b_asset_name,
       )
-    expect Some(factory_input) =
+    expect Some(Input {
+      output: Output {
+        address: Address { payment_credential: factory_payment_credential, .. },
+        ..
+      },
+      ..
+    }) =
       list.find(
         inputs,
         fn(input) {
-          let Input { output_reference: out_ref, output: Output { value, .. } } =
-            input
-          and {
-            out_ref == factory_ref,
-            value.quantity_of(value, authen_policy_id, factory_auth_an) == 1,
-          }
+          let Input { output_reference: out_ref, .. } = input
+          out_ref == factory_ref
         },
       )
-    let Input { output: Output { address: factory_address, .. }, .. } =
-      factory_input
-    let Address { payment_credential: factory_payment_credential, .. } =
-      factory_address
-    when factory_step is {
-      CreateTreasury -> {
-        // validate that there's only 1 Factory UTxO in the Transaction Inputs
-        expect [_] =
-          list.filter(
-            inputs,
-            fn(input) {
-              let Input {
-                output: Output {
-                  address: Address { payment_credential: payment_cred, .. },
-                  ..
-                },
-                ..
-              } = input
-              factory_payment_credential == payment_cred
-            },
-          )
+    let factory_inputs =
+      list.filter(
+        inputs,
+        fn(input) {
+          let Input {
+            output: Output { address: Address { payment_credential, .. }, .. },
+            ..
+          } = input
+          payment_credential == factory_payment_credential
+        },
+      )
+    when factory_inputs is {
+      [factory_input] -> {
+        // validate legitimate of factory input 
+        let Input { output: Output { value: factory_input_value, .. }, .. } =
+          factory_input
+        expect
+          value.quantity_of(
+            factory_input_value,
+            authen_policy_id,
+            factory_auth_an,
+          ) == 1
         expect [f_out_head, f_out_tail] =
           list.filter(
             outputs,
             fn(output) {
-              let Output { address: out_addr, value: out_value, .. } = output
-              and {
-                out_addr == factory_address,
-                value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1,
-              }
+              let Output { address: Address { payment_credential, .. }, .. } =
+                output
+              payment_credential == factory_payment_credential
             },
           )
-        expect Output { datum: InlineDatum(f_out_head_raw_datum), .. } =
+        let Output { datum: f_out_head_datum, value: f_out_head_value, .. } =
           f_out_head
-        expect Output { datum: InlineDatum(f_out_tail_raw_datum), .. } =
+        let Output { datum: f_out_tail_datum, value: f_out_tail_value, .. } =
           f_out_tail
-        expect f_out_head_datum: FactoryDatum = f_out_head_raw_datum
-        expect f_out_tai_datum: FactoryDatum = f_out_tail_raw_datum
+        // validate factory outputs
+        expect and {
+            // validate that new Factory UTxO datum must be followed by Linked List rule
+            // (old head, old tail) -> (old head, LP Token Name) and (LP Token Name, old tail)
+            // old head < LP Token Name < old tail
+            builtin.less_than_bytearray(current_head, lp_asset_name),
+            builtin.less_than_bytearray(lp_asset_name, current_tail),
+            value.quantity_of(
+              f_out_head_value,
+              authen_policy_id,
+              factory_auth_an,
+            ) == 1,
+            value.quantity_of(
+              f_out_tail_value,
+              authen_policy_id,
+              factory_auth_an,
+            ) == 1,
+            f_out_head_datum == InlineDatum(
+              FactoryDatum { head: current_head, tail: lp_asset_name },
+            ),
+            f_out_tail_datum == InlineDatum(
+              FactoryDatum { head: lp_asset_name, tail: current_tail },
+            ),
+          }
         // validate that there's only 1 Treasury UTxO in the Transaction Outputs
         // Treasury UTxO must contain treasury_token in the value
         expect [treasury_out] =
           list.filter(
             outputs,
             fn(output) {
-              let Output { address: out_addr, value: out_value, .. } = output
-              let Address { payment_credential, .. } = out_addr
-              and {
-                value.quantity_of(out_value, authen_policy_id, treasury_auth_an) == 1,
-                when payment_credential is {
-                  ScriptCredential(hash) -> treasury_hash == hash
-                  _ -> False
-                },
-              }
-            },
-          )
-        // validate that there's default_number_seller Seller UTxOs in the Transaction Outputs
-        // Each Seller UTxO must cointain seller_token in the value
-        let seller_outputs =
-          list.filter(
-            outputs,
-            fn(output) {
-              let Output { address: out_addr, value: out_value, .. } = output
-              let Address { payment_credential, .. } = out_addr
-              and {
-                value.quantity_of(out_value, treasury_hash, seller_auth_an) == 1,
-                when payment_credential is {
-                  ScriptCredential(hash) -> seller_hash == hash
-                  _ -> False
-                },
-              }
-            },
-          )
-        expect list.length(seller_outputs) == default_number_seller
-        expect
-          list.all(
-            seller_outputs,
-            fn(seller_output) {
-              expect Output { datum: InlineDatum(seller_raw_datum), .. } =
-                seller_output
-              expect seller_datum: SellerDatum = seller_raw_datum
-              let SellerDatum {
-                base_asset: s_base_asset,
-                raise_asset: s_raise_asset,
-                amount: s_amount,
-                penalty_amount: s_penalty_amount,
-              } = seller_datum
-              and {
-                s_base_asset == base_asset,
-                s_raise_asset == raise_asset,
-                s_amount == 0,
-                s_penalty_amount == 0,
-              }
+              let Output { address: Address { payment_credential, .. }, .. } =
+                output
+              payment_credential == ScriptCredential(treasury_hash)
             },
           )
         expect Output {
@@ -169,25 +150,42 @@ validator(
           datum: InlineDatum(treasury_out_raw_datum),
           ..
         } = treasury_out
+        // validate legitimate of treasury output
+        expect
+          value.quantity_of(
+            treasury_out_value,
+            authen_policy_id,
+            treasury_auth_an,
+          ) == 1
         expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
+        let TreasuryDatum { base_asset, raise_asset, .. } = treasury_out_datum
+        // validate that there's default_number_seller Seller UTxOs in the Transaction Outputs
+        // Each Seller UTxO must cointain seller_token in the value
+        let default_seller_datum =
+          SellerDatum { base_asset, raise_asset, amount: 0, penalty_amount: 0 }
+        let seller_outputs =
+          list.filter(
+            outputs,
+            fn(output) {
+              let Output {
+                address: Address { payment_credential, .. },
+                value: out_value,
+                datum,
+                ..
+              } = output
+              and {
+                value.quantity_of(out_value, treasury_hash, seller_auth_an) == 1,
+                payment_credential == ScriptCredential(seller_hash),
+                datum == InlineDatum(default_seller_datum),
+              }
+            },
+          )
+        expect list.length(seller_outputs) == default_number_seller
         and {
-          // validate that new Factory UTxO datum must be followed by Linked List rule
-          // (old head, old tail) -> (old head, LP Token Name) and (LP Token Name, old tail)
-          // old head < LP Token Name < old tail
-          builtin.less_than_bytearray(current_head, lp_asset_name),
-          builtin.less_than_bytearray(lp_asset_name, current_tail),
-          f_out_head_datum == FactoryDatum {
-            head: current_head,
-            tail: lp_asset_name,
-          },
-          f_out_tai_datum == FactoryDatum {
-            head: lp_asset_name,
-            tail: current_tail,
-          },
           value.from_minted_value(mint) == validation.get_value_of_minting_treasury(
             authen_policy_id: authen_policy_id,
             treasury_policy_id: treasury_hash,
-            step: factory_step,
+            step: CreateTreasury,
           ),
           validation.validate_creating_treasury_out(
             treasury_out_value: treasury_out_value,
@@ -198,66 +196,86 @@ validator(
             seller_hash: seller_hash,
             authen_policy_id: authen_policy_id,
           ),
+          validation.validate_new_config_out(
+            outputs: outputs,
+            treasury_datum: treasury_out_datum,
+            treasury_hash: treasury_hash,
+            config_hash: config_hash,
+          ),
         }
       }
-      RemoveTreasury -> {
-        expect [factory_input_1, factory_input_2] =
-          list.filter(
-            inputs,
-            fn(input) {
-              let Input {
-                output: Output { address: out_addr, value: out_value, .. },
-                ..
-              } = input
-              and {
-                out_addr == factory_address,
-                value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1,
-              }
-            },
-          )
+      [factory_input_1, factory_input_2] -> {
         expect Input {
-          output: Output { datum: InlineDatum(factory_input_1_raw_datum), .. },
+          output: Output {
+            datum: factory_input_1_datum,
+            value: factory_input_1_value,
+            ..
+          },
           ..
         } = factory_input_1
         expect Input {
-          output: Output { datum: InlineDatum(factory_input_2_raw_datum), .. },
+          output: Output {
+            datum: factory_input_2_datum,
+            value: factory_input_2_value,
+            ..
+          },
           ..
         } = factory_input_2
-        expect factory_input_1_datum: FactoryDatum = factory_input_1_raw_datum
-        expect factory_input_2_datum: FactoryDatum = factory_input_2_raw_datum
-        let FactoryDatum { head: f1_head, tail: f1_tail } =
-          factory_input_1_datum
-        let FactoryDatum { head: f2_head, tail: f2_tail } =
-          factory_input_2_datum
-        expect [new_factory_head, new_factory_tail] =
-          if f1_head == lp_asset_name && f2_tail == lp_asset_name {
-            [f2_head, f1_tail]
-          } else if f1_tail == lp_asset_name && f2_head == lp_asset_name {
-            [f1_head, f2_tail]
-          } else {
-            fail
+        expect (
+          InlineDatum(FactoryDatum {
+            head: new_f_datum_head,
+            tail: f_datum_tail_lp,
+          }),
+          InlineDatum(FactoryDatum {
+            head: f_datum_head_lp,
+            tail: new_f_datum_tail,
+          }),
+        ) =
+          utils.sort_two_consecutive_factory_datum(
+            factory_input_1_datum,
+            factory_input_2_datum,
+          )
+        expect and {
+            value.quantity_of(
+              factory_input_1_value,
+              authen_policy_id,
+              treasury_auth_an,
+            ) == 1,
+            value.quantity_of(
+              factory_input_2_value,
+              authen_policy_id,
+              treasury_auth_an,
+            ) == 1,
+            f_datum_tail_lp == lp_asset_name,
+            f_datum_head_lp == lp_asset_name,
           }
         expect Some(factory_output) = list.head(outputs)
-        expect factory_output.address == factory_address
-        expect
-          value.quantity_of(
-            factory_output.value,
-            authen_policy_id,
-            factory_auth_an,
-          ) == 1
-        expect Output { datum: InlineDatum(factory_out_raw_datum), .. } =
-          factory_output
-        expect factory_out_datum: FactoryDatum = factory_out_raw_datum
+        let Output {
+          value: f_out_value,
+          address: Address { payment_credential: f_out_pc, .. },
+          datum: f_out_datum,
+        } = factory_output
+        expect and {
+            value.quantity_of(f_out_value, authen_policy_id, factory_auth_an) == 1,
+            f_out_pc == factory_payment_credential,
+            f_out_datum == InlineDatum(
+              FactoryDatum { head: new_f_datum_head, tail: new_f_datum_tail },
+            ),
+          }
         expect [treasury_in] =
           list.filter(
             inputs,
             fn(input) {
               let Input {
-                output: Output { address: out_addr, value: out_value, .. },
+                output: Output {
+                  address: Address { payment_credential, .. },
+                  value: out_value,
+                  ..
+                },
                 ..
               } = input
               and {
-                out_addr == factory_address,
+                payment_credential == ScriptCredential(treasury_hash),
                 value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1,
               }
             },
@@ -289,15 +307,10 @@ validator(
           ..
         } = validity_range
         and {
-          builtin.less_than_bytearray(new_factory_head, new_factory_tail),
-          factory_out_datum == FactoryDatum {
-            head: new_factory_head,
-            tail: new_factory_tail,
-          },
           value.from_minted_value(mint) == validation.get_value_of_minting_treasury(
             authen_policy_id: authen_policy_id,
             treasury_policy_id: treasury_hash,
-            step: factory_step,
+            step: RemoveTreasury,
           ),
           list.has(extra_signatories, owner_pkh),
           if end_valid_time_range < start_time {
@@ -314,6 +327,7 @@ validator(
           },
         }
       }
+      _ -> False
     }
   }
 }

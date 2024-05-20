@@ -23,8 +23,8 @@ pub type FactoryStep {
 }
 
 pub type AuthenRedeemer {
-  MintFactory
-  MintTreasury { step: FactoryStep }
+  Initialization
+  UsingFactory
 }
 
 pub type FactoryDatum {
@@ -33,15 +33,28 @@ pub type FactoryDatum {
 }
 
 pub type FactoryRedeemer {
-  base_asset: Asset,
-  raise_asset: Asset,
-  step: FactoryStep,
+  asset_a: Asset,
+  asset_b: Asset,
 }
 
 pub type PenaltyConfig {
   penalty_start_time: Int,
   penalty_end_time: Int,
   percent: Int,
+}
+
+pub type ConfigDatum {
+  order_hash: ValidatorHash,
+  base_asset: Asset,
+  raise_asset: Asset,
+  start_time: Int,
+  end_time: Int,
+  penalty_config: Option<PenaltyConfig>,
+}
+
+pub type ConfigRedeemer {
+  UpdateConfig
+  UsingConfig
 }
 
 pub type TreasuryDatum {
@@ -84,6 +97,7 @@ pub type TreasuryRedeemer {
   // -> CancelLBE(less than minimum raise or pool is created) change is_cancelled to True 
   // -> RedeemOrders(refund) -> CloseEvent
   CancelLBE
+  UpdateLBE
 }
 
 pub type SellerDatum {

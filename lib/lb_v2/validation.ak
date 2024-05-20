@@ -10,12 +10,13 @@ use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
 use lb_v2/types.{
-  Asset, CreateTreasury, FactoryStep, OrderDatum, PenaltyConfig, PoolDatum,
-  PubKeyHash, RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
+  Asset, ConfigDatum, CreateTreasury, FactoryStep, OrderDatum, PenaltyConfig,
+  PoolDatum, PubKeyHash, RemoveTreasury, SellerDatum, TreasuryDatum,
+  ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  calculate_penalty, compute_asset_name_from_base_and_raise,
+  calculate_penalty, compute_asset_name_from_base_and_raise, config_auth_an,
   default_burn_liquidity, default_number_seller, factory_auth_an, fee_ada,
   get_order_value, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
 }
@@ -29,9 +30,11 @@ pub fn get_value_of_minting_treasury(
     CreateTreasury ->
       value.from_asset(authen_policy_id, factory_auth_an, 1)
         |> value.add(authen_policy_id, treasury_auth_an, 1)
+        |> value.add(treasury_policy_id, config_auth_an, 1)
         |> value.add(treasury_policy_id, seller_auth_an, default_number_seller)
     RemoveTreasury ->
       value.from_asset(authen_policy_id, factory_auth_an, -1)
+        |> value.add(treasury_policy_id, config_auth_an, -1)
         |> value.add(authen_policy_id, treasury_auth_an, -1)
   }
 }
@@ -335,35 +338,22 @@ pub fn get_treasury_input_by_out_ref(
   treasury_input
 }
 
-pub fn get_treasury_ref_input_datum(
+pub fn get_config_ref_input_datum(
   reference_inputs: List<Input>,
-  authen_policy_id: PolicyId,
   treasury_hash: ValidatorHash,
-) -> TreasuryDatum {
-  expect [treasury_ref_input] =
+) -> ConfigDatum {
+  expect [config_ref_input] =
     list.filter(
       reference_inputs,
       fn(input) {
-        let Input {
-          output: Output {
-            address: Address { payment_credential, .. },
-            value: out_value,
-            ..
-          },
-          ..
-        } = input
-        and {
-          value.quantity_of(out_value, authen_policy_id, treasury_auth_an) == 1,
-          payment_credential == ScriptCredential(treasury_hash),
-        }
+        let Input { output: Output { value: out_value, .. }, .. } = input
+        value.quantity_of(out_value, treasury_hash, order_auth_an) == 1
       },
     )
-  expect Input {
-    output: Output { datum: InlineDatum(raw_treasury_datum), .. },
-    ..
-  } = treasury_ref_input
-  expect treasury_datum: TreasuryDatum = raw_treasury_datum
-  treasury_datum
+  expect Input { output: Output { datum: InlineDatum(raw_datum), .. }, .. } =
+    config_ref_input
+  expect datum: ConfigDatum = raw_datum
+  datum
 }
 
 pub fn get_seller_input_by_out_ref(
@@ -622,7 +612,6 @@ pub fn validate_collect_seller(
 }
 
 pub fn validate_using_seller(
-  authen_policy_id: PolicyId,
   treasury_hash: ValidatorHash,
   out_ref: OutputReference,
   seller_in_datum: SellerDatum,
@@ -664,26 +653,21 @@ pub fn validate_using_seller(
       },
     )
   // Validate Datums
-  let treasury_datum =
-    get_treasury_ref_input_datum(
-      reference_inputs,
-      authen_policy_id,
-      treasury_hash,
-    )
+  let config_datum = get_config_ref_input_datum(reference_inputs, treasury_hash)
   let order_inputs =
-    get_order_inputs(inputs, seller_hash, treasury_datum.order_hash)
+    get_order_inputs(inputs, seller_hash, config_datum.order_hash)
   let order_outputs =
-    get_order_outputs(outputs, seller_hash, treasury_datum.order_hash)
+    get_order_outputs(outputs, seller_hash, config_datum.order_hash)
   let (delta_amount, delta_penalty) =
     apply_order(
       order_inputs: order_inputs,
       order_outputs: order_outputs,
-      penalty_config: treasury_datum.penalty_config,
+      penalty_config: config_datum.penalty_config,
       start_valid_time_range: start_valid_time_range,
       end_valid_time_range: end_valid_time_range,
       seller_hash: seller_hash,
-      base_asset: treasury_datum.base_asset,
-      raise_asset: treasury_datum.base_asset,
+      base_asset: config_datum.base_asset,
+      raise_asset: config_datum.base_asset,
       extra_signatories: extra_signatories,
     )
   let order_input_count = list.length(order_inputs)
@@ -702,19 +686,19 @@ pub fn validate_using_seller(
       treasury_policy_id: treasury_hash,
       seller_hash: seller_hash,
       seller_datum: SellerDatum {
-        base_asset: treasury_datum.base_asset,
-        raise_asset: treasury_datum.raise_asset,
+        base_asset: config_datum.base_asset,
+        raise_asset: config_datum.raise_asset,
         amount: seller_in_datum.amount + delta_amount,
         penalty_amount: seller_in_datum.penalty_amount + delta_penalty,
       },
     )
   and {
     // validate LBE ID
-    treasury_datum.base_asset == seller_in_datum.base_asset,
-    treasury_datum.raise_asset == seller_in_datum.raise_asset,
+    config_datum.base_asset == seller_in_datum.base_asset,
+    config_datum.raise_asset == seller_in_datum.raise_asset,
     // validate time frame
-    treasury_datum.start_time < start_valid_time_range,
-    treasury_datum.end_time > end_valid_time_range,
+    config_datum.start_time < start_valid_time_range,
+    config_datum.end_time > end_valid_time_range,
     // validate minting
     is_valid_minting,
   }
@@ -1349,4 +1333,44 @@ fn apply_refund_order(
     amount,
     penalty_amount,
   )
+}
+
+pub fn validate_new_config_out(
+  outputs: List<Output>,
+  treasury_datum: TreasuryDatum,
+  treasury_hash: ValidatorHash,
+  config_hash: ValidatorHash,
+) -> Bool {
+  expect [config_output] =
+    list.filter(
+      outputs,
+      fn(output) {
+        let Output { address: Address { payment_credential, .. }, .. } = output
+        payment_credential == ScriptCredential(config_hash)
+      },
+    )
+  expect Output {
+    value: config_out_value,
+    datum: InlineDatum(config_raw_datum),
+    ..
+  } = config_output
+  expect value.quantity_of(config_out_value, treasury_hash, config_auth_an) == 1
+  expect config_datum: ConfigDatum = config_raw_datum
+  let TreasuryDatum {
+    order_hash,
+    base_asset,
+    raise_asset,
+    start_time,
+    end_time,
+    penalty_config,
+    ..
+  } = treasury_datum
+  config_datum == ConfigDatum {
+    order_hash,
+    base_asset,
+    raise_asset,
+    start_time,
+    end_time,
+    penalty_config,
+  }
 }

@@ -23,9 +23,9 @@ import type {
   Translucent,
   UTxO,
 } from "../types";
-import type { TreasuryValidatorValidateTreasurySpending } from "../../plutus";
-import { address2PlutusAddress } from "../utils";
-import { DEFAULT_NUMBER_SELLER } from "../constants";
+import { FactoryValidatorValidateFactory, type TreasuryValidatorValidateTreasurySpending } from "../../plutus";
+import { address2PlutusAddress, computeLPAssetName } from "../utils";
+import { DEFAULT_NUMBER_SELLER, LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -85,6 +85,24 @@ beforeEach(async () => {
   ammDeployedValidators = await deployMinswapValidators(t, ammValidators);
 });
 
+test("quick", async()=>{
+  const lpAssetName = computeLPAssetName(
+    baseAsset.policyId + baseAsset.assetName,
+    "",
+  );
+  const factoryDatumHead: FactoryValidatorValidateFactory["datum"] = {
+    head: LBE_INIT_FACTORY_HEAD,
+    tail: lpAssetName,
+  }
+  const factoryDatumTail: FactoryValidatorValidateFactory["datum"] = {
+    head: lpAssetName,
+    tail: LBE_INIT_FACTORY_TAIL,
+  }
+  const headRaw = T.Data.to(factoryDatumHead, FactoryValidatorValidateFactory.datum);
+  const tailRaw = T.Data.to(factoryDatumTail, FactoryValidatorValidateFactory.datum);
+  console.log({headRaw, tailRaw});
+  expect(headRaw < tailRaw).toBeTruthy();
+});
 
 test("example flow", async () => {
   const options: WarehouseBuilderOptions = {

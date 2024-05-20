@@ -4,7 +4,7 @@ use aiken/hash
 use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
-use lb_v2/types.{Asset, PenaltyConfig}
+use lb_v2/types.{Asset, FactoryDatum, PenaltyConfig}
 
 pub const factory_auth_an = #"666163746f7279"
 
@@ -13,6 +13,8 @@ pub const treasury_auth_an = #"7472656173757279"
 pub const seller_auth_an = #"73656c6c6572"
 
 pub const order_auth_an = #"6f72646572"
+
+pub const config_auth_an = #"636f6e666967"
 
 pub const default_number_seller = 20
 
@@ -52,6 +54,18 @@ pub fn sort_two_assets(asset_a: Asset, asset_b: Asset) -> (Asset, Asset) {
     } else {
       (asset_b, asset_a)
     }
+  }
+}
+
+pub fn sorted_asset(asset_a: Asset, asset_b: Asset) -> Bool {
+  let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
+    asset_a
+  let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
+    asset_b
+  if asset_a_policy_id == asset_b_policy_id {
+    builtin.less_than_bytearray(asset_a_asset_name, asset_b_asset_name)
+  } else {
+    builtin.less_than_bytearray(asset_a_policy_id, asset_b_policy_id)
   }
 }
 
@@ -129,4 +143,15 @@ pub fn compute_asset_name_from_base_and_raise(
     asset_b_policy_id,
     asset_b_asset_name,
   )
+}
+
+pub fn sort_two_consecutive_factory_datum(
+  datum_a: Data,
+  datum_b: Data,
+) -> (Data, Data) {
+  if builtin.less_than_bytearray(datum_a, datum_b) {
+    (datum_a, datum_b)
+  } else {
+    (datum_b, datum_a)
+  }
 }

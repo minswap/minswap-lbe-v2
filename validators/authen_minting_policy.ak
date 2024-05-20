@@ -3,18 +3,16 @@ use aiken/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, ScriptContext, Transaction,
 }
 use aiken/transaction/value
-use lb_v2/types.{
-  AuthenRedeemer, CreateTreasury, FactoryDatum, MintFactory, MintTreasury,
-  RemoveTreasury,
-}
+use lb_v2/types.{AuthenRedeemer, FactoryDatum, Initialization, UsingFactory}
 use lb_v2/utils.{factory_auth_an}
 
 validator(out_ref: OutputReference) {
   fn validate_authen(redeemer: AuthenRedeemer, context: ScriptContext) {
-    let ScriptContext { transaction, purpose } = context
-    expect Mint(authen_policy_id) = purpose
+    expect ScriptContext { transaction, purpose: Mint(authen_policy_id) } =
+      context
     when redeemer is {
-      MintFactory -> {
+      // This redeemer can be called once to initialize the whole LBE system
+      Initialization -> {
         let Transaction { inputs, mint, outputs, .. } = transaction
         // validate that `out_ref` must be presented in the Transaction Inputs
         expect [_] =
@@ -36,7 +34,7 @@ validator(out_ref: OutputReference) {
           }
         // validate that there's only 1 Factory UTxO in the Transaction Outputs
         // The Factory UTxO must contain Factory Token in the value
-        expect [factory_output] =
+        expect [Output { datum, .. }] =
           list.filter(
             outputs,
             fn(output) {
@@ -44,29 +42,23 @@ validator(out_ref: OutputReference) {
               value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1
             },
           )
-        expect Output { datum: InlineDatum(factory_datum), .. } = factory_output
-        expect FactoryDatum { head, tail }: FactoryDatum = factory_datum
-        and {
-          head == #"00",
-          tail == #"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
-        }
+        datum == InlineDatum(
+          FactoryDatum {
+            head: #"00",
+            tail: #"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
+          },
+        )
       }
-      MintTreasury { step } -> {
+      UsingFactory -> {
         let Transaction { inputs, .. } = transaction
-        let factory_inputs =
-          list.filter(
-            inputs,
-            fn(input) {
-              let Input { output, .. } = input
-              let Output { value: out_value, .. } = output
-              value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1
-            },
-          )
-        let count_factory_inputs = list.length(factory_inputs)
-        when step is {
-          CreateTreasury -> count_factory_inputs == 1
-          RemoveTreasury -> count_factory_inputs == 2
-        }
+        // Foward logic to Factory Validator
+        list.any(
+          inputs,
+          fn(input) {
+            let Input { output: Output { value: out_value, .. }, .. } = input
+            value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1
+          },
+        )
       }
     }
   }

@@ -3,8 +3,7 @@ use aiken/transaction.{ScriptContext, Spend, Transaction}
 use aiken/transaction/credential.{Inline, ScriptCredential}
 use aiken/transaction/value
 use lb_v2/types.{
-  CollectOrder, OrderDatum, OrderRedeemer, RedeemOrder, UpdateOrder,
-  ValidatorHash,
+  CollectOrder, OrderRedeemer, RedeemOrder, UpdateOrder, ValidatorHash,
 }
 use lb_v2/utils.{order_auth_an}
 
@@ -36,16 +35,5 @@ validator(
           order_auth_an,
         ) < 0
     }
-  }
-}
-
-// this is unused, only used to access the type in blueprints
-validator {
-  fn feed_type_order(
-    _datum: OrderDatum,
-    _redeemer: OrderRedeemer,
-    _ctx: ScriptContext,
-  ) -> Bool {
-    False
   }
 }
