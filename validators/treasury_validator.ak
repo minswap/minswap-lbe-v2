@@ -1,10 +1,12 @@
-// use aiken/interval.{Finite, Interval, IntervalBound}
+use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Mint, Output, ScriptContext, Spend, Transaction,
   WithdrawFrom,
 }
-use aiken/transaction/credential.{Address, Inline, ScriptCredential}
+use aiken/transaction/credential.{
+  Address, Inline, ScriptCredential, VerificationKeyCredential,
+}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
   CancelLBE, CloseEvent, CollectManager, CollectOrders, CreateAmmPool, PoolDatum,
@@ -26,6 +28,7 @@ validator(authen_policy_id: PolicyId) {
       mint,
       validity_range,
       reference_inputs,
+      extra_signatories,
       ..
     } = transaction
     let treasury_input =
@@ -61,20 +64,69 @@ validator(authen_policy_id: PolicyId) {
         },
       )
     let mint_value = value.from_minted_value(mint)
-    // expect Interval {
-    //   upper_bound: IntervalBound {
-    //     bound_type: Finite(end_valid_time_range),
-    //     ..
-    //   },
-    //   lower_bound: IntervalBound {
-    //     bound_type: Finite(start_valid_time_range),
-    //     ..
-    //   },
-    // } = validity_range
+    expect Interval {
+      upper_bound: IntervalBound {
+        bound_type: Finite(end_valid_time_range),
+        ..
+      },
+      lower_bound: IntervalBound {
+        bound_type: Finite(_start_valid_time_range),
+        ..
+      },
+    } = validity_range
+    // need to check all minting value to not burn manager auth beacause it forward logic to this contract
     when redeemer is {
       // UpdateLBE before discovery phase
-      UpdateLBE -> False
+      UpdateLBE -> {
+        let TreasuryDatum {
+          manager_hash,
+          seller_hash,
+          order_hash,
+          base_asset,
+          raise_asset,
+          owner,
+          start_time,
+          ..
+        } = treasury_in_datum
+        expect Address {
+          payment_credential: VerificationKeyCredential(owner_pkh),
+          ..
+        } = owner
+        let treasury_output =
+          validation.get_treasury_output(
+            outputs,
+            authen_policy_id,
+            treasury_hash,
+          )
+        expect Output {
+          value: treasury_out_value,
+          datum: InlineDatum(raw_treasury_out_datum),
+          ..
+        } = treasury_output
+        expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
+        and {
+          // before discovery phase
+          end_valid_time_range < start_time,
+          // sign by project owner
+          list.has(extra_signatories, owner_pkh),
+          // create new one
+          validation.validate_creating_treasury_out(
+            treasury_out_value: treasury_out_value,
+            treasury_out_datum: treasury_out_datum,
+            base_asset: base_asset,
+            raise_asset: raise_asset,
+            manager_hash: manager_hash,
+            seller_hash: seller_hash,
+            order_hash: order_hash,
+            authen_policy_id: authen_policy_id,
+          ),
+          // mint nothing
+          mint_value == value.zero(),
+        }
+      }
+
       CollectManager -> {
+        // TODO: handle collect for cancel 
         let treasury_output =
           validation.get_treasury_output(
             outputs,
@@ -119,6 +171,7 @@ validator(authen_policy_id: PolicyId) {
         )
       }
       CloseEvent -> {
+        // forward logic to factory
         expect [_, _] =
           list.filter(
             inputs,
@@ -140,6 +193,7 @@ validator(authen_policy_id: PolicyId) {
         let pool_output = validation.get_amm_pool_output(outputs)
         expect Output { datum: InlineDatum(pool_raw_datum), .. } = pool_output
         expect amm_pool_datum: PoolDatum = pool_raw_datum
+        // TODO: check mint value of this function to make sure tx not burn manager token
         validation.validate_create_dex_pool(
           treasury_in_datum: treasury_in_datum,
           treasury_output: treasury_output,
@@ -187,12 +241,15 @@ validator(authen_policy_id: PolicyId) {
             authen_policy_id,
             treasury_hash,
           )
-        validation.validate_cancel_lbe(
-          treasury_in_datum: treasury_in_datum,
-          treasury_in_value: treasury_in_value,
-          treasury_output: treasury_output,
-          ref_inputs: reference_inputs,
-        )
+        and {
+          validation.validate_cancel_lbe(
+            treasury_in_datum: treasury_in_datum,
+            treasury_in_value: treasury_in_value,
+            treasury_output: treasury_output,
+            ref_inputs: reference_inputs,
+          ),
+          mint_value == value.zero(),
+        }
       }
     }
   }
@@ -211,9 +268,9 @@ validator(authen_policy_id: PolicyId) {
         validation.has_spend_treasury(inputs, authen_policy_id, script_hash)
       }
       Mint(treasury_policy_id) -> or {
-          // create Treasury
+          // create Treasury -> forward logic to factory
           value.quantity_of(mint_value, authen_policy_id, treasury_auth_an) == 1,
-          // Collect Seller Manager
+          // Collect Manager -> forward logic to treasury spending -> spending must check mint value
           validation.has_spend_treasury(
             inputs,
             authen_policy_id,

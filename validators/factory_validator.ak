@@ -7,7 +7,7 @@ use aiken/transaction.{
 use aiken/transaction/credential.{
   Address, ScriptCredential, VerificationKeyCredential,
 }
-use aiken/transaction/value.{PolicyId}
+use aiken/transaction/value.{PolicyId, ada_policy_id}
 use lb_v2/types.{
   Asset, FactoryDatum, FactoryRedeemer, ManagerDatum, SellerDatum, TreasuryDatum,
   ValidatorHash,
@@ -87,6 +87,7 @@ validator(
       )
     when factory_inputs is {
       [factory_input] -> {
+        // 1. Validate 1 factory In and 2 Factory Outs
         // validate legitimate of factory input 
         let Input { output: Output { value: factory_input_value, .. }, .. } =
           factory_input
@@ -133,6 +134,7 @@ validator(
               FactoryDatum { head: lp_asset_name, tail: current_tail },
             ),
           }
+        // 2. Validate Treasury Out
         // validate that there's only 1 Treasury UTxO in the Transaction Outputs
         // Treasury UTxO must contain treasury_token in the value
         expect [treasury_out] =
@@ -150,6 +152,18 @@ validator(
           ..
         } = treasury_out
         expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
+        expect
+          validation.validate_creating_treasury_out(
+            treasury_out_value: treasury_out_value,
+            treasury_out_datum: treasury_out_datum,
+            base_asset: base_asset,
+            raise_asset: raise_asset,
+            manager_hash: manager_hash,
+            seller_hash: seller_hash,
+            order_hash: order_hash,
+            authen_policy_id: authen_policy_id,
+          )
+        // 3. Validate Manager Out
         // seller manager 
         expect [manager_out] =
           list.filter(
@@ -166,6 +180,16 @@ validator(
           ..
         } = manager_out
         expect manager_datum: ManagerDatum = manager_out_raw_datum
+        expect
+          validation.validate_creating_manager_out(
+            base_asset: base_asset,
+            raise_asset: raise_asset,
+            manager_out_value: manager_out_value,
+            manager_out_datum: manager_datum,
+            treasury_hash: treasury_hash,
+            seller_hash: seller_hash,
+          )
+        // 4. Validate Sellers
         // validate that there's default_number_seller Seller UTxOs in the Transaction Outputs
         // Each Seller UTxO must cointain seller_token in the value
         let default_seller_datum =
@@ -189,32 +213,22 @@ validator(
           )
         expect list.length(seller_outputs) == default_number_seller
         and {
+          // 5. Mint value
           value.from_minted_value(mint) == validation.get_value_of_minting_treasury(
             authen_policy_id: authen_policy_id,
             treasury_policy_id: treasury_hash,
             manager_policy_id: manager_hash,
             is_create_treasury: True,
           ),
-          validation.validate_creating_treasury_out(
-            treasury_out_value: treasury_out_value,
-            treasury_out_datum: treasury_out_datum,
-            base_asset: base_asset,
-            raise_asset: raise_asset,
-            order_hash: order_hash,
-            manager_hash: manager_hash,
-            authen_policy_id: authen_policy_id,
-          ),
-          validation.validate_creating_manager_out(
-            base_asset: base_asset,
-            raise_asset: raise_asset,
-            manager_out_value: manager_out_value,
-            manager_out_datum: manager_datum,
-            treasury_hash: treasury_hash,
-            seller_hash: seller_hash,
-          ),
+          // 6. Base-Raise Asset
+          // base asset must not ada
+          // base != raise
+          base_asset.policy_id != ada_policy_id,
+          base_asset != raise_asset,
         }
       }
       [factory_input_1, factory_input_2] -> {
+        // 1. Validate 2 Factory inputs and 1 Factory Output
         expect Input {
           output: Output {
             datum: InlineDatum(factory_input_1_raw_datum),
@@ -270,6 +284,7 @@ validator(
               FactoryDatum { head: new_f_datum_head, tail: new_f_datum_tail },
             ),
           }
+        // 2. Validate treasury in 
         expect [treasury_in] =
           list.filter(
             inputs,
@@ -299,6 +314,7 @@ validator(
           start_time,
           reserve_raise,
           total_penalty,
+          is_manager_collected,
           ..
         } = treasury_datum
         expect Address {
@@ -325,9 +341,10 @@ validator(
             // cancel before LBE
             True
           } else {
-            // cancel beacause fail
+            // cancel beacause fail + Collected All sellers and manager + refunded all
             and {
               is_cancelled == True,
+              is_manager_collected == True,
               reserve_raise == 0,
               total_penalty == 0,
             }

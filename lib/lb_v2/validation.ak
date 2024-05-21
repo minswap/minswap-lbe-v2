@@ -38,26 +38,20 @@ pub fn get_value_of_minting_treasury(
   }
 }
 
-pub fn get_mint_value_of_add_sellers(
-  treasury_policy_id: PolicyId,
-  add_seller_count: Int,
-) -> Value {
-  expect add_seller_count > 0
-  value.from_asset(treasury_policy_id, seller_auth_an, add_seller_count)
-}
-
 pub fn validate_creating_treasury_out(
   treasury_out_value: Value,
   treasury_out_datum: TreasuryDatum,
   base_asset: Asset,
   raise_asset: Asset,
-  order_hash: ValidatorHash,
   manager_hash: ValidatorHash,
+  seller_hash: ValidatorHash,
+  order_hash: ValidatorHash,
   authen_policy_id: PolicyId,
 ) -> Bool {
   // check all field except owner
   let TreasuryDatum {
     manager_hash: t_manager_hash,
+    seller_hash: t_seller_hash,
     order_hash: t_order_hash,
     collected_fund,
     base_asset: t_base_asset,
@@ -72,6 +66,7 @@ pub fn validate_creating_treasury_out(
     penalty_config,
     total_penalty,
     is_cancelled,
+    is_manager_collected,
     ..
   } = treasury_out_datum
   let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
@@ -81,15 +76,13 @@ pub fn validate_creating_treasury_out(
       |> value.add(authen_policy_id, treasury_auth_an, 1)
       |> value.add(base_asset_pid, base_asset_an, reserve_base)
   and {
-    // base asset must not ada
-    base_asset_pid != ada_policy_id,
     // treasury datum
     manager_hash == t_manager_hash,
+    seller_hash == t_seller_hash,
     order_hash == t_order_hash,
     collected_fund == 0,
     t_base_asset == base_asset,
     t_raise_asset == raise_asset,
-    base_asset != raise_asset,
     value.without_lovelace(treasury_out_value) == expected_treasury_out_value,
     start_time > 0,
     start_time < end_time,
@@ -121,6 +114,7 @@ pub fn validate_creating_treasury_out(
     },
     total_penalty == 0,
     is_cancelled == False,
+    is_manager_collected == False,
   }
 }
 
@@ -391,7 +385,7 @@ pub fn get_manager_inputs(
   )
 }
 
-pub fn get_treasury_input_by_ref_inputs(
+pub fn get_treasury_ref_inputs(
   ref_inputs: List<Input>,
   authen_policy_id: PolicyId,
   treasury_hash: ValidatorHash,
@@ -668,11 +662,7 @@ pub fn validate_using_seller(
     )
   // Validate Datums
   expect [treasury_ref_input] =
-    get_treasury_input_by_ref_inputs(
-      reference_inputs,
-      authen_policy_id,
-      treasury_hash,
-    )
+    get_treasury_ref_inputs(reference_inputs, authen_policy_id, treasury_hash)
   expect Input {
     output: Output { datum: InlineDatum(raw_treasury_datum), .. },
     ..
@@ -1383,14 +1373,8 @@ pub fn validate_manage_seller(
       ..
     },
   } = validity_range
-  let TreasuryDatum {
-    base_asset,
-    raise_asset,
-    // start_time,
-    end_time,
-    is_cancelled,
-    ..
-  } = treasury_datum
+  let TreasuryDatum { base_asset, raise_asset, end_time, is_cancelled, .. } =
+    treasury_datum
   let ManagerDatum {
     base_asset: sm_base_asset,
     raise_asset: sm_raise_asset,
@@ -1462,15 +1446,12 @@ pub fn validate_manage_seller(
         },
       )
     and {
-      True,
       // no seller outputs
       list.length(seller_outputs) == 0,
       // mint value
-      mint_value == value.from_asset(
-        manager_hash,
-        seller_auth_an,
-        -seller_input_count,
-      ),
+      value.flatten(mint_value) == [
+        (manager_hash, seller_auth_an, -seller_input_count),
+      ],
       // update datum
       manager_out_datum == ManagerDatum {
         ..manager_in_datum,

@@ -84,7 +84,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
             },
           )
         expect [treasury_ref_input] =
-          validation.get_treasury_input_by_ref_inputs(
+          validation.get_treasury_ref_inputs(
             ref_inputs: reference_inputs,
             authen_policy_id: authen_policy_id,
             treasury_hash: treasury_hash,
@@ -129,12 +129,8 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
         )
       }
       SpendManager ->
-        // TODO: check treasury use which redeemer
-        validation.has_spend_treasury(
-          inputs: inputs,
-          authen_policy_id: authen_policy_id,
-          treasury_hash: treasury_hash,
-        )
+        // this line forward logic to treasury minting+make sure dont mint any seller
+        value.flatten(mint_value) == [(treasury_hash, manager_auth_an, -1)]
     }
   }
 

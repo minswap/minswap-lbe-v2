@@ -19,6 +19,7 @@ pub type Asset {
 
 pub type AuthenRedeemer {
   Initialization
+  // check factory exist in inputs
   UsingFactory
 }
 
@@ -61,17 +62,27 @@ pub type TreasuryDatum {
   // added when collect manager once, descrease when refund
   total_penalty: Int,
   is_cancelled: Bool,
+  is_manager_collected: Bool,
 }
 
 pub type TreasuryRedeemer {
+  // collect manager to update reserve_raise and total_penalty
+  // or collect when cancelled
   CollectManager
+  // collect fund from orders
   CollectOrders
+  // create pool
   CreateAmmPool
-  // handle refund in redeem
+  // redeem LP or refund if cancel
   RedeemOrders
+  // Close event after refund by cancel or close LBE before discovery phase
   CloseEvent
-  // change cancelled = True to block creating more orders or refund collected fund
+  // change status to cancel 
+  // If Not enough fund 
+  //    or pool created 
+  // =>next step: CollectManager -> RedeemOrders(refund)
   CancelLBE
+  // update LBE before discovery phase
   UpdateLBE
 }
 
@@ -84,8 +95,11 @@ pub type ManagerDatum {
   total_penalty: Int,
 }
 
-// no need beacause we can get it by time in Treasury datum through ref input
 pub type ManagerRedeemer {
+  // ManageSeller = AddSeller | CollectSeller 
+  // depend the time range
+  //    - AddSeller before end discovery
+  //    - CollectSeller after end discovery
   ManageSeller
   SpendManager
 }
@@ -118,6 +132,7 @@ pub type OrderRedeemer {
   RedeemOrder
 }
 
+// AMM TYPE
 // Profit Sharing Numerator & Denominator
 pub type ProfitSharing =
   (Int, Int)
