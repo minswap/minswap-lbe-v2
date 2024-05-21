@@ -10,7 +10,7 @@ use aiken/transaction/credential.{
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
   Asset, CreateTreasury, FactoryDatum, FactoryRedeemer, RemoveTreasury,
-  SellerDatum, TreasuryDatum, ValidatorHash,
+  SellerDatum, SellerManagerDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   compute_lp_asset_name, default_number_seller, factory_auth_an, seller_auth_an,
@@ -27,8 +27,8 @@ validator(
   order_hash: ValidatorHash,
   // ValidatorHash of Seller Contract
   seller_hash: ValidatorHash,
-  // ValidatorHash of Config Contract
-  config_hash: ValidatorHash,
+  // ValidatorHash of Seller Contract
+  seller_manager_hash: ValidatorHash,
 ) {
   fn validate_factory(
     datum: FactoryDatum,
@@ -149,14 +149,24 @@ validator(
           datum: InlineDatum(treasury_out_raw_datum),
           ..
         } = treasury_out
-        // validate legitimate of treasury output
-        expect
-          value.quantity_of(
-            treasury_out_value,
-            authen_policy_id,
-            treasury_auth_an,
-          ) == 1
         expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
+        // seller manager 
+        expect [seller_manager_out] =
+          list.filter(
+            outputs,
+            fn(output) {
+              let Output { address: Address { payment_credential, .. }, .. } =
+                output
+              payment_credential == ScriptCredential(seller_manager_hash)
+            },
+          )
+        expect Output {
+          value: seller_manager_out_value,
+          datum: InlineDatum(seller_manager_out_raw_datum),
+          ..
+        } = seller_manager_out
+        expect seller_manager_datum: SellerManagerDatum =
+          seller_manager_out_raw_datum
         // validate that there's default_number_seller Seller UTxOs in the Transaction Outputs
         // Each Seller UTxO must cointain seller_token in the value
         let default_seller_datum =
@@ -172,7 +182,11 @@ validator(
                 ..
               } = output
               and {
-                value.quantity_of(out_value, treasury_hash, seller_auth_an) == 1,
+                value.quantity_of(
+                  out_value,
+                  seller_manager_hash,
+                  seller_auth_an,
+                ) == 1,
                 payment_credential == ScriptCredential(seller_hash),
                 datum == InlineDatum(default_seller_datum),
               }
@@ -183,6 +197,7 @@ validator(
           value.from_minted_value(mint) == validation.get_value_of_minting_treasury(
             authen_policy_id: authen_policy_id,
             treasury_policy_id: treasury_hash,
+            seller_manager_policy_id: seller_manager_hash,
             step: CreateTreasury,
           ),
           validation.validate_creating_treasury_out(
@@ -191,14 +206,16 @@ validator(
             base_asset: base_asset,
             raise_asset: raise_asset,
             order_hash: order_hash,
-            seller_hash: seller_hash,
+            seller_manager_hash: seller_manager_hash,
             authen_policy_id: authen_policy_id,
           ),
-          validation.validate_new_config_out(
-            outputs: outputs,
-            treasury_datum: treasury_out_datum,
+          validation.validate_creating_seller_manager_out(
+            base_asset: base_asset,
+            raise_asset: raise_asset,
+            seller_manager_out_value: seller_manager_out_value,
+            seller_manager_out_datum: seller_manager_datum,
             treasury_hash: treasury_hash,
-            config_hash: config_hash,
+            seller_hash: seller_hash,
           ),
         }
       }
@@ -285,7 +302,6 @@ validator(
           owner,
           is_cancelled,
           start_time,
-          seller_count,
           reserve_raise,
           total_penalty,
           ..
@@ -306,6 +322,7 @@ validator(
           value.from_minted_value(mint) == validation.get_value_of_minting_treasury(
             authen_policy_id: authen_policy_id,
             treasury_policy_id: treasury_hash,
+            seller_manager_policy_id: seller_manager_hash,
             step: RemoveTreasury,
           ),
           list.has(extra_signatories, owner_pkh),
@@ -315,7 +332,6 @@ validator(
           } else {
             // cancel beacause fail
             and {
-              seller_count == 0,
               is_cancelled == True,
               reserve_raise == 0,
               total_penalty == 0,

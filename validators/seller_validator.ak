@@ -8,7 +8,11 @@ use lb_v2/types.{
 use lb_v2/utils.{seller_auth_an}
 use lb_v2/validation
 
-validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
+validator(
+  authen_policy_id: PolicyId,
+  treasury_hash: ValidatorHash,
+  seller_manager_hash: ValidatorHash,
+) {
   fn validate_seller_spending(
     seller_in_datum: SellerDatum,
     redeemer: SellerRedeemer,
@@ -40,6 +44,8 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
           validity_range: validity_range,
           extra_signatories: extra_signatories,
           mint_value: mint_value,
+          authen_policy_id: authen_policy_id,
+          seller_manager_hash: seller_manager_hash,
         )
       }
       _ -> False
@@ -67,7 +73,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
       }
       CollectOrderToken ->
         validation.has_spend_treasury(inputs, authen_policy_id, treasury_hash)
-      _ -> False
+      CountingSeller -> False
     }
   }
 }

@@ -1,4 +1,4 @@
-use aiken/interval.{Finite, Interval, IntervalBound}
+// use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Mint, Output, ScriptContext, Spend, Transaction,
@@ -7,9 +7,8 @@ use aiken/transaction.{
 use aiken/transaction/credential.{Address, Inline, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  AddSeller, CancelLBE, CloseEvent, CollectOrders, CollectSeller, CreateAmmPool,
-  CreateTreasury, InitTreasury, PoolDatum, RedeemOrders, SellerDatum,
-  TreasuryDatum, TreasuryRedeemer,
+  CancelLBE, CloseEvent, CollectOrders, CollectSellerManager, CreateAmmPool,
+  PoolDatum, RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
 }
 use lb_v2/utils.{factory_auth_an}
 use lb_v2/validation
@@ -62,75 +61,40 @@ validator(authen_policy_id: PolicyId) {
         },
       )
     let mint_value = value.from_minted_value(mint)
-    expect Interval {
-      upper_bound: IntervalBound {
-        bound_type: Finite(end_valid_time_range),
-        ..
-      },
-      lower_bound: IntervalBound {
-        bound_type: Finite(start_valid_time_range),
-        ..
-      },
-    } = validity_range
+    // expect Interval {
+    //   upper_bound: IntervalBound {
+    //     bound_type: Finite(end_valid_time_range),
+    //     ..
+    //   },
+    //   lower_bound: IntervalBound {
+    //     bound_type: Finite(start_valid_time_range),
+    //     ..
+    //   },
+    // } = validity_range
     when redeemer is {
-      AddSeller -> {
+      // UpdateLBE before discovery phase
+      UpdateLBE -> False
+      CollectSellerManager -> {
         let treasury_output =
           validation.get_treasury_output(
             outputs,
             authen_policy_id,
             treasury_hash,
           )
-        let TreasuryDatum { seller_hash, base_asset, raise_asset, .. } =
-          treasury_in_datum
-        let seller_outputs =
-          validation.get_seller_outputs(
-            outputs: outputs,
-            treasury_policy_id: treasury_hash,
-            seller_hash: seller_hash,
-            seller_datum: SellerDatum {
-              base_asset,
-              raise_asset,
-              amount: 0,
-              penalty_amount: 0,
-            },
-          )
-        expect [] =
-          validation.get_seller_inputs(
+        let TreasuryDatum { seller_manager_hash, .. } = treasury_in_datum
+        expect [seller_manager_input] =
+          validation.get_seller_manager_inputs(
             inputs: inputs,
             treasury_policy_id: treasury_hash,
-            seller_hash: seller_hash,
+            seller_manager_hash: seller_manager_hash,
           )
-        validation.validate_add_seller(
+        validation.validate_collect_seller_manager(
           treasury_output: treasury_output,
           treasury_in_datum: treasury_in_datum,
-          treasury_in_value: treasury_in_value,
+          seller_manager_input: seller_manager_input,
+          // start_valid_time_range: start_valid_time_range,
           mint_value: mint_value,
           treasury_hash: treasury_hash,
-          seller_outputs: seller_outputs,
-          end_valid_time_range: end_valid_time_range,
-        )
-      }
-      CollectSeller -> {
-        let treasury_output =
-          validation.get_treasury_output(
-            outputs,
-            authen_policy_id,
-            treasury_hash,
-          )
-        let TreasuryDatum { seller_hash, .. } = treasury_in_datum
-        let seller_inputs =
-          validation.get_seller_inputs(
-            inputs: inputs,
-            treasury_policy_id: treasury_hash,
-            seller_hash: seller_hash,
-          )
-        validation.validate_collect_seller(
-          treasury_output: treasury_output,
-          treasury_in_datum: treasury_in_datum,
-          mint_value: mint_value,
-          treasury_hash: treasury_hash,
-          seller_inputs: seller_inputs,
-          start_valid_time_range: start_valid_time_range,
         )
       }
       CollectOrders -> {
@@ -230,49 +194,39 @@ validator(authen_policy_id: PolicyId) {
           ref_inputs: reference_inputs,
         )
       }
-      _ -> False
     }
   }
 
   fn validate_treasury_minting_or_withdrawal(
-    redeemer: TreasuryRedeemer,
+    _redeemer: Data,
     context: ScriptContext,
   ) {
     let ScriptContext { purpose, transaction } = context
-    let Transaction { inputs, mint, .. } = transaction
-    let mint_value = value.from_minted_value(mint)
-    when redeemer is {
-      CollectOrders -> {
-        expect WithdrawFrom(stake_credential) = purpose
+    let Transaction { inputs, .. } = transaction
+    // let mint_value = value.from_minted_value(mint)
+    when purpose is {
+      WithdrawFrom(stake_credential) -> {
+        // collect orders
         expect Inline(ScriptCredential(script_hash)) = stake_credential
         validation.has_spend_treasury(inputs, authen_policy_id, script_hash)
       }
-      other_redeemer -> {
-        expect Mint(treasury_policy_id) = purpose
-        when other_redeemer is {
-          InitTreasury ->
-            mint_value == validation.get_value_of_minting_treasury(
-              authen_policy_id: authen_policy_id,
-              treasury_policy_id: treasury_policy_id,
-              step: CreateTreasury,
-            )
-          AddSeller ->
-            // foward logic to spending treasury
-            validation.has_spend_treasury(
-              inputs,
-              authen_policy_id,
-              treasury_policy_id,
-            )
-          CollectSeller ->
-            // foward logic to spending treasury
-            validation.has_spend_treasury(
-              inputs,
-              authen_policy_id,
-              treasury_policy_id,
-            )
-          _ -> False
+      Mint(treasury_policy_id) -> or {
+          // create Treasury
+          // TODO
+          // mint_value == validation.get_value_of_minting_treasury(
+          //   authen_policy_id: authen_policy_id,
+          //   treasury_policy_id: treasury_policy_id,
+          //   step: CreateTreasury,
+          // ),
+          False,
+          // Collect Seller Manager
+          validation.has_spend_treasury(
+            inputs,
+            authen_policy_id,
+            treasury_policy_id,
+          ),
         }
-      }
+      _ -> False
     }
   }
 }

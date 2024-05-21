@@ -14,7 +14,7 @@ pub const seller_auth_an = #"73656c6c6572"
 
 pub const order_auth_an = #"6f72646572"
 
-pub const config_auth_an = #"636f6e666967"
+pub const manager_auth_an = #"4d616e61676572"
 
 pub const default_number_seller = 20
 

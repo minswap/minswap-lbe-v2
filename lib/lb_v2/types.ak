@@ -43,25 +43,11 @@ pub type PenaltyConfig {
   percent: Int,
 }
 
-pub type ConfigDatum {
-  order_hash: ValidatorHash,
-  base_asset: Asset,
-  raise_asset: Asset,
-  start_time: Int,
-  end_time: Int,
-  penalty_config: Option<PenaltyConfig>,
-}
-
-pub type ConfigRedeemer {
-  UpdateConfig
-  UsingConfig
-}
-
 pub type TreasuryDatum {
   // Protocol Info
+  seller_manager_hash: ValidatorHash,
   seller_hash: ValidatorHash,
   order_hash: ValidatorHash,
-  seller_count: Int,
   // increase when collect orders, descrease when collect LP or refund
   collected_fund: Int,
   // LBE details
@@ -84,9 +70,7 @@ pub type TreasuryDatum {
 }
 
 pub type TreasuryRedeemer {
-  InitTreasury
-  AddSeller
-  CollectSeller
+  CollectSellerManager
   CollectOrders
   CreateAmmPool
   // handle refund in redeem
@@ -98,6 +82,21 @@ pub type TreasuryRedeemer {
   // -> RedeemOrders(refund) -> CloseEvent
   CancelLBE
   UpdateLBE
+}
+
+pub type SellerManagerDatum {
+  seller_hash: ValidatorHash,
+  base_asset: Asset,
+  raise_asset: Asset,
+  seller_count: Int,
+  reserve_raise: Int,
+  total_penalty: Int,
+}
+
+// no need beacause we can get it by time in Treasury datum through ref input
+pub type SellerManagerRedeemer {
+  ManageSeller
+  SpendSellerManager
 }
 
 pub type SellerDatum {
