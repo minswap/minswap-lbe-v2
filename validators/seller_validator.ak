@@ -60,7 +60,7 @@ validator(
       context
     when redeemer is {
       UsingSeller -> {
-        let seller_policy_id =
+        let seller_hash =
           when purpose is {
             Mint(policy_id) -> policy_id
             WithdrawFrom(stake_credential) -> {
@@ -69,7 +69,7 @@ validator(
             }
             _ -> fail
           }
-        validation.has_spend_seller(inputs, treasury_hash, seller_policy_id)
+        validation.has_spend_seller(inputs, manager_hash, seller_hash)
       }
       CollectOrderToken ->
         validation.has_spend_treasury(inputs, authen_policy_id, treasury_hash)

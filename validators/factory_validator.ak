@@ -9,8 +9,8 @@ use aiken/transaction/credential.{
 }
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  Asset, CreateTreasury, FactoryDatum, FactoryRedeemer, ManagerDatum,
-  RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
+  Asset, FactoryDatum, FactoryRedeemer, ManagerDatum, SellerDatum, TreasuryDatum,
+  ValidatorHash,
 }
 use lb_v2/utils.{
   compute_lp_asset_name, default_number_seller, factory_auth_an, seller_auth_an,
@@ -193,7 +193,7 @@ validator(
             authen_policy_id: authen_policy_id,
             treasury_policy_id: treasury_hash,
             manager_policy_id: manager_hash,
-            step: CreateTreasury,
+            is_create_treasury: True,
           ),
           validation.validate_creating_treasury_out(
             treasury_out_value: treasury_out_value,
@@ -318,7 +318,7 @@ validator(
             authen_policy_id: authen_policy_id,
             treasury_policy_id: treasury_hash,
             manager_policy_id: manager_hash,
-            step: RemoveTreasury,
+            is_create_treasury: False,
           ),
           list.has(extra_signatories, owner_pkh),
           if end_valid_time_range < start_time {

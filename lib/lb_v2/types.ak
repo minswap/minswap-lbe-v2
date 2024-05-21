@@ -17,11 +17,6 @@ pub type Asset {
   asset_name: AssetName,
 }
 
-pub type FactoryStep {
-  CreateTreasury
-  RemoveTreasury
-}
-
 pub type AuthenRedeemer {
   Initialization
   UsingFactory
@@ -57,15 +52,14 @@ pub type TreasuryDatum {
   end_time: Int,
   owner: Address,
   minimum_raise: Option<Int>,
-  // added when collect seller, descrease when refund
+  // added when collect manager once, descrease when refund
   maximum_raise: Option<Int>,
   reserve_base: Int,
   reserve_raise: Int,
   total_liquidity: Int,
   penalty_config: Option<PenaltyConfig>,
-  // added when collect seller, descrease when refund
+  // added when collect manager once, descrease when refund
   total_penalty: Int,
-  // status: just support CancelLBE
   is_cancelled: Bool,
 }
 
@@ -76,10 +70,7 @@ pub type TreasuryRedeemer {
   // handle refund in redeem
   RedeemOrders
   CloseEvent
-  // Cancel flow
-  // ... -> CollectOrders 
-  // -> CancelLBE(less than minimum raise or pool is created) change is_cancelled to True 
-  // -> RedeemOrders(refund) -> CloseEvent
+  // change cancelled = True to block creating more orders or refund collected fund
   CancelLBE
   UpdateLBE
 }

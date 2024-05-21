@@ -1,13 +1,12 @@
 use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Mint, Output, ScriptContext, Spend, Transaction,
-  WithdrawFrom,
 }
-use aiken/transaction/credential.{Address, Inline, ScriptCredential}
+use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  CollectOrderToken, ManageSeller, ManagerDatum, ManagerRedeemer, SellerDatum,
-  SellerRedeemer, SpendManager, TreasuryDatum, UsingSeller, ValidatorHash,
+  ManageSeller, ManagerDatum, ManagerRedeemer, SellerDatum, SpendManager,
+  TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{manager_auth_an}
 use lb_v2/validation
@@ -129,30 +128,25 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
           seller_outputs: seller_outputs,
         )
       }
-
-      SpendManager -> True
+      SpendManager ->
+        // TODO: check treasury use which redeemer
+        validation.has_spend_treasury(
+          inputs: inputs,
+          authen_policy_id: authen_policy_id,
+          treasury_hash: treasury_hash,
+        )
     }
   }
 
-  fn validate_manager_minting(redeemer: SellerRedeemer, context: ScriptContext) {
-    let ScriptContext { purpose, transaction: Transaction { inputs, .. } } =
-      context
-    when redeemer is {
-      UsingSeller -> {
-        let seller_policy_id =
-          when purpose is {
-            Mint(policy_id) -> policy_id
-            WithdrawFrom(stake_credential) -> {
-              expect Inline(ScriptCredential(script_hash)) = stake_credential
-              script_hash
-            }
-            _ -> fail
-          }
-        validation.has_spend_seller(inputs, treasury_hash, seller_policy_id)
-      }
-      CollectOrderToken ->
-        validation.has_spend_treasury(inputs, authen_policy_id, treasury_hash)
-      _ -> False
-    }
+  fn validate_manager_minting(_: Data, context: ScriptContext) {
+    expect ScriptContext {
+      purpose: Mint(policy_id),
+      transaction: Transaction { inputs, .. },
+    } = context
+    validation.has_spend_manager(
+      inputs: inputs,
+      treasury_policy_id: treasury_hash,
+      manager_hash: policy_id,
+    )
   }
 }

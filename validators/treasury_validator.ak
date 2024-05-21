@@ -10,7 +10,7 @@ use lb_v2/types.{
   CancelLBE, CloseEvent, CollectManager, CollectOrders, CreateAmmPool, PoolDatum,
   RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
 }
-use lb_v2/utils.{factory_auth_an}
+use lb_v2/utils.{factory_auth_an, treasury_auth_an}
 use lb_v2/validation
 
 validator(authen_policy_id: PolicyId) {
@@ -202,8 +202,8 @@ validator(authen_policy_id: PolicyId) {
     context: ScriptContext,
   ) {
     let ScriptContext { purpose, transaction } = context
-    let Transaction { inputs, .. } = transaction
-    // let mint_value = value.from_minted_value(mint)
+    let Transaction { inputs, mint, .. } = transaction
+    let mint_value = value.from_minted_value(mint)
     when purpose is {
       WithdrawFrom(stake_credential) -> {
         // collect orders
@@ -212,13 +212,7 @@ validator(authen_policy_id: PolicyId) {
       }
       Mint(treasury_policy_id) -> or {
           // create Treasury
-          // TODO
-          // mint_value == validation.get_value_of_minting_treasury(
-          //   authen_policy_id: authen_policy_id,
-          //   treasury_policy_id: treasury_policy_id,
-          //   step: CreateTreasury,
-          // ),
-          False,
+          value.quantity_of(mint_value, authen_policy_id, treasury_auth_an) == 1,
           // Collect Seller Manager
           validation.has_spend_treasury(
             inputs,
