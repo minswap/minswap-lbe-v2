@@ -9,8 +9,8 @@ use aiken/transaction/credential.{
 }
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  Asset, CreateTreasury, FactoryDatum, FactoryRedeemer, RemoveTreasury,
-  SellerDatum, SellerManagerDatum, TreasuryDatum, ValidatorHash,
+  Asset, CreateTreasury, FactoryDatum, FactoryRedeemer, ManagerDatum,
+  RemoveTreasury, SellerDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   compute_lp_asset_name, default_number_seller, factory_auth_an, seller_auth_an,
@@ -28,7 +28,7 @@ validator(
   // ValidatorHash of Seller Contract
   seller_hash: ValidatorHash,
   // ValidatorHash of Seller Contract
-  seller_manager_hash: ValidatorHash,
+  manager_hash: ValidatorHash,
 ) {
   fn validate_factory(
     datum: FactoryDatum,
@@ -151,22 +151,21 @@ validator(
         } = treasury_out
         expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
         // seller manager 
-        expect [seller_manager_out] =
+        expect [manager_out] =
           list.filter(
             outputs,
             fn(output) {
               let Output { address: Address { payment_credential, .. }, .. } =
                 output
-              payment_credential == ScriptCredential(seller_manager_hash)
+              payment_credential == ScriptCredential(manager_hash)
             },
           )
         expect Output {
-          value: seller_manager_out_value,
-          datum: InlineDatum(seller_manager_out_raw_datum),
+          value: manager_out_value,
+          datum: InlineDatum(manager_out_raw_datum),
           ..
-        } = seller_manager_out
-        expect seller_manager_datum: SellerManagerDatum =
-          seller_manager_out_raw_datum
+        } = manager_out
+        expect manager_datum: ManagerDatum = manager_out_raw_datum
         // validate that there's default_number_seller Seller UTxOs in the Transaction Outputs
         // Each Seller UTxO must cointain seller_token in the value
         let default_seller_datum =
@@ -182,11 +181,7 @@ validator(
                 ..
               } = output
               and {
-                value.quantity_of(
-                  out_value,
-                  seller_manager_hash,
-                  seller_auth_an,
-                ) == 1,
+                value.quantity_of(out_value, manager_hash, seller_auth_an) == 1,
                 payment_credential == ScriptCredential(seller_hash),
                 datum == InlineDatum(default_seller_datum),
               }
@@ -197,7 +192,7 @@ validator(
           value.from_minted_value(mint) == validation.get_value_of_minting_treasury(
             authen_policy_id: authen_policy_id,
             treasury_policy_id: treasury_hash,
-            seller_manager_policy_id: seller_manager_hash,
+            manager_policy_id: manager_hash,
             step: CreateTreasury,
           ),
           validation.validate_creating_treasury_out(
@@ -206,14 +201,14 @@ validator(
             base_asset: base_asset,
             raise_asset: raise_asset,
             order_hash: order_hash,
-            seller_manager_hash: seller_manager_hash,
+            manager_hash: manager_hash,
             authen_policy_id: authen_policy_id,
           ),
-          validation.validate_creating_seller_manager_out(
+          validation.validate_creating_manager_out(
             base_asset: base_asset,
             raise_asset: raise_asset,
-            seller_manager_out_value: seller_manager_out_value,
-            seller_manager_out_datum: seller_manager_datum,
+            manager_out_value: manager_out_value,
+            manager_out_datum: manager_datum,
             treasury_hash: treasury_hash,
             seller_hash: seller_hash,
           ),
@@ -322,7 +317,7 @@ validator(
           value.from_minted_value(mint) == validation.get_value_of_minting_treasury(
             authen_policy_id: authen_policy_id,
             treasury_policy_id: treasury_hash,
-            seller_manager_policy_id: seller_manager_hash,
+            manager_policy_id: manager_hash,
             step: RemoveTreasury,
           ),
           list.has(extra_signatories, owner_pkh),

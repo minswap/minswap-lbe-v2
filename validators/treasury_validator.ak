@@ -7,8 +7,8 @@ use aiken/transaction.{
 use aiken/transaction/credential.{Address, Inline, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  CancelLBE, CloseEvent, CollectOrders, CollectSellerManager, CreateAmmPool,
-  PoolDatum, RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
+  CancelLBE, CloseEvent, CollectManager, CollectOrders, CreateAmmPool, PoolDatum,
+  RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
 }
 use lb_v2/utils.{factory_auth_an}
 use lb_v2/validation
@@ -74,24 +74,24 @@ validator(authen_policy_id: PolicyId) {
     when redeemer is {
       // UpdateLBE before discovery phase
       UpdateLBE -> False
-      CollectSellerManager -> {
+      CollectManager -> {
         let treasury_output =
           validation.get_treasury_output(
             outputs,
             authen_policy_id,
             treasury_hash,
           )
-        let TreasuryDatum { seller_manager_hash, .. } = treasury_in_datum
-        expect [seller_manager_input] =
-          validation.get_seller_manager_inputs(
+        let TreasuryDatum { manager_hash, .. } = treasury_in_datum
+        expect [manager_input] =
+          validation.get_manager_inputs(
             inputs: inputs,
             treasury_policy_id: treasury_hash,
-            seller_manager_hash: seller_manager_hash,
+            manager_hash: manager_hash,
           )
-        validation.validate_collect_seller_manager(
+        validation.validate_collect_manager(
           treasury_output: treasury_output,
           treasury_in_datum: treasury_in_datum,
-          seller_manager_input: seller_manager_input,
+          manager_input: manager_input,
           // start_valid_time_range: start_valid_time_range,
           mint_value: mint_value,
           treasury_hash: treasury_hash,

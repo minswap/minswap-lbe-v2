@@ -6,20 +6,19 @@ use aiken/transaction.{
 use aiken/transaction/credential.{Address, Inline, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  CollectOrderToken, ManageSeller, SellerDatum, SellerManagerDatum,
-  SellerManagerRedeemer, SellerRedeemer, SpendSellerManager, TreasuryDatum,
-  UsingSeller, ValidatorHash,
+  CollectOrderToken, ManageSeller, ManagerDatum, ManagerRedeemer, SellerDatum,
+  SellerRedeemer, SpendManager, TreasuryDatum, UsingSeller, ValidatorHash,
 }
 use lb_v2/utils.{manager_auth_an}
 use lb_v2/validation
 
 validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
-  fn validate_seller_manager_spending(
-    seller_manager_in_datum: SellerManagerDatum,
-    redeemer: SellerManagerRedeemer,
+  fn validate_manager_spending(
+    manager_in_datum: ManagerDatum,
+    redeemer: ManagerRedeemer,
     context: ScriptContext,
   ) {
-    expect ScriptContext { purpose: Spend(seller_manager_out_ref), transaction } =
+    expect ScriptContext { purpose: Spend(manager_out_ref), transaction } =
       context
     let Transaction {
       mint,
@@ -35,7 +34,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
         expect Some(Input {
           output: Output {
             address: Address {
-              payment_credential: ScriptCredential(seller_manager_hash),
+              payment_credential: ScriptCredential(manager_hash),
               ..
             },
             ..
@@ -50,7 +49,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
                 output: Output { value: sm_in_value, .. },
               } = input
               and {
-                out_ref == seller_manager_out_ref,
+                out_ref == manager_out_ref,
                 value.quantity_of(sm_in_value, treasury_hash, manager_auth_an) == 1,
               }
             },
@@ -66,10 +65,10 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
                 },
                 ..
               } = input
-              payment_credential == ScriptCredential(seller_manager_hash)
+              payment_credential == ScriptCredential(manager_hash)
             },
           )
-        expect [seller_manager_out] =
+        expect [manager_out] =
           list.filter(
             outputs,
             fn(output) {
@@ -78,7 +77,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
                 value: sm_in_value,
                 ..
               } = output
-              payment_credential == ScriptCredential(seller_manager_hash) && value.quantity_of(
+              payment_credential == ScriptCredential(manager_hash) && value.quantity_of(
                 sm_in_value,
                 treasury_hash,
                 manager_auth_an,
@@ -102,13 +101,13 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
         let seller_inputs =
           validation.get_seller_inputs(
             inputs: inputs,
-            seller_manager_policy_id: seller_manager_hash,
+            manager_policy_id: manager_hash,
             seller_hash: seller_hash,
           )
         let seller_outputs =
           validation.get_seller_outputs(
             outputs: outputs,
-            seller_manager_policy_id: seller_manager_hash,
+            manager_policy_id: manager_hash,
             seller_hash: seller_hash,
             seller_datum: SellerDatum {
               base_asset,
@@ -118,10 +117,10 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
             },
           )
         validation.validate_manage_seller(
-          seller_manager_hash: seller_manager_hash,
-          // seller_manager_in_value: seller_manager_in_value,
-          seller_manager_in_datum: seller_manager_in_datum,
-          seller_manager_out: seller_manager_out,
+          manager_hash: manager_hash,
+          // manager_in_value: manager_in_value,
+          manager_in_datum: manager_in_datum,
+          manager_out: manager_out,
           // treasury_ref_input: treasury_ref_input,
           validity_range: validity_range,
           mint_value: mint_value,
@@ -131,14 +130,11 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
         )
       }
 
-      SpendSellerManager -> True
+      SpendManager -> True
     }
   }
 
-  fn validate_seller_manager_minting(
-    redeemer: SellerRedeemer,
-    context: ScriptContext,
-  ) {
+  fn validate_manager_minting(redeemer: SellerRedeemer, context: ScriptContext) {
     let ScriptContext { purpose, transaction: Transaction { inputs, .. } } =
       context
     when redeemer is {

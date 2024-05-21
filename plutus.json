@@ -70,7 +70,7 @@
           }
         },
         {
-          "title": "seller_manager_hash",
+          "title": "manager_hash",
           "schema": {
             "$ref": "#/definitions/ByteArray"
           }
@@ -145,17 +145,17 @@
       "hash": "2a9b6dc05023aba5fff2d02d5306e660d48771eb9e9cbd27dcb66191"
     },
     {
-      "title": "seller_manager_validator.validate_seller_manager_spending",
+      "title": "seller_manager_validator.validate_manager_spending",
       "datum": {
-        "title": "seller_manager_in_datum",
+        "title": "manager_in_datum",
         "schema": {
-          "$ref": "#/definitions/lb_v2~1types~1SellerManagerDatum"
+          "$ref": "#/definitions/lb_v2~1types~1ManagerDatum"
         }
       },
       "redeemer": {
         "title": "redeemer",
         "schema": {
-          "$ref": "#/definitions/RedeemerWrapper$lb_v2~1types~1SellerManagerRedeemer"
+          "$ref": "#/definitions/RedeemerWrapper$lb_v2~1types~1ManagerRedeemer"
         }
       },
       "parameters": [
@@ -176,7 +176,7 @@
       "hash": "8a89649ba2c15e5d4824c2aeede0bc9b90483b4ec60a591e9449d791"
     },
     {
-      "title": "seller_manager_validator.validate_seller_manager_minting",
+      "title": "seller_manager_validator.validate_manager_minting",
       "redeemer": {
         "title": "redeemer",
         "schema": {
@@ -228,7 +228,7 @@
           }
         },
         {
-          "title": "seller_manager_hash",
+          "title": "manager_hash",
           "schema": {
             "$ref": "#/definitions/ByteArray"
           }
@@ -259,7 +259,7 @@
           }
         },
         {
-          "title": "seller_manager_hash",
+          "title": "manager_hash",
           "schema": {
             "$ref": "#/definitions/ByteArray"
           }
@@ -433,7 +433,7 @@
         }
       ]
     },
-    "RedeemerWrapper$lb_v2/types/SellerManagerRedeemer": {
+    "RedeemerWrapper$lb_v2/types/ManagerRedeemer": {
       "title": "Wrapped Redeemer",
       "description": "A redeemer wrapped in an extra constructor to make multi-validator detection possible on-chain.",
       "anyOf": [
@@ -442,7 +442,7 @@
           "index": 1,
           "fields": [
             {
-              "$ref": "#/definitions/lb_v2~1types~1SellerManagerRedeemer"
+              "$ref": "#/definitions/lb_v2~1types~1ManagerRedeemer"
             }
           ]
         }
@@ -687,6 +687,59 @@
         }
       ]
     },
+    "lb_v2/types/ManagerDatum": {
+      "title": "ManagerDatum",
+      "anyOf": [
+        {
+          "title": "ManagerDatum",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "seller_hash",
+              "$ref": "#/definitions/ByteArray"
+            },
+            {
+              "title": "base_asset",
+              "$ref": "#/definitions/lb_v2~1types~1Asset"
+            },
+            {
+              "title": "raise_asset",
+              "$ref": "#/definitions/lb_v2~1types~1Asset"
+            },
+            {
+              "title": "seller_count",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "reserve_raise",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "total_penalty",
+              "$ref": "#/definitions/Int"
+            }
+          ]
+        }
+      ]
+    },
+    "lb_v2/types/ManagerRedeemer": {
+      "title": "ManagerRedeemer",
+      "anyOf": [
+        {
+          "title": "ManageSeller",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        },
+        {
+          "title": "SpendManager",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        }
+      ]
+    },
     "lb_v2/types/OrderDatum": {
       "title": "OrderDatum",
       "anyOf": [
@@ -842,59 +895,6 @@
         }
       ]
     },
-    "lb_v2/types/SellerManagerDatum": {
-      "title": "SellerManagerDatum",
-      "anyOf": [
-        {
-          "title": "SellerManagerDatum",
-          "dataType": "constructor",
-          "index": 0,
-          "fields": [
-            {
-              "title": "seller_hash",
-              "$ref": "#/definitions/ByteArray"
-            },
-            {
-              "title": "base_asset",
-              "$ref": "#/definitions/lb_v2~1types~1Asset"
-            },
-            {
-              "title": "raise_asset",
-              "$ref": "#/definitions/lb_v2~1types~1Asset"
-            },
-            {
-              "title": "seller_count",
-              "$ref": "#/definitions/Int"
-            },
-            {
-              "title": "reserve_raise",
-              "$ref": "#/definitions/Int"
-            },
-            {
-              "title": "total_penalty",
-              "$ref": "#/definitions/Int"
-            }
-          ]
-        }
-      ]
-    },
-    "lb_v2/types/SellerManagerRedeemer": {
-      "title": "SellerManagerRedeemer",
-      "anyOf": [
-        {
-          "title": "ManageSeller",
-          "dataType": "constructor",
-          "index": 0,
-          "fields": []
-        },
-        {
-          "title": "SpendSellerManager",
-          "dataType": "constructor",
-          "index": 1,
-          "fields": []
-        }
-      ]
-    },
     "lb_v2/types/SellerRedeemer": {
       "title": "SellerRedeemer",
       "anyOf": [
@@ -927,7 +927,7 @@
           "index": 0,
           "fields": [
             {
-              "title": "seller_manager_hash",
+              "title": "manager_hash",
               "$ref": "#/definitions/ByteArray"
             },
             {
@@ -1002,7 +1002,7 @@
       "title": "TreasuryRedeemer",
       "anyOf": [
         {
-          "title": "CollectSellerManager",
+          "title": "CollectManager",
           "dataType": "constructor",
           "index": 0,
           "fields": []

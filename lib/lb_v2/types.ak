@@ -45,7 +45,7 @@ pub type PenaltyConfig {
 
 pub type TreasuryDatum {
   // Protocol Info
-  seller_manager_hash: ValidatorHash,
+  manager_hash: ValidatorHash,
   seller_hash: ValidatorHash,
   order_hash: ValidatorHash,
   // increase when collect orders, descrease when collect LP or refund
@@ -70,7 +70,7 @@ pub type TreasuryDatum {
 }
 
 pub type TreasuryRedeemer {
-  CollectSellerManager
+  CollectManager
   CollectOrders
   CreateAmmPool
   // handle refund in redeem
@@ -84,7 +84,7 @@ pub type TreasuryRedeemer {
   UpdateLBE
 }
 
-pub type SellerManagerDatum {
+pub type ManagerDatum {
   seller_hash: ValidatorHash,
   base_asset: Asset,
   raise_asset: Asset,
@@ -94,9 +94,9 @@ pub type SellerManagerDatum {
 }
 
 // no need beacause we can get it by time in Treasury datum through ref input
-pub type SellerManagerRedeemer {
+pub type ManagerRedeemer {
   ManageSeller
-  SpendSellerManager
+  SpendManager
 }
 
 pub type SellerDatum {

@@ -11,7 +11,7 @@ use lb_v2/validation
 validator(
   authen_policy_id: PolicyId,
   treasury_hash: ValidatorHash,
-  seller_manager_hash: ValidatorHash,
+  manager_hash: ValidatorHash,
 ) {
   fn validate_seller_spending(
     seller_in_datum: SellerDatum,
@@ -45,7 +45,7 @@ validator(
           extra_signatories: extra_signatories,
           mint_value: mint_value,
           authen_policy_id: authen_policy_id,
-          seller_manager_hash: seller_manager_hash,
+          manager_hash: manager_hash,
         )
       }
       _ -> False
