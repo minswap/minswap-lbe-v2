@@ -18,6 +18,8 @@ pub const manager_auth_an = #"4d616e61676572"
 
 pub const default_number_seller = 20
 
+pub const amm_factory_auth_asset_name = #"4d5350"
+
 /// IMPORTANT: This block is code-gen. Please do not edit!
 /// *******************************************
 pub const amm_pool_auth_asset_name = #"4d5350"

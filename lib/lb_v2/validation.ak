@@ -14,11 +14,11 @@ use lb_v2/types.{
   SellerDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
-  amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  calculate_penalty, compute_asset_name_from_base_and_raise,
-  default_burn_liquidity, default_number_seller, factory_auth_an, fee_ada,
-  get_order_value, manager_auth_an, minimum_ada, order_auth_an, seller_auth_an,
-  treasury_auth_an,
+  amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
+  amm_pool_validation_hash, calculate_penalty,
+  compute_asset_name_from_base_and_raise, default_burn_liquidity,
+  default_number_seller, factory_auth_an, fee_ada, get_order_value,
+  manager_auth_an, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
 }
 
 pub fn get_value_of_minting_treasury(
@@ -214,17 +214,6 @@ pub fn validate_create_dex_pool(
     total_liquidity: pool_total_liquidity,
     ..
   } = amm_pool_datum
-  expect and {
-      value.quantity_of(
-        mint_value,
-        amm_authen_policy_id,
-        amm_pool_auth_asset_name,
-      ) == 1,
-      asset_a == pool_asset_a,
-      asset_b == pool_asset_b,
-      datum_in_reserve_a == pool_reserve_a,
-      datum_in_reserve_b == pool_reserve_b,
-    }
   let lp_asset_name =
     utils.compute_lp_asset_name(
       asset_a_policy_id,
@@ -232,6 +221,19 @@ pub fn validate_create_dex_pool(
       asset_b_policy_id,
       asset_b_asset_name,
     )
+  expect and {
+      // check mint value of this redeemer to make sure tx not burn manager token or mint/burn order tokens,...
+      mint_value == (
+        value.zero()
+          |> value.add(amm_authen_policy_id, amm_factory_auth_asset_name, 1)
+          |> value.add(amm_authen_policy_id, amm_pool_auth_asset_name, 1)
+          |> value.add(amm_authen_policy_id, lp_asset_name, 9223372036854775807)
+      ),
+      asset_a == pool_asset_a,
+      asset_b == pool_asset_b,
+      datum_in_reserve_a == pool_reserve_a,
+      datum_in_reserve_b == pool_reserve_b,
+    }
   expect Output {
     value: treasury_out_value,
     datum: InlineDatum(treasury_out_datum_raw),

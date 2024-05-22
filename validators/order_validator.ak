@@ -28,10 +28,10 @@ validator(
         // -> SellerWithdrawal
         dict.has_key(withdrawals, Inline(ScriptCredential(seller_hash)))
       CollectOrder ->
-        // -> TreasuryWithdrawal -> TreasurySpending(TODO: others spending need to check no orders)
+        // -> TreasuryWithdrawal -> TreasurySpending(others spending need to check no orders)
         dict.has_key(withdrawals, Inline(ScriptCredential(treasury_hash)))
       RedeemOrder ->
-        // -> SellerMinting -> TreasurySpending(TODO: others spending need to check no orders)
+        // -> SellerMinting -> TreasurySpending(others spending need to check no orders)
         value.quantity_of(
           value.from_minted_value(mint),
           seller_hash,
