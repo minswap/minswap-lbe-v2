@@ -4,9 +4,7 @@ use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Output, ScriptContext, Spend, Transaction,
 }
-use aiken/transaction/credential.{
-  Address, ScriptCredential, VerificationKeyCredential,
-}
+use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId, ada_policy_id}
 use lb_v2/types.{
   Asset, FactoryDatum, FactoryRedeemer, ManagerDatum, SellerDatum, TreasuryDatum,
@@ -318,10 +316,7 @@ validator(
           is_manager_collected,
           ..
         } = treasury_datum
-        expect Address {
-          payment_credential: VerificationKeyCredential(owner_pkh),
-          ..
-        } = owner
+        let Address { payment_credential: owner_payment_credential, .. } = owner
 
         expect Interval {
           upper_bound: IntervalBound {
@@ -330,6 +325,7 @@ validator(
           },
           ..
         } = validity_range
+
         and {
           value.from_minted_value(mint) == validation.get_value_of_minting_treasury(
             authen_policy_id: authen_policy_id,
@@ -337,7 +333,12 @@ validator(
             manager_policy_id: manager_hash,
             is_create_treasury: False,
           ),
-          list.has(extra_signatories, owner_pkh),
+          // authorize by owner
+          validation.validate_authorize_by_owner(
+            owner_payment_credential: owner_payment_credential,
+            extra_signatories: extra_signatories,
+            inputs: inputs,
+          ),
           if end_valid_time_range < start_time {
             // cancel before LBE
             True

@@ -4,9 +4,7 @@ use aiken/transaction.{
   InlineDatum, Input, Mint, Output, ScriptContext, Spend, Transaction,
   WithdrawFrom,
 }
-use aiken/transaction/credential.{
-  Address, Inline, ScriptCredential, VerificationKeyCredential,
-}
+use aiken/transaction/credential.{Address, Inline, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
   CancelLBE, CloseEvent, CollectManager, CollectOrders, CreateAmmPool, PoolDatum,
@@ -95,10 +93,7 @@ validator(authen_policy_id: PolicyId) {
       UpdateLBE -> {
         let TreasuryDatum { base_asset, raise_asset, owner, start_time, .. } =
           treasury_in_datum
-        expect Address {
-          payment_credential: VerificationKeyCredential(owner_pkh),
-          ..
-        } = owner
+        let Address { payment_credential: owner_payment_credential, .. } = owner
         let treasury_output =
           validation.get_treasury_output(
             outputs,
@@ -114,8 +109,12 @@ validator(authen_policy_id: PolicyId) {
         and {
           // before discovery phase
           end_valid_time_range < start_time,
-          // sign by project owner
-          list.has(extra_signatories, owner_pkh),
+          // Authorize by owner
+          validation.validate_authorize_by_owner(
+            owner_payment_credential: owner_payment_credential,
+            extra_signatories: extra_signatories,
+            inputs: inputs,
+          ),
           // create new one
           validation.validate_creating_treasury_out(
             treasury_out_value: treasury_out_value,

@@ -4,7 +4,7 @@ use aiken/transaction.{
   InlineDatum, Input, Output, OutputReference, ValidityRange,
 }
 use aiken/transaction/credential.{
-  Address, ScriptCredential, VerificationKeyCredential,
+  Address, PaymentCredential, ScriptCredential, VerificationKeyCredential,
 }
 use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
@@ -701,6 +701,7 @@ pub fn validate_using_seller(
       base_asset: base_asset,
       raise_asset: base_asset,
       extra_signatories: extra_signatories,
+      inputs: inputs,
     )
   let order_input_count = list.length(order_inputs)
   let order_output_count = list.length(order_outputs)
@@ -746,6 +747,7 @@ pub fn apply_order(
   base_asset: Asset,
   raise_asset: Asset,
   extra_signatories: List<ByteArray>,
+  inputs: List<Input>,
 ) -> (Int, Int) {
   let (total_input_amount, total_input_penalty) =
     list.foldl(
@@ -769,10 +771,7 @@ pub fn apply_order(
           penalty_amount,
           owner,
         }: OrderDatum = raw_o_datum
-        expect Address {
-          payment_credential: VerificationKeyCredential(pub_key_hash),
-          ..
-        } = owner
+        let Address { payment_credential: owner_payment_credential, .. } = owner
         let expected_order =
           get_order_value(
             amount: amount,
@@ -782,7 +781,11 @@ pub fn apply_order(
           )
         // validate orders
         expect and {
-            list.has(extra_signatories, pub_key_hash),
+            validate_authorize_by_owner(
+              owner_payment_credential: owner_payment_credential,
+              extra_signatories: extra_signatories,
+              inputs: inputs,
+            ),
             is_collected == False,
             o_base_asset == base_asset,
             o_raise_asset == raise_asset,
@@ -1485,5 +1488,33 @@ pub fn validate_manage_seller(
     }
   } else {
     False
+  }
+}
+
+pub fn validate_authorize_by_owner(
+  owner_payment_credential: PaymentCredential,
+  extra_signatories: List<PubKeyHash>,
+  inputs: List<Input>,
+) -> Bool {
+  when owner_payment_credential is {
+    VerificationKeyCredential(owner_pkh) ->
+      // Verify transaction must be signed by Owner
+      list.has(extra_signatories, owner_pkh)
+    ScriptCredential(_) -> {
+      // In case owner is script address, this script will require at least 1 owner UTxO in input
+      // If owner UTxO has enough condition to unlock itself, it can unlock this script as well
+      let has_owner_script_in_inputs =
+        list.any(
+          inputs,
+          fn(input) {
+            let Input { output, .. } = input
+            let Output { address: out_address, .. } = output
+            let Address { payment_credential: out_payment_credential, .. } =
+              out_address
+            out_payment_credential == owner_payment_credential
+          },
+        )
+      has_owner_script_in_inputs
+    }
   }
 }
