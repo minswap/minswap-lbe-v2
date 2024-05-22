@@ -169,6 +169,8 @@ pub fn validate_create_dex_pool(
     reserve_base,
     reserve_raise,
     total_penalty,
+    is_cancelled,
+    is_manager_collected,
     ..
   } = treasury_in_datum
   // vaidate timing when create amm pool
@@ -188,13 +190,16 @@ pub fn validate_create_dex_pool(
         }
       None -> reserve_raise + total_penalty
     }
+  // validate LBE status
   expect and {
       start_valid_time_range > end_time,
-      collected_fund == final_reserve_raise,
+      collected_fund == reserve_raise + total_penalty,
       when minimum_raise is {
         Some(minn) -> final_reserve_raise >= minn
         None -> True
       },
+      is_cancelled == False,
+      is_manager_collected == True,
     }
   let (asset_a, asset_b) = utils.sort_two_assets(base_asset, raise_asset)
   let (datum_in_reserve_a, datum_in_reserve_b) =
@@ -584,11 +589,11 @@ pub fn validate_collect_manager(
   treasury_output: Output,
   treasury_in_datum: TreasuryDatum,
   manager_input: Input,
-  // _start_valid_time_range: Int,
   mint_value: Value,
   treasury_hash: ValidatorHash,
 ) -> Bool {
-  let TreasuryDatum { base_asset, raise_asset, .. } = treasury_in_datum
+  let TreasuryDatum { base_asset, raise_asset, is_manager_collected, .. } =
+    treasury_in_datum
   expect Output { datum: InlineDatum(treasury_out_raw_datum), .. } =
     treasury_output
   expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
@@ -606,17 +611,20 @@ pub fn validate_collect_manager(
     ..
   }: ManagerDatum = raw_manager_datum
   and {
+    is_manager_collected == False,
     // validate Mint Amount
     mint_value == value.from_asset(treasury_hash, manager_auth_an, -1),
     // validate seller manager datum 
     sm_base_asset == base_asset,
     sm_raise_asset == raise_asset,
+    // seller_count == 0 that mean LBE is already cancelled or finish
     seller_count == 0,
     // validate treasury output
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
       reserve_raise: reserve_raise,
       total_penalty: total_penalty,
+      is_manager_collected: True,
     },
   }
 }
@@ -850,6 +858,10 @@ pub fn validate_collect_order(
     base_asset,
     raise_asset,
     is_cancelled,
+    is_manager_collected,
+    reserve_raise,
+    total_penalty,
+    minimum_raise,
     ..
   } = treasury_in_datum
   expect Output {
@@ -894,16 +906,20 @@ pub fn validate_collect_order(
     ),
     // 3. validate time range(no need to check because It must collect seller first)
     //    - datum.end_time < start_valid_time_range
-    // 4. no seller
-    //    - datum.seller_count == 0
-    // TODO: another way
-    // seller_count == 0,
+    // 4. collect manager
+    is_manager_collected == True,
     // 5. Mint nothing
     value.flatten(mint_value) == [],
     // 6. Not cancel yet
     is_cancelled == False,
+    // 7. Collected manager
+    is_manager_collected == True,
+    // 8. Reach min raise
+    when minimum_raise is {
+      None -> True
+      Some(min) -> reserve_raise + total_penalty >= min
+    },
   }
-  // 7.TODO reach min_raise
 }
 
 // return (total_amount+total_penalty) of orders
@@ -1056,6 +1072,7 @@ pub fn validate_redeem_lp(
       (seller_hash, order_auth_an, -list.length(order_inputs)),
     ],
   }
+  // this function dont need to check collected beacause treasury must collect before create pool
 }
 
 // return (total fund(amount and penalty) of orders, total lp that users redeemed, total raise asset that user redeem)
@@ -1179,7 +1196,6 @@ pub fn validate_cancel_lbe(
     // 1. collected_fund == reserve_raise+penalty(collected all orders) 
     //          && seller == 0(because when collected_fund == reserve_raise+penalty == 0, it can be Counting phase when trreasury havent collected any seller)
     collected_fund == reserve_raise + total_penalty,
-    // seller_count == 0, TODO
     // 2. reason
     if collected_fund < min_raise {
       True
@@ -1224,6 +1240,7 @@ pub fn validate_refund(
     is_cancelled,
     reserve_raise,
     total_penalty,
+    is_manager_collected,
     ..
   } = treasury_in_datum
   expect Output {
@@ -1275,6 +1292,7 @@ pub fn validate_refund(
     value.flatten(mint_value) == [
       (seller_hash, order_auth_an, -list.length(order_inputs)),
     ],
+    is_manager_collected == True,
   }
 }
 

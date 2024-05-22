@@ -135,9 +135,7 @@ validator(authen_policy_id: PolicyId) {
           manager_inputs == [],
         }
       }
-
       CollectManager -> {
-        // TODO: handle collect for cancel 
         let treasury_output =
           validation.get_treasury_output(
             outputs,
@@ -150,7 +148,6 @@ validator(authen_policy_id: PolicyId) {
             treasury_output: treasury_output,
             treasury_in_datum: treasury_in_datum,
             manager_input: manager_input,
-            // start_valid_time_range: start_valid_time_range,
             mint_value: mint_value,
             treasury_hash: treasury_hash,
           ),
