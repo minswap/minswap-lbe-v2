@@ -125,9 +125,11 @@ pub fn validate_creating_manager_out(
   manager_out_datum: ManagerDatum,
   treasury_hash: ValidatorHash,
   seller_hash: ValidatorHash,
+  order_hash: ValidatorHash,
 ) -> Bool {
   let ManagerDatum {
     seller_hash: sm_seller_hash,
+    order_hash: sm_order_hash,
     base_asset: sm_base_asset,
     raise_asset: sm_raise_asset,
     seller_count,
@@ -139,6 +141,7 @@ pub fn validate_creating_manager_out(
       |> value.add(treasury_hash, manager_auth_an, 1)
   and {
     sm_seller_hash == seller_hash,
+    sm_order_hash == order_hash,
     sm_base_asset == base_asset,
     sm_raise_asset == raise_asset,
     seller_count == default_number_seller,

@@ -87,6 +87,7 @@ pub type TreasuryRedeemer {
 }
 
 pub type ManagerDatum {
+  order_hash: ValidatorHash,
   seller_hash: ValidatorHash,
   base_asset: Asset,
   raise_asset: Asset,

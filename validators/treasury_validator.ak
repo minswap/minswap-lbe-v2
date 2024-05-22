@@ -193,7 +193,7 @@ validator(authen_policy_id: PolicyId) {
         let pool_output = validation.get_amm_pool_output(outputs)
         expect Output { datum: InlineDatum(pool_raw_datum), .. } = pool_output
         expect amm_pool_datum: PoolDatum = pool_raw_datum
-        // TODO: check mint value of this function to make sure tx not burn manager token
+        // TODO: check mint value of this function to make sure tx not burn manager token or mint/burn orders,...
         validation.validate_create_dex_pool(
           treasury_in_datum: treasury_in_datum,
           treasury_output: treasury_output,
@@ -263,14 +263,18 @@ validator(authen_policy_id: PolicyId) {
     let mint_value = value.from_minted_value(mint)
     when purpose is {
       WithdrawFrom(stake_credential) -> {
-        // collect orders
+        // collect orders -> forward logic to treasury spending
+        // TODO: need to check order input of treasury
         expect Inline(ScriptCredential(script_hash)) = stake_credential
         validation.has_spend_treasury(inputs, authen_policy_id, script_hash)
       }
       Mint(treasury_policy_id) -> or {
           // create Treasury -> forward logic to factory
           value.quantity_of(mint_value, authen_policy_id, treasury_auth_an) == 1,
-          // Collect Manager -> forward logic to treasury spending -> spending must check mint value
+          // Collect Manager -> forward logic to treasury spending
+          // TODO:
+          // - must check mint value
+          // - No manager in others redeemer
           validation.has_spend_treasury(
             inputs,
             authen_policy_id,

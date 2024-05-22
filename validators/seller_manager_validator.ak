@@ -28,6 +28,16 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
       ..
     } = transaction
     let mint_value = value.from_minted_value(mint)
+    // need to check no orders input+mint value beacause 
+    //      ` OrderSpending(UpdateOrder) -> SellerWithdrawal -> SellerSpending(CountingSeller) -> Manager Minting -> Manager Spending`
+    //   or `                      SellerMinting             -> SellerSpending(CountingSeller) -> Manager Minting -> Manager Spending`
+    let ManagerDatum { seller_hash, order_hash, .. } = manager_in_datum
+    expect [] =
+      validation.get_order_inputs(
+        inputs: inputs,
+        seller_policy_id: seller_hash,
+        order_hash: order_hash,
+      )
     when redeemer is {
       ManageSeller -> {
         expect Some(Input {
@@ -129,7 +139,8 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
         )
       }
       SpendManager ->
-        // this line forward logic to treasury minting+make sure dont mint any seller
+        // this line forward logic to treasury minting
+        // + make sure dont mint any seller
         value.flatten(mint_value) == [(treasury_hash, manager_auth_an, -1)]
     }
   }

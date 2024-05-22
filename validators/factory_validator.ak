@@ -188,6 +188,7 @@ validator(
             manager_out_datum: manager_datum,
             treasury_hash: treasury_hash,
             seller_hash: seller_hash,
+            order_hash: order_hash,
           )
         // 4. Validate Sellers
         // validate that there's default_number_seller Seller UTxOs in the Transaction Outputs
