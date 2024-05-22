@@ -856,8 +856,8 @@ pub fn validate_collect_order(
   mint_value: Value,
 ) -> Bool {
   let TreasuryDatum {
+    seller_hash,
     collected_fund,
-    // LBE details
     base_asset,
     raise_asset,
     is_cancelled,
@@ -889,6 +889,7 @@ pub fn validate_collect_order(
       order_outputs: order_outputs,
       base_asset: base_asset,
       raise_asset: raise_asset,
+      seller_hash: seller_hash,
     )
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
     raise_asset
@@ -931,6 +932,7 @@ pub fn apply_collecting_orders(
   order_outputs: List<Output>,
   base_asset: Asset,
   raise_asset: Asset,
+  seller_hash: ValidatorHash,
 ) -> Int {
   expect [order_input, ..remaining_order_inputs] = order_inputs
   expect Input {
@@ -945,6 +947,7 @@ pub fn apply_collecting_orders(
       order_output,
       base_asset,
       raise_asset,
+      seller_hash: seller_hash,
     )
   if remaining_order_inputs == [] {
     expect remaining_order_outputs == []
@@ -956,6 +959,7 @@ pub fn apply_collecting_orders(
         remaining_order_outputs,
         base_asset,
         raise_asset,
+        seller_hash,
       )
     acc_fund + fund_amount
   }
@@ -966,6 +970,7 @@ pub fn apply_collecting_order(
   order_output: Output,
   base_asset: Asset,
   raise_asset: Asset,
+  seller_hash: ValidatorHash,
 ) -> Int {
   let OrderDatum {
     base_asset: o_base_asset,
@@ -986,6 +991,7 @@ pub fn apply_collecting_order(
       order_out_value == (
         value.zero() // fee for redeemLP
           |> value.add(ada_policy_id, ada_asset_name, fee_ada + minimum_ada)
+          |> value.add(seller_hash, order_auth_an, 1)
       ),
       o_base_asset == base_asset,
       o_raise_asset == raise_asset,
