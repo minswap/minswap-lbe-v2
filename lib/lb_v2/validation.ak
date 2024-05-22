@@ -151,6 +151,7 @@ pub fn validate_creating_manager_out(
   }
 }
 
+// TODO: validate this logic
 pub fn validate_create_dex_pool(
   treasury_in_datum: TreasuryDatum,
   treasury_output: Output,
@@ -158,8 +159,6 @@ pub fn validate_create_dex_pool(
   mint_value: Value,
   amm_pool_datum: PoolDatum,
 ) -> Bool {
-  // this function dont need to check is_cancel 
-  // beacause total raise higher than minumum and pool must be created
   let TreasuryDatum {
     collected_fund,
     base_asset,
@@ -902,6 +901,7 @@ pub fn validate_collect_order(
     // 6. Not cancel yet
     is_cancelled == False,
   }
+  // 7.TODO reach min_raise
 }
 
 // return (total_amount+total_penalty) of orders

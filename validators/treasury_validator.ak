@@ -75,6 +75,7 @@ validator(authen_policy_id: PolicyId) {
       },
     } = validity_range
     // need to check all minting value to not burn manager auth beacause it forward logic to this contract
+    // TODO: No order inputs, no manager inputs in unrelated redeemer
     when redeemer is {
       // UpdateLBE before discovery phase
       UpdateLBE -> {
