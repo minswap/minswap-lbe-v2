@@ -177,7 +177,7 @@ validator(authen_policy_id: PolicyId) {
         }
       }
       CloseEvent -> {
-        // forward logic to factory
+        // forward logic to factory with case 2 factory inputs
         expect [_, _] =
           list.filter(
             inputs,

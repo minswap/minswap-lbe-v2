@@ -1,5 +1,4 @@
 use aiken/builtin
-use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Output, ScriptContext, Spend, Transaction,
@@ -39,7 +38,6 @@ validator(
         mint,
         outputs,
         extra_signatories,
-        validity_range,
         ..
       },
       purpose: Spend(factory_ref),
@@ -162,7 +160,7 @@ validator(
             authen_policy_id: authen_policy_id,
           )
         // 3. Validate Manager Out
-        // seller manager 
+        // manager 
         expect [manager_out] =
           list.filter(
             outputs,
@@ -220,8 +218,8 @@ validator(
             is_create_treasury: True,
           ),
           // 6. Base-Raise Asset
-          // base asset must not ada
-          // base != raise
+          // base_asset must not ada
+          // base_asset != raise_asset
           base_asset.policy_id != ada_policy_id,
           base_asset != raise_asset,
         }
@@ -310,21 +308,12 @@ validator(
         let TreasuryDatum {
           owner,
           is_cancelled,
-          start_time,
           reserve_raise,
           total_penalty,
           is_manager_collected,
           ..
         } = treasury_datum
         let Address { payment_credential: owner_payment_credential, .. } = owner
-
-        expect Interval {
-          upper_bound: IntervalBound {
-            bound_type: Finite(end_valid_time_range),
-            ..
-          },
-          ..
-        } = validity_range
 
         and {
           value.from_minted_value(mint) == validation.get_value_of_minting_treasury(
@@ -339,17 +328,12 @@ validator(
             extra_signatories: extra_signatories,
             inputs: inputs,
           ),
-          if end_valid_time_range < start_time {
-            // cancel before LBE
-            True
-          } else {
-            // cancel beacause fail + Collected All sellers and manager + refunded all
-            and {
-              is_cancelled == True,
-              is_manager_collected == True,
-              reserve_raise == 0,
-              total_penalty == 0,
-            }
+          // cancel beacause fail + Collected All sellers and manager + refunded all
+          and {
+            is_cancelled == True,
+            is_manager_collected == True,
+            reserve_raise == 0,
+            total_penalty == 0,
           },
         }
       }

@@ -15,8 +15,8 @@ validator(out_ref: OutputReference) {
       Initialization -> {
         let Transaction { inputs, mint, outputs, .. } = transaction
         // validate that `out_ref` must be presented in the Transaction Inputs
-        expect [_] =
-          list.filter(
+        expect
+          list.any(
             inputs,
             fn(input) {
               let Input { output_reference, .. } = input
@@ -25,13 +25,8 @@ validator(out_ref: OutputReference) {
           )
         // Transaction must mint only 1 Factory Auth Asset
         let mint_value = value.from_minted_value(mint)
-        expect [(minted_pid, minted_an, minted_amount)] =
-          value.flatten(mint_value)
-        expect and {
-            minted_pid == authen_policy_id,
-            minted_an == factory_auth_an,
-            minted_amount == 1,
-          }
+        expect
+          value.flatten(mint_value) == [(authen_policy_id, factory_auth_an, 1)]
         // validate that there's only 1 Factory UTxO in the Transaction Outputs
         // The Factory UTxO must contain Factory Token in the value
         expect [Output { datum, .. }] =
@@ -51,7 +46,7 @@ validator(out_ref: OutputReference) {
       }
       UsingFactory -> {
         let Transaction { inputs, .. } = transaction
-        // Foward logic to Factory Validator
+        // Foward logic to Factory Validator, Factory need to check this minting carefully
         list.any(
           inputs,
           fn(input) {

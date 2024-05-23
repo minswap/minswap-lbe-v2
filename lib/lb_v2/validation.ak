@@ -71,6 +71,7 @@ pub fn validate_creating_treasury_out(
   } = treasury_out_datum
   let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
     base_asset
+  // base_asset must be not ada(already validate in factory)
   let expected_treasury_out_value =
     value.zero()
       |> value.add(authen_policy_id, treasury_auth_an, 1)
@@ -83,7 +84,6 @@ pub fn validate_creating_treasury_out(
     collected_fund == 0,
     t_base_asset == base_asset,
     t_raise_asset == raise_asset,
-    value.without_lovelace(treasury_out_value) == expected_treasury_out_value,
     start_time > 0,
     start_time < end_time,
     when minimum_raise is {
@@ -115,6 +115,8 @@ pub fn validate_creating_treasury_out(
     total_penalty == 0,
     is_cancelled == False,
     is_manager_collected == False,
+    // treasury value
+    value.without_lovelace(treasury_out_value) == expected_treasury_out_value,
   }
 }
 
@@ -136,10 +138,8 @@ pub fn validate_creating_manager_out(
     reserve_raise,
     total_penalty,
   } = manager_out_datum
-  let expected_manager_out_value =
-    value.zero()
-      |> value.add(treasury_hash, manager_auth_an, 1)
   and {
+    // manager datum
     sm_seller_hash == seller_hash,
     sm_order_hash == order_hash,
     sm_base_asset == base_asset,
@@ -147,7 +147,10 @@ pub fn validate_creating_manager_out(
     seller_count == default_number_seller,
     reserve_raise == 0,
     total_penalty == 0,
-    value.without_lovelace(manager_out_value) == expected_manager_out_value,
+    // manager treasury
+    value.flatten(value.without_lovelace(manager_out_value)) == [
+      (treasury_hash, manager_auth_an, 1),
+    ],
   }
 }
 
@@ -1174,6 +1177,7 @@ fn apply_redeeming_lp_order(
   (amount + penalty_amount, o_lp_amount, o_remaining_raise_amount)
 }
 
+// TODO: support cancel before discovery by owner
 pub fn validate_cancel_lbe(
   treasury_in_datum: TreasuryDatum,
   treasury_in_value: Value,

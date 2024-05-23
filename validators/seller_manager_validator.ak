@@ -158,7 +158,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
         manager_hash: policy_id,
       ),
       // Create Treasury: forward logic -> Minting Authen -> Factory Authen(this contract will validate this minting)
-      value.quantity_of(mint_value, authen_policy_id, factory_auth_an) > 0,
+      value.quantity_of(mint_value, authen_policy_id, factory_auth_an) == 1,
     }
   }
 }
