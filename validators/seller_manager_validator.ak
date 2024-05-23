@@ -8,7 +8,7 @@ use lb_v2/types.{
   ManageSeller, ManagerDatum, ManagerRedeemer, SellerDatum, SpendManager,
   TreasuryDatum, ValidatorHash,
 }
-use lb_v2/utils.{manager_auth_an}
+use lb_v2/utils.{factory_auth_an, manager_auth_an}
 use lb_v2/validation
 
 validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
@@ -148,12 +148,17 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
   fn validate_manager_minting(_: Data, context: ScriptContext) {
     expect ScriptContext {
       purpose: Mint(policy_id),
-      transaction: Transaction { inputs, .. },
+      transaction: Transaction { inputs, mint, .. },
     } = context
-    validation.has_spend_manager(
-      inputs: inputs,
-      treasury_policy_id: treasury_hash,
-      manager_hash: policy_id,
-    )
+    let mint_value = value.from_minted_value(mint)
+    or {
+      validation.has_spend_manager(
+        inputs: inputs,
+        treasury_policy_id: treasury_hash,
+        manager_hash: policy_id,
+      ),
+      // Create Treasury: forward logic -> Minting Authen -> Factory Authen(this contract will validate this minting)
+      value.quantity_of(mint_value, authen_policy_id, factory_auth_an) > 0,
+    }
   }
 }
