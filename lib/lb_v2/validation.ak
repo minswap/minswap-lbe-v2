@@ -295,16 +295,12 @@ pub fn has_spend_manager(
       inputs,
       fn(input) {
         let Input {
-          output: Output { address: in_addr, value: in_value, .. },
+          output: Output { address: Address { payment_credential, .. }, value: in_value, .. },
           ..
         } = input
-        let Address { payment_credential, .. } = in_addr
         and {
-          value.quantity_of(in_value, treasury_policy_id, seller_auth_an) == 1,
-          when payment_credential is {
-            ScriptCredential(hash) -> manager_hash == hash
-            _ -> False
-          },
+          value.quantity_of(in_value, treasury_policy_id, manager_auth_an) == 1,
+          payment_credential == ScriptCredential(manager_hash),
         }
       },
     )
