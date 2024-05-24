@@ -1,7 +1,9 @@
+use aiken/dict.{Dict}
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
-  InlineDatum, Input, Output, OutputReference, ValidityRange,
+  InlineDatum, Input, Output, OutputReference, Redeemer, ScriptPurpose, Spend,
+  ValidityRange,
 }
 use aiken/transaction/credential.{
   Address, PaymentCredential, ScriptCredential, VerificationKeyCredential,
@@ -10,8 +12,9 @@ use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
 use lb_v2/types.{
-  Asset, ManagerDatum, OrderDatum, PenaltyConfig, PoolDatum, PubKeyHash,
-  SellerDatum, TreasuryDatum, ValidatorHash,
+  Asset, ManagerDatum, ManagerRedeemer, OrderDatum, PenaltyConfig, PoolDatum,
+  PubKeyHash, SellerDatum, SellerRedeemer, TreasuryDatum, TreasuryRedeemer,
+  ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
@@ -268,8 +271,10 @@ pub fn has_spend_treasury(
   inputs: List<Input>,
   authen_policy_id: PolicyId,
   treasury_hash: ValidatorHash,
+  redeemers: Dict<ScriptPurpose, Redeemer>,
+  expected_redeemer: TreasuryRedeemer,
 ) -> Bool {
-  expect [_] =
+  expect [Input { output_reference: treasury_out_ref, .. }] =
     list.filter(
       inputs,
       fn(input) {
@@ -287,15 +292,19 @@ pub fn has_spend_treasury(
         }
       },
     )
-  True
+  expect Some(raw_redeemer) = dict.get(redeemers, Spend(treasury_out_ref))
+  expect redeemer: TreasuryRedeemer = raw_redeemer
+  redeemer == expected_redeemer
 }
 
 pub fn has_spend_manager(
   inputs: List<Input>,
   treasury_policy_id: PolicyId,
   manager_hash: ValidatorHash,
+  redeemers: Dict<ScriptPurpose, Redeemer>,
+  expected_redeemer: ManagerRedeemer,
 ) -> Bool {
-  expect [_] =
+  expect [Input { output_reference: manager_out_ref, .. }] =
     list.filter(
       inputs,
       fn(input) {
@@ -313,15 +322,19 @@ pub fn has_spend_manager(
         }
       },
     )
-  True
+  expect Some(raw_redeemer) = dict.get(redeemers, Spend(manager_out_ref))
+  expect redeemer: ManagerRedeemer = raw_redeemer
+  redeemer == expected_redeemer
 }
 
 pub fn has_spend_seller(
   inputs: List<Input>,
   manager_policy_id: PolicyId,
   seller_hash: ValidatorHash,
+  redeemers: Dict<ScriptPurpose, Redeemer>,
+  expected_redeemer: SellerRedeemer,
 ) -> Bool {
-  expect [_] =
+  expect [Input { output_reference: seller_out_ref, .. }] =
     list.filter(
       inputs,
       fn(input) {
@@ -339,7 +352,9 @@ pub fn has_spend_seller(
         }
       },
     )
-  True
+  expect Some(raw_redeemer) = dict.get(redeemers, Spend(seller_out_ref))
+  expect redeemer: SellerRedeemer = raw_redeemer
+  redeemer == expected_redeemer
 }
 
 pub fn get_seller_inputs(

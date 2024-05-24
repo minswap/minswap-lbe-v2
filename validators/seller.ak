@@ -3,7 +3,7 @@ use aiken/transaction.{Mint, ScriptContext, Spend, Transaction, WithdrawFrom}
 use aiken/transaction/credential.{Inline, ScriptCredential}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
-  CollectOrderToken, CountingSeller, SellerDatum, SellerRedeemer, UsingSeller,
+  CountingSeller, RedeemOrders, SellerDatum, SellerRedeemer, UsingSeller,
   ValidatorHash,
 }
 use lb_v2/utils.{seller_auth_an}
@@ -49,37 +49,42 @@ validator(
           manager_hash: manager_hash,
         )
       }
-      CollectOrderToken -> False
     }
   }
 
   fn validate_seller_minting_or_withdraw(
-    redeemer: SellerRedeemer,
+    _redeemer: Data,
     context: ScriptContext,
   ) {
     let ScriptContext {
       purpose,
-      transaction: Transaction { inputs, withdrawals, .. },
+      transaction: Transaction { inputs, withdrawals, redeemers, .. },
     } = context
     when purpose is {
       WithdrawFrom(stake_credential) -> {
         // OrderSpending(UpdateOrder) -> SellerWithdrawal -> SellerSpending
         expect Inline(ScriptCredential(seller_hash)) = stake_credential
-        // TODO: check seller spending redeemer
-        validation.has_spend_seller(inputs, manager_hash, seller_hash)
+        validation.has_spend_seller(
+          inputs: inputs,
+          manager_policy_id: manager_hash,
+          seller_hash: seller_hash,
+          redeemers: redeemers,
+          expected_redeemer: UsingSeller,
+        )
       }
       Mint(policy_id) ->
-        when redeemer is {
-          UsingSeller ->
-            dict.has_key(withdrawals, Inline(ScriptCredential(policy_id)))
-          CollectOrderToken ->
-            // TODO: check treasury redeemer
-            validation.has_spend_treasury(
-              inputs,
-              authen_policy_id,
-              treasury_hash,
-            )
-          _ -> False
+        if dict.has_key(withdrawals, Inline(ScriptCredential(policy_id))) {
+          // forward logic to (Seller - WithdrawFrom) -> (Seller - Spending - UsingSeller)
+          True
+        } else {
+          // forward logic to (Treasury-Spending-RedeemOrders)
+          validation.has_spend_treasury(
+            inputs: inputs,
+            authen_policy_id: authen_policy_id,
+            treasury_hash: treasury_hash,
+            redeemers: redeemers,
+            expected_redeemer: RedeemOrders,
+          )
         }
       _ -> False
     }

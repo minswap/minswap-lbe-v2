@@ -116,7 +116,6 @@ pub type SellerDatum {
 pub type SellerRedeemer {
   UsingSeller
   CountingSeller
-  CollectOrderToken
 }
 
 pub type OrderDatum {
