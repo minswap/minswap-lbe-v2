@@ -148,18 +148,19 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
   fn validate_manager_minting(_: Data, context: ScriptContext) {
     expect ScriptContext {
       purpose: Mint(policy_id),
-      transaction: Transaction { inputs, mint, .. },
+      transaction: Transaction { inputs, mint, redeemers, .. },
     } = context
     let mint_value = value.from_minted_value(mint)
-    or {
-      // TODO: check manager redeemer
+    if value.quantity_of(mint_value, authen_policy_id, factory_auth_an) == 1 {
+      True
+    } else {
       validation.has_spend_manager(
         inputs: inputs,
         treasury_policy_id: treasury_hash,
         manager_hash: policy_id,
-      ),
-      // Create Treasury: forward logic -> Minting Authen -> Factory Authen(this contract will validate this minting)
-      value.quantity_of(mint_value, authen_policy_id, factory_auth_an) == 1,
+        redeemers: redeemers,
+        expected_redeemer: ManageSeller,
+      )
     }
   }
 }

@@ -72,27 +72,19 @@ validator(authen_policy_id: PolicyId) {
         ..
       },
     } = validity_range
-    // need to check all minting value to not burn manager auth beacause it forward logic to this contract
-    // No order inputs, no manager inputs in unrelated redeemer
-    let TreasuryDatum { seller_hash, order_hash, manager_hash, .. } =
-      treasury_in_datum
-    let order_inputs =
-      validation.get_order_inputs(
-        inputs: inputs,
-        seller_policy_id: seller_hash,
-        order_hash: order_hash,
-      )
-    let manager_inputs =
-      validation.get_manager_inputs(
-        inputs: inputs,
-        treasury_policy_id: treasury_hash,
-        manager_hash: manager_hash,
-      )
     when redeemer is {
       // UpdateLBE before discovery phase
       UpdateLBE -> {
-        let TreasuryDatum { base_asset, raise_asset, owner, start_time, .. } =
-          treasury_in_datum
+        let TreasuryDatum {
+          base_asset,
+          raise_asset,
+          owner,
+          start_time,
+          manager_hash,
+          seller_hash,
+          order_hash,
+          ..
+        } = treasury_in_datum
         let Address { payment_credential: owner_payment_credential, .. } = owner
         let treasury_output =
           validation.get_treasury_output(
@@ -128,33 +120,39 @@ validator(authen_policy_id: PolicyId) {
           ),
           // mint nothing
           mint_value == value.zero(),
-          // no order inputs
-          order_inputs == [],
-          // no manager inputs
-          manager_inputs == [],
         }
       }
       CollectManager -> {
+        let TreasuryDatum { manager_hash, .. } = treasury_in_datum
         let treasury_output =
           validation.get_treasury_output(
             outputs,
             authen_policy_id,
             treasury_hash,
           )
-        expect [manager_input] = manager_inputs
-        and {
-          validation.validate_collect_manager(
-            treasury_output: treasury_output,
-            treasury_in_datum: treasury_in_datum,
-            manager_input: manager_input,
-            mint_value: mint_value,
-            treasury_hash: treasury_hash,
-          ),
-          // no order inputs
-          order_inputs == [],
-        }
+
+        expect [manager_input] =
+          validation.get_manager_inputs(
+            inputs: inputs,
+            treasury_policy_id: treasury_hash,
+            manager_hash: manager_hash,
+          )
+        validation.validate_collect_manager(
+          treasury_output: treasury_output,
+          treasury_in_datum: treasury_in_datum,
+          manager_input: manager_input,
+          mint_value: mint_value,
+          treasury_hash: treasury_hash,
+        )
       }
       CollectOrders -> {
+        let TreasuryDatum { seller_hash, order_hash, .. } = treasury_in_datum
+        let order_inputs =
+          validation.get_order_inputs(
+            inputs: inputs,
+            seller_policy_id: seller_hash,
+            order_hash: order_hash,
+          )
         let order_outputs =
           validation.get_order_outputs(outputs, seller_hash, order_hash)
         let treasury_output =
@@ -163,18 +161,14 @@ validator(authen_policy_id: PolicyId) {
             authen_policy_id,
             treasury_hash,
           )
-        and {
-          validation.validate_collect_order(
-            order_inputs: order_inputs,
-            order_outputs: order_outputs,
-            treasury_output: treasury_output,
-            treasury_in_datum: treasury_in_datum,
-            treasury_in_value: treasury_in_value,
-            mint_value: mint_value,
-          ),
-          // no manager inputs
-          manager_inputs == [],
-        }
+        validation.validate_collect_order(
+          order_inputs: order_inputs,
+          order_outputs: order_outputs,
+          treasury_output: treasury_output,
+          treasury_in_datum: treasury_in_datum,
+          treasury_in_value: treasury_in_value,
+          mint_value: mint_value,
+        )
       }
       CloseEvent -> {
         // forward logic to factory with case 2 factory inputs
@@ -187,12 +181,7 @@ validator(authen_policy_id: PolicyId) {
               value.quantity_of(out_value, authen_policy_id, factory_auth_an) == 1
             },
           )
-        and {
-          // no order inputs
-          order_inputs == [],
-          // no manager inputs
-          manager_inputs == [],
-        }
+        True
       }
       CreateAmmPool -> {
         let treasury_output =
@@ -204,22 +193,17 @@ validator(authen_policy_id: PolicyId) {
         let pool_output = validation.get_amm_pool_output(outputs)
         expect Output { datum: InlineDatum(pool_raw_datum), .. } = pool_output
         expect amm_pool_datum: PoolDatum = pool_raw_datum
-        and {
-          validation.validate_create_dex_pool(
-            treasury_in_datum: treasury_in_datum,
-            treasury_output: treasury_output,
-            validity_range: validity_range,
-            mint_value: mint_value,
-            amm_pool_datum: amm_pool_datum,
-          ),
-          // no order inputs
-          order_inputs == [],
-          // no manager inputs
-          manager_inputs == [],
-        }
+        validation.validate_create_dex_pool(
+          treasury_in_datum: treasury_in_datum,
+          treasury_output: treasury_output,
+          validity_range: validity_range,
+          mint_value: mint_value,
+          amm_pool_datum: amm_pool_datum,
+        )
       }
       RedeemOrders -> {
-        let TreasuryDatum { total_liquidity, .. } = treasury_in_datum
+        let TreasuryDatum { total_liquidity, seller_hash, order_hash, .. } =
+          treasury_in_datum
         let treasury_output =
           validation.get_treasury_output(
             outputs,
@@ -227,28 +211,30 @@ validator(authen_policy_id: PolicyId) {
             treasury_hash,
           )
 
-        and {
-          if total_liquidity != 0 {
-            validation.validate_redeem_lp(
-              order_inputs: order_inputs,
-              outputs: outputs,
-              treasury_output: treasury_output,
-              treasury_in_datum: treasury_in_datum,
-              treasury_in_value: treasury_in_value,
-              mint_value: mint_value,
-            )
-          } else {
-            validation.validate_refund(
-              order_inputs: order_inputs,
-              outputs: outputs,
-              treasury_output: treasury_output,
-              treasury_in_datum: treasury_in_datum,
-              treasury_in_value: treasury_in_value,
-              mint_value: mint_value,
-            )
-          },
-          // no manager inputs
-          manager_inputs == [],
+        let order_inputs =
+          validation.get_order_inputs(
+            inputs: inputs,
+            seller_policy_id: seller_hash,
+            order_hash: order_hash,
+          )
+        if total_liquidity != 0 {
+          validation.validate_redeem_lp(
+            order_inputs: order_inputs,
+            outputs: outputs,
+            treasury_output: treasury_output,
+            treasury_in_datum: treasury_in_datum,
+            treasury_in_value: treasury_in_value,
+            mint_value: mint_value,
+          )
+        } else {
+          validation.validate_refund(
+            order_inputs: order_inputs,
+            outputs: outputs,
+            treasury_output: treasury_output,
+            treasury_in_datum: treasury_in_datum,
+            treasury_in_value: treasury_in_value,
+            mint_value: mint_value,
+          )
         }
       }
       CancelLBE -> {
@@ -266,10 +252,6 @@ validator(authen_policy_id: PolicyId) {
             ref_inputs: reference_inputs,
           ),
           mint_value == value.zero(),
-          // no order inputs
-          order_inputs == [],
-          // no manager inputs
-          manager_inputs == [],
         }
       }
     }
@@ -280,25 +262,34 @@ validator(authen_policy_id: PolicyId) {
     context: ScriptContext,
   ) {
     let ScriptContext { purpose, transaction } = context
-    let Transaction { inputs, mint, .. } = transaction
+    let Transaction { inputs, mint, redeemers, .. } = transaction
     let mint_value = value.from_minted_value(mint)
     when purpose is {
       WithdrawFrom(stake_credential) -> {
         // collect orders -> forward logic to treasury spending
         // need to check order input of treasury
-        expect Inline(ScriptCredential(script_hash)) = stake_credential
-        // TODO: check oreder redeemer 
-        validation.has_spend_treasury(inputs, authen_policy_id, script_hash)
+        expect Inline(ScriptCredential(treasury_hash)) = stake_credential
+        validation.has_spend_treasury(
+          inputs: inputs,
+          authen_policy_id: authen_policy_id,
+          treasury_hash: treasury_hash,
+          redeemers: redeemers,
+          expected_redeemer: CollectOrders,
+        )
       }
-      Mint(treasury_policy_id) -> or {
-          // create Treasury -> forward logic to factory
-          value.quantity_of(mint_value, authen_policy_id, treasury_auth_an) == 1,
-          // TODO: check order redeemer
+      Mint(treasury_policy_id) ->
+        if
+        value.quantity_of(mint_value, authen_policy_id, treasury_auth_an) == 1{
+        
+          True
+        } else {
           validation.has_spend_treasury(
-            inputs,
-            authen_policy_id,
-            treasury_policy_id,
-          ),
+            inputs: inputs,
+            authen_policy_id: authen_policy_id,
+            treasury_hash: treasury_policy_id,
+            redeemers: redeemers,
+            expected_redeemer: CollectManager,
+          )
         }
       _ -> False
     }
