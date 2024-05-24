@@ -33,13 +33,7 @@ validator(
     context: ScriptContext,
   ) {
     expect ScriptContext {
-      transaction: Transaction {
-        inputs,
-        mint,
-        outputs,
-        extra_signatories,
-        ..
-      },
+      transaction: Transaction { inputs, mint, outputs, extra_signatories, .. },
       purpose: Spend(factory_ref),
     } = context
     let FactoryRedeemer { base_asset, raise_asset } = redeemer

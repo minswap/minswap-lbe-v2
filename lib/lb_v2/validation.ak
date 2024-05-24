@@ -58,6 +58,7 @@ pub fn validate_creating_treasury_out(
     raise_asset: t_raise_asset,
     start_time,
     end_time,
+    minimum_order_raise,
     minimum_raise,
     maximum_raise,
     reserve_base,
@@ -86,6 +87,10 @@ pub fn validate_creating_treasury_out(
     t_raise_asset == raise_asset,
     start_time > 0,
     start_time < end_time,
+    when minimum_order_raise is {
+      Some(min_order) -> min_order > 0
+      _ -> True
+    },
     when minimum_raise is {
       Some(minn) ->
         when maximum_raise is {
@@ -295,7 +300,11 @@ pub fn has_spend_manager(
       inputs,
       fn(input) {
         let Input {
-          output: Output { address: Address { payment_credential, .. }, value: in_value, .. },
+          output: Output {
+            address: Address { payment_credential, .. },
+            value: in_value,
+            ..
+          },
           ..
         } = input
         and {
@@ -685,6 +694,7 @@ pub fn validate_using_seller(
     penalty_config,
     start_time,
     end_time,
+    minimum_order_raise,
     ..
   }: TreasuryDatum = raw_treasury_datum
   let order_inputs = get_order_inputs(inputs, seller_hash, order_hash)
@@ -701,6 +711,7 @@ pub fn validate_using_seller(
       raise_asset: base_asset,
       extra_signatories: extra_signatories,
       inputs: inputs,
+      minimum_order_raise: minimum_order_raise,
     )
   let order_input_count = list.length(order_inputs)
   let order_output_count = list.length(order_outputs)
@@ -747,6 +758,7 @@ pub fn apply_order(
   raise_asset: Asset,
   extra_signatories: List<ByteArray>,
   inputs: List<Input>,
+  minimum_order_raise: Option<Int>,
 ) -> (Int, Int) {
   let (total_input_amount, total_input_penalty) =
     list.foldl(
@@ -821,6 +833,11 @@ pub fn apply_order(
           )
         // validate orders
         expect and {
+            when minimum_order_raise is {
+              Some(min_order_raise) -> amount >= min_order_raise
+              None -> amount > 0
+            },
+            penalty_amount >= 0,
             is_collected == False,
             o_base_asset == base_asset,
             o_raise_asset == raise_asset,

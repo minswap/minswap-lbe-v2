@@ -52,6 +52,7 @@ pub type TreasuryDatum {
   start_time: Int,
   end_time: Int,
   owner: Address,
+  minimum_order_raise: Option<Int>,
   minimum_raise: Option<Int>,
   // added when collect manager once, descrease when refund
   maximum_raise: Option<Int>,
