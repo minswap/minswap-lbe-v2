@@ -12,7 +12,7 @@
   },
   "validators": [
     {
-      "title": "authen_minting_policy.validate_authen",
+      "title": "authen.validate_authen",
       "redeemer": {
         "title": "redeemer",
         "schema": {
@@ -31,7 +31,7 @@
       "hash": "abc2760b00ab171a76c13b1238e02378f052b9a904257d8e0fbf980e"
     },
     {
-      "title": "factory_validator.validate_factory",
+      "title": "factory.validate_factory",
       "datum": {
         "title": "datum",
         "schema": {
@@ -114,7 +114,7 @@
       "hash": "f6370ca8af3ea1232b393f6ae739bccdc43eed9dcdb6b411e2a8f455"
     },
     {
-      "title": "manager_validator.validate_manager_spending",
+      "title": "manager.validate_manager_spending",
       "datum": {
         "title": "manager_in_datum",
         "schema": {
@@ -145,7 +145,7 @@
       "hash": "2a0f51640c4e8d1d84d7b4bd200cfcef1dc467b8e1f592d03b8a94f6"
     },
     {
-      "title": "manager_validator.validate_manager_minting",
+      "title": "manager.validate_manager_minting",
       "redeemer": {
         "title": "_",
         "schema": {
@@ -170,7 +170,7 @@
       "hash": "2a0f51640c4e8d1d84d7b4bd200cfcef1dc467b8e1f592d03b8a94f6"
     },
     {
-      "title": "order_validator.validate_order",
+      "title": "order.validate_order",
       "datum": {
         "title": "_raw_datum",
         "schema": {
@@ -201,7 +201,7 @@
       "hash": "7f0f5ffb68fd378660cc628002d66dc9d3d42ce2d7bea29f01d808de"
     },
     {
-      "title": "seller_validator.validate_seller_spending",
+      "title": "seller.validate_seller_spending",
       "datum": {
         "title": "seller_in_datum",
         "schema": {
@@ -238,7 +238,7 @@
       "hash": "0f31f4d642245303579a1d5c6b0a63979257fa87ffb814297b5a26fa"
     },
     {
-      "title": "seller_validator.validate_seller_minting_or_withdraw",
+      "title": "seller.validate_seller_minting_or_withdraw",
       "redeemer": {
         "title": "_redeemer",
         "schema": {
@@ -269,7 +269,7 @@
       "hash": "0f31f4d642245303579a1d5c6b0a63979257fa87ffb814297b5a26fa"
     },
     {
-      "title": "treasury_validator.validate_treasury_spending",
+      "title": "treasury.validate_treasury_spending",
       "datum": {
         "title": "treasury_in_datum",
         "schema": {
@@ -294,7 +294,7 @@
       "hash": "bd7b059d810b6291e45076826ebf4828568573e56096e690863f695c"
     },
     {
-      "title": "treasury_validator.validate_treasury_minting_or_withdrawal",
+      "title": "treasury.validate_treasury_minting_or_withdrawal",
       "redeemer": {
         "title": "_redeemer",
         "schema": {
