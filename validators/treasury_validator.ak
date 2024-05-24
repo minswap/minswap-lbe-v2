@@ -287,14 +287,13 @@ validator(authen_policy_id: PolicyId) {
         // collect orders -> forward logic to treasury spending
         // need to check order input of treasury
         expect Inline(ScriptCredential(script_hash)) = stake_credential
+        // TODO: check oreder redeemer 
         validation.has_spend_treasury(inputs, authen_policy_id, script_hash)
       }
       Mint(treasury_policy_id) -> or {
           // create Treasury -> forward logic to factory
           value.quantity_of(mint_value, authen_policy_id, treasury_auth_an) == 1,
-          // Collect Manager -> forward logic to treasury spending
-          // - must check mint value
-          // - No manager in others redeemer
+          // TODO: check order redeemer
           validation.has_spend_treasury(
             inputs,
             authen_policy_id,

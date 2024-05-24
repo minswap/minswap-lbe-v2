@@ -152,6 +152,7 @@ validator(authen_policy_id: PolicyId, treasury_hash: ValidatorHash) {
     } = context
     let mint_value = value.from_minted_value(mint)
     or {
+      // TODO: check manager redeemer
       validation.has_spend_manager(
         inputs: inputs,
         treasury_policy_id: treasury_hash,
