@@ -61,24 +61,27 @@ validator(
       purpose,
       transaction: Transaction { inputs, withdrawals, .. },
     } = context
-    when redeemer is {
-      UsingSeller ->
+    when purpose is {
+      WithdrawFrom(stake_credential) -> {
         // OrderSpending(UpdateOrder) -> SellerWithdrawal -> SellerSpending
-        when purpose is {
-          Mint(policy_id) ->
+        expect Inline(ScriptCredential(seller_hash)) = stake_credential
+        // TODO: check seller spending redeemer
+        validation.has_spend_seller(inputs, manager_hash, seller_hash)
+      }
+      Mint(policy_id) ->
+        when redeemer is {
+          UsingSeller ->
             dict.has_key(withdrawals, Inline(ScriptCredential(policy_id)))
-          WithdrawFrom(stake_credential) -> {
-            expect Inline(ScriptCredential(seller_hash)) = stake_credential
-            validation.has_spend_seller(inputs, manager_hash, seller_hash)
-          }
+          CollectOrderToken ->
+            // TODO: check treasury redeemer
+            validation.has_spend_treasury(
+              inputs,
+              authen_policy_id,
+              treasury_hash,
+            )
           _ -> False
         }
-      CollectOrderToken -> {
-        expect Mint(_) = purpose
-        // check mint value of all treasury spending 
-        validation.has_spend_treasury(inputs, authen_policy_id, treasury_hash)
-      }
-      CountingSeller -> False
+      _ -> False
     }
   }
 }
