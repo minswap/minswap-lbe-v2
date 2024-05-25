@@ -463,7 +463,7 @@ pub fn get_treasury_input_by_out_ref(
 
 pub fn get_seller_input_by_out_ref(
   inputs: List<Input>,
-  treasury_policy_id: PolicyId,
+  manager_policy_id: PolicyId,
   out_ref: OutputReference,
 ) -> Input {
   expect [seller_input] =
@@ -473,7 +473,7 @@ pub fn get_seller_input_by_out_ref(
         let Input { output_reference, output: Output { value: out_value, .. } } =
           input
         and {
-          value.quantity_of(out_value, treasury_policy_id, seller_auth_an) == 1,
+          value.quantity_of(out_value, manager_policy_id, seller_auth_an) == 1,
           output_reference == out_ref,
         }
       },
@@ -673,7 +673,7 @@ pub fn validate_using_seller(
     },
   } = validity_range
   // Validate always spend exactly 1 Seller UTxO
-  let seller_input = get_seller_input_by_out_ref(inputs, treasury_hash, out_ref)
+  let seller_input = get_seller_input_by_out_ref(inputs, manager_hash, out_ref)
   expect Input {
     output: Output {
       address: Address { payment_credential: ScriptCredential(seller_hash), .. },
