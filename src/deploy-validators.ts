@@ -3,12 +3,12 @@ import path from "path";
 import * as T from "@minswap/translucent";
 import type { OutRef, Script, Translucent, Tx, UTxO } from "./types";
 import {
-  AuthenMintingPolicyValidateAuthen,
-  FactoryValidatorValidateFactory,
-  TreasuryValidatorValidateTreasurySpending,
-  OrderValidatorFeedTypeOrder,
-  SellerValidatorValidateSellerSpending,
-  OrderValidatorValidateOrder,
+  AuthenValidateAuthen,
+  FactoryValidateFactory,
+  TreasuryValidateTreasurySpending,
+  SellerValidateSellerSpending,
+  OrderValidateOrder,
+  ManagerValidateManagerSpending,
 } from "../plutus";
 
 import {
@@ -23,7 +23,7 @@ export type Validators = {
   treasuryValidator: Script;
   sellerValidator: Script;
   orderValidator: Script;
-  orderValidatorFeedType: Script;
+  managerValidator: Script;
 };
 
 export type MinswapValidators = {
@@ -66,41 +66,46 @@ export function collectValidators(options: {
     const fileContent = fs.readFileSync(path.resolve("params.json"), "utf-8");
     seedOutRef = JSON.parse(fileContent).seedOutRef;
   }
-  const authenValidator = new AuthenMintingPolicyValidateAuthen({
+  const authenValidator = new AuthenValidateAuthen({
     transactionId: { hash: seedOutRef!.txHash },
     outputIndex: BigInt(seedOutRef!.outputIndex),
   });
   const authenValidatorHash = t.utils.validatorToScriptHash(authenValidator);
-  const treasuryValidator = new TreasuryValidatorValidateTreasurySpending(
+  const treasuryValidator = new TreasuryValidateTreasurySpending(
     authenValidatorHash,
   );
   const treasuryValidatorHash =
     t.utils.validatorToScriptHash(treasuryValidator);
-
-  const sellerValidator = new SellerValidatorValidateSellerSpending(
+  const managerValidator = new ManagerValidateManagerSpending(
     authenValidatorHash,
     treasuryValidatorHash,
   );
+  const managerValidatorHash = t.utils.validatorToScriptHash(managerValidator);
+  const sellerValidator = new SellerValidateSellerSpending(
+    authenValidatorHash,
+    treasuryValidatorHash,
+    managerValidatorHash,
+  );
   const sellerValidatorHash = t.utils.validatorToScriptHash(sellerValidator);
-  const orderValidator = new OrderValidatorValidateOrder(
+  const orderValidator = new OrderValidateOrder(
     treasuryValidatorHash,
     sellerValidatorHash,
   );
   const orderValidatorHash = t.utils.validatorToScriptHash(orderValidator);
-  const factoryValidator = new FactoryValidatorValidateFactory(
+  const factoryValidator = new FactoryValidateFactory(
     authenValidatorHash,
     treasuryValidatorHash,
     orderValidatorHash,
     sellerValidatorHash,
+    managerValidatorHash,
   );
-  const orderValidatorFeedType = new OrderValidatorFeedTypeOrder();
   const validators = {
     authenValidator,
     treasuryValidator,
     orderValidator,
     sellerValidator,
     factoryValidator,
-    orderValidatorFeedType,
+    managerValidator,
   };
 
   if (!dry) {
@@ -191,8 +196,9 @@ export async function deployValidators(
   const deploymentsChain = [
     () => processElement(t, "authenValidator", validators.authenValidator),
     () => processElement(t, "treasuryValidator", validators.treasuryValidator),
-    () => processElement(t, "orderValidator", validators.orderValidator),
+    () => processElement(t, "managerValidator", validators.managerValidator),
     () => processElement(t, "sellerValidator", validators.sellerValidator),
+    () => processElement(t, "orderValidator", validators.orderValidator),
     () => processElement(t, "factoryValidator", validators.factoryValidator),
   ];
   let res: DeployedValidators = {};

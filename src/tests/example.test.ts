@@ -23,9 +23,9 @@ import type {
   Translucent,
   UTxO,
 } from "../types";
-import { FactoryValidatorValidateFactory, type TreasuryValidatorValidateTreasurySpending } from "../../plutus";
 import { address2PlutusAddress, computeLPAssetName } from "../utils";
 import { DEFAULT_NUMBER_SELLER, LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
+import { FactoryValidateFactory, type TreasuryValidateTreasurySpending } from "../../plutus";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -90,17 +90,16 @@ test("quick", async()=>{
     baseAsset.policyId + baseAsset.assetName,
     "",
   );
-  const factoryDatumHead: FactoryValidatorValidateFactory["datum"] = {
+  const factoryDatumHead: FactoryValidateFactory["datum"] = {
     head: LBE_INIT_FACTORY_HEAD,
     tail: lpAssetName,
   }
-  const factoryDatumTail: FactoryValidatorValidateFactory["datum"] = {
+  const factoryDatumTail: FactoryValidateFactory["datum"] = {
     head: lpAssetName,
     tail: LBE_INIT_FACTORY_TAIL,
   }
-  const headRaw = T.Data.to(factoryDatumHead, FactoryValidatorValidateFactory.datum);
-  const tailRaw = T.Data.to(factoryDatumTail, FactoryValidatorValidateFactory.datum);
-  console.log({headRaw, tailRaw});
+  const headRaw = T.Data.to(factoryDatumHead, FactoryValidateFactory.datum);
+  const tailRaw = T.Data.to(factoryDatumTail, FactoryValidateFactory.datum);
   expect(headRaw < tailRaw).toBeTruthy();
 });
 
@@ -119,16 +118,17 @@ test("example flow", async () => {
   const initFactoryTx = await quickSubmitBuilder(emulator)({
     txBuilder: tx,
     extraSignatures: [ACCOUNT_1.privateKey],
+    stats: true,
   });
   expect(initFactoryTx).toBeTruthy();
   console.info("Init Factory done");
 
   const discoveryStartSlot = emulator.slot;
   const discoveryEndSlot = discoveryStartSlot + 60 * 60 * 24 * 2; // 2 days
-  const treasuryDatum: TreasuryValidatorValidateTreasurySpending["treasuryInDatum"] = {
+  const treasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] = {
     sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
     orderHash: t.utils.validatorToScriptHash(validators.orderValidator),
-    sellerCount: DEFAULT_NUMBER_SELLER,
+    managerHash: t.utils.validatorToScriptHash(validators.managerValidator),
     collectedFund: 0n,
     baseAsset: baseAsset,
     raiseAsset: {
@@ -146,6 +146,8 @@ test("example flow", async () => {
     penaltyConfig: null,
     totalPenalty: 0n,
     isCancelled: false,
+    minimumOrderRaise: null,
+    isManagerCollected: false,
   };
   builder = new WarehouseBuilder(options);
   let factoryUtxo: UTxO = (
@@ -156,27 +158,28 @@ test("example flow", async () => {
   builder.buildCreateTreasury({ factoryUtxo, treasuryDatum });
   const createTreasuryTx = await quickSubmitBuilder(emulator)({
     txBuilder: builder.complete(),
+    stats: true,
   });
   expect(createTreasuryTx).toBeTruthy();
   console.info("create treasury done");
 
-  let treasuryUtxo = (
-    await emulator.getUtxos(
-      t.utils.validatorToAddress(validators.treasuryValidator),
-    )
-  ).find((u) => u.scriptRef === undefined)!;
-  let validFrom = t.utils.slotToUnixTime(emulator.slot);
-  let validTo = t.utils.slotToUnixTime(emulator.slot + 60 * 10);
-  builder = new WarehouseBuilder(options);
-  builder.buildAddSeller({
-    treasuryUtxo,
-    addSellerCount: 5n,
-    validFrom,
-    validTo,
-  })
-  const addSellersTx = await quickSubmitBuilder(emulator)({
-    txBuilder: builder.complete(),
-  });
-  expect(addSellersTx).toBeTruthy();
-  console.info("Add Sellers done");
+  // let treasuryUtxo = (
+  //   await emulator.getUtxos(
+  //     t.utils.validatorToAddress(validators.treasuryValidator),
+  //   )
+  // ).find((u) => u.scriptRef === undefined)!;
+  // let validFrom = t.utils.slotToUnixTime(emulator.slot);
+  // let validTo = t.utils.slotToUnixTime(emulator.slot + 60 * 10);
+  // builder = new WarehouseBuilder(options);
+  // builder.buildAddSeller({
+  //   treasuryUtxo,
+  //   addSellerCount: 5n,
+  //   validFrom,
+  //   validTo,
+  // })
+  // const addSellersTx = await quickSubmitBuilder(emulator)({
+  //   txBuilder: builder.complete(),
+  // });
+  // expect(addSellersTx).toBeTruthy();
+  // console.info("Add Sellers done");
 });

@@ -25,14 +25,31 @@ export function quickSubmitBuilder(emulator: Emulator) {
     txBuilder,
     extraSignatures,
     debug,
+    stats,
   }: {
     txBuilder: Tx;
     extraSignatures?: PrivateKey[];
     debug?: boolean;
+    stats?: boolean;
   }) {
     const completedTx = await txBuilder.complete();
     if (debug) {
       console.log("debug", completedTx.txComplete.to_json());
+    }
+    if (stats) {
+      const body = completedTx.txComplete.body();
+      const txFee = body.fee().to_str();
+      let totalCoin = 0n;
+      for (let i = 0; i < body.outputs().len(); i++) {
+        const output = body.outputs().get(i);
+        const addressDetails = T.getAddressDetails(output.address().to_bech32());
+        if (addressDetails.paymentCredential?.type == "Script") {
+          const coin = BigInt(output.amount().coin().to_str());
+          totalCoin += coin;
+        }
+      }
+      totalCoin /= 1_000_000n;
+      console.log("stats", {txFee, totalCoin});
     }
     const signedTx = completedTx.sign();
     for (const privateKey of extraSignatures || []) {
