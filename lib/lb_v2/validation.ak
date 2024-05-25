@@ -723,7 +723,7 @@ pub fn validate_using_seller(
       end_valid_time_range: end_valid_time_range,
       seller_hash: seller_hash,
       base_asset: base_asset,
-      raise_asset: base_asset,
+      raise_asset: raise_asset,
       extra_signatories: extra_signatories,
       inputs: inputs,
       minimum_order_raise: minimum_order_raise,
