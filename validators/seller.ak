@@ -53,7 +53,7 @@ validator(
   }
 
   fn validate_seller_minting_or_withdraw(
-    _redeemer: SellerRedeemer,
+    _redeemer: Data,
     context: ScriptContext,
   ) {
     let ScriptContext {

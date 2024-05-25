@@ -21,7 +21,8 @@ use lb_v2/utils.{
   amm_pool_validation_hash, calculate_penalty,
   compute_asset_name_from_base_and_raise, default_burn_liquidity,
   default_number_seller, factory_auth_an, fee_ada, get_order_value,
-  manager_auth_an, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
+  make_wrapper_redeemer, manager_auth_an, minimum_ada, order_auth_an,
+  seller_auth_an, treasury_auth_an,
 }
 
 pub fn get_value_of_minting_treasury(
@@ -353,8 +354,7 @@ pub fn has_spend_seller(
       },
     )
   expect Some(raw_redeemer) = dict.get(redeemers, Spend(seller_out_ref))
-  expect redeemer: SellerRedeemer = raw_redeemer
-  redeemer == expected_redeemer
+  make_wrapper_redeemer(expected_redeemer) == raw_redeemer
 }
 
 pub fn get_seller_inputs(
