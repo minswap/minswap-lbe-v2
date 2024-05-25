@@ -9,7 +9,7 @@ import {
   SellerValidateSellerSpending,
   TreasuryValidateTreasurySpending,
 } from "../plutus.ts";
-import type { Address, Assets, Translucent, Tx, UTxO, UnixTime } from "./types.ts";
+import type { Address, Assets, RewardAddress, Translucent, Tx, UTxO, UnixTime } from "./types.ts";
 import {
   DEFAULT_NUMBER_SELLER,
   DUMMY_REDEEMER,
@@ -117,6 +117,7 @@ export class WarehouseBuilder {
   managerAddress: Address;
   sellerAddress: Address;
   orderAddress: Address;
+  sellerRewardAddress: RewardAddress;
 
   // Auth Token
   factoryToken: string;
@@ -172,6 +173,7 @@ export class WarehouseBuilder {
     this.managerAddress = t.utils.validatorToAddress(validators.managerValidator);
     this.sellerAddress = t.utils.validatorToAddress(validators.sellerValidator);
     this.orderAddress = t.utils.validatorToAddress(validators.orderValidator);
+    this.sellerRewardAddress = t.utils.validatorToRewardAddress(validators.sellerValidator);
 
     this.factoryToken = T.toUnit(this.authenHash, FACTORY_AUTH_AN);
     this.treasuryToken = T.toUnit(this.authenHash, TREASURY_AUTH_AN);
@@ -494,7 +496,7 @@ export class WarehouseBuilder {
     );
   }
 
-  public buildCollectSeller(options: BuildCollectSellersOptions) {}
+  public buildCollectSeller(options: BuildCollectSellersOptions) { }
 
   /************************* PARSER  *************************/
   private fromDatumTreasury(rawDatum: string): TreasuryValidateTreasurySpending["treasuryInDatum"] {
@@ -537,21 +539,25 @@ export class WarehouseBuilder {
     return T.Data.to(datum, ManagerValidateManagerSpending.managerInDatum);
   }
 
+  private toRedeemerSellerSpend(redeemer: SellerValidateSellerSpending["redeemer"]): string {
+    return T.Data.to(redeemer, SellerValidateSellerSpending.redeemer);
+  }
+
   /************************* SPENDING  *************************/
   private spendingSellerInput() {
     if (this.sellerInputs.length === 0) {
       return;
     }
-    if (this.sellerSpendRedeemer && this.sellerSpendRedeemer.wrapper === "UsingSeller") {
+    invariant(this.sellerSpendRedeemer);
+    if (this.sellerSpendRedeemer.wrapper === "UsingSeller") {
       invariant(this.treasuryRefInput);
       this.tx.readFrom([this.treasuryRefInput]);
     }
-    invariant(this.sellerSpendRedeemer);
     this.tx
       .readFrom([this.deployedValidators["sellerValidator"]])
       .collectFrom(
         this.sellerInputs,
-        T.Data.to(this.sellerSpendRedeemer, SellerValidateSellerSpending.redeemer),
+        this.toRedeemerSellerSpend(this.sellerSpendRedeemer),
       );
   }
 
@@ -790,6 +796,17 @@ export class WarehouseBuilder {
     cases[this.factoryInputs.length]();
   }
 
+  /************************* WITHDRAW *************************/
+  private withdrawFromSeller() {
+    this.tx
+      .readFrom([this.deployedValidators["treasuryValidator"]])
+      .withdraw(
+        this.sellerRewardAddress,
+        0n,
+        this.toRedeemerSellerSpend({wrapper: "UsingSeller"}),
+      )
+  }
+
   /************************* MINTING *************************/
   private mintingTreasuryToken() {
     const cases: Record<number, bigint> = {
@@ -837,12 +854,17 @@ export class WarehouseBuilder {
 
   private mintingOrderToken(count: bigint) {
     const mintAmount = this.treasuryInputs.length ? -1n * BigInt(this.orderInputs.length) : count;
-    this.tx.readFrom([this.deployedValidators["sellerValidator"]]).mintAssets(
-      {
-        [this.orderToken]: mintAmount,
-      },
-      DUMMY_REDEEMER,
-    );
+    this.tx
+      .readFrom([this.deployedValidators["sellerValidator"]])
+      .mintAssets(
+        {
+          [this.orderToken]: mintAmount,
+        },
+        DUMMY_REDEEMER,
+      );
+    if (count > 0) {
+      this.withdrawFromSeller();
+    }
   }
 
   private mintingFactoryToken() {

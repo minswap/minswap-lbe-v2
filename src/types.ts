@@ -10,6 +10,7 @@ export type UTxO = T.UTxO;
 export type ScriptRef = T.ScriptRef;
 export type Script = T.Script;
 export type Address = T.Address;
+export type RewardAddress = T.RewardAddress;
 export type OutputData = T.OutputData;
 export type UnixTime = T.UnixTime;
 export type Network = T.Network;

@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "bun:test";
 import * as T from "@minswap/translucent";
 import {
   WarehouseBuilder,
+  type BuildUsingSellerOptions,
   type WarehouseBuilderOptions,
 } from "../build-tx";
 import {
@@ -24,8 +25,8 @@ import type {
   UTxO,
 } from "../types";
 import { address2PlutusAddress, computeLPAssetName } from "../utils";
-import { DEFAULT_NUMBER_SELLER, LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
-import { FactoryValidateFactory, type TreasuryValidateTreasurySpending } from "../../plutus";
+import { LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
+import { FactoryValidateFactory, FeedTypeOrder, type TreasuryValidateTreasurySpending } from "../../plutus";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -40,6 +41,10 @@ let baseAsset: {
   policyId: string;
   assetName: string;
 };
+let raiseAsset: {
+  policyId: string;
+  assetName: string;
+}
 
 beforeEach(async () => {
   await T.loadModule();
@@ -49,6 +54,10 @@ beforeEach(async () => {
     policyId: "e16c2dc8ae937e8d3790c7fd7168d7b994621ba14ca11415f39fed72",
     assetName: "4d494e",
   };
+  raiseAsset = {
+    policyId: "",
+    assetName: "",
+  }
   ACCOUNT_0 = await generateAccount({
     lovelace: 2000000000000000000n,
     [T.toUnit(baseAsset.policyId, baseAsset.assetName)]: 69_000_000_000_000n,
@@ -83,6 +92,15 @@ beforeEach(async () => {
     },
   });
   ammDeployedValidators = await deployMinswapValidators(t, ammValidators);
+
+   // registerStake
+   await quickSubmitBuilder(emulator)({
+    txBuilder: t
+      .newTx()
+      .registerStake(
+        t.utils.validatorToRewardAddress(validators.sellerValidator),
+      ),
+  });
 });
 
 test("quick", async()=>{
@@ -123,6 +141,7 @@ test("example flow", async () => {
   expect(initFactoryTx).toBeTruthy();
   console.info("Init Factory done");
 
+  // create treasury
   const discoveryStartSlot = emulator.slot;
   const discoveryEndSlot = discoveryStartSlot + 60 * 60 * 24 * 2; // 2 days
   const treasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] = {
@@ -162,6 +181,43 @@ test("example flow", async () => {
   });
   expect(createTreasuryTx).toBeTruthy();
   console.info("create treasury done");
+
+  // deposit orders
+  let treasuryRefInput: UTxO = (
+    await emulator.getUtxos(
+      t.utils.validatorToAddress(validators.treasuryValidator),
+    )
+  ).find((u) => !u.scriptRef) as UTxO;
+  let sellerUtxos: UTxO[] = (
+    await emulator.getUtxos(
+      t.utils.validatorToAddress(validators.sellerValidator),
+    )
+  ).filter((u) => !u.scriptRef) as UTxO[];
+  let orderDatum: FeedTypeOrder["_datum"] = {
+    baseAsset,
+    raiseAsset, 
+    owner: address2PlutusAddress(ACCOUNT_0.address),
+    amount: 100n,
+    isCollected: false,
+    penaltyAmount: 0n,
+  };
+  for (const sellerUtxo of sellerUtxos) {
+    builder = new WarehouseBuilder(options);
+    const buildUsingSellerOptions: BuildUsingSellerOptions = {
+      treasuryRefInput,
+      sellerUtxo: sellerUtxo,
+      validFrom: t.utils.slotToUnixTime(emulator.slot),
+      validTo: t.utils.slotToUnixTime(emulator.slot + 100),
+      owners: [ACCOUNT_0.address],
+      orderInputs: [],
+      orderOutputDatums: [orderDatum],
+    };
+    builder.buildUsingSeller(buildUsingSellerOptions);
+    await quickSubmitBuilder(emulator)({
+      txBuilder: builder.complete(),
+    });
+  }
+  console.info(`deposited ${sellerUtxos.length} orders.`);
 
   // let treasuryUtxo = (
   //   await emulator.getUtxos(
