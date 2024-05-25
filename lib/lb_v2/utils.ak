@@ -147,3 +147,7 @@ pub fn sort_two_consecutive_factory_datum(
     (datum_b, datum_a)
   }
 }
+
+pub fn make_wrapper_redeemer(redeemer: Data) -> Data {
+  builtin.constr_data(1, [redeemer])
+}

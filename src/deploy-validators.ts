@@ -30,9 +30,12 @@ export type MinswapValidators = {
   authenValidator: Script;
   factoryValidator: Script;
   poolValidator: Script;
-}
+};
 
-export function collectMinswapValidators(options: { t: Translucent, seedOutRef: OutRef }): MinswapValidators {
+export function collectMinswapValidators(options: {
+  t: Translucent;
+  seedOutRef: OutRef;
+}): MinswapValidators {
   const { t, seedOutRef } = options;
 
   const authenValidator = new MinswapAuthen({
@@ -44,10 +47,7 @@ export function collectMinswapValidators(options: { t: Translucent, seedOutRef: 
   const poolValidator = new MinswapPool(authenValidatorHash);
   const poolValidatorHash = t.utils.validatorToScriptHash(poolValidator);
 
-  const factoryValidator = new MinswapFactory(
-    authenValidatorHash,
-    poolValidatorHash,
-  );
+  const factoryValidator = new MinswapFactory(authenValidatorHash, poolValidatorHash);
 
   return {
     authenValidator,
@@ -71,11 +71,8 @@ export function collectValidators(options: {
     outputIndex: BigInt(seedOutRef!.outputIndex),
   });
   const authenValidatorHash = t.utils.validatorToScriptHash(authenValidator);
-  const treasuryValidator = new TreasuryValidateTreasurySpending(
-    authenValidatorHash,
-  );
-  const treasuryValidatorHash =
-    t.utils.validatorToScriptHash(treasuryValidator);
+  const treasuryValidator = new TreasuryValidateTreasurySpending(authenValidatorHash);
+  const treasuryValidatorHash = t.utils.validatorToScriptHash(treasuryValidator);
   const managerValidator = new ManagerValidateManagerSpending(
     authenValidatorHash,
     treasuryValidatorHash,
@@ -87,10 +84,7 @@ export function collectValidators(options: {
     managerValidatorHash,
   );
   const sellerValidatorHash = t.utils.validatorToScriptHash(sellerValidator);
-  const orderValidator = new OrderValidateOrder(
-    treasuryValidatorHash,
-    sellerValidatorHash,
-  );
+  const orderValidator = new OrderValidateOrder(treasuryValidatorHash, sellerValidatorHash);
   const orderValidatorHash = t.utils.validatorToScriptHash(orderValidator);
   const factoryValidator = new FactoryValidateFactory(
     authenValidatorHash,

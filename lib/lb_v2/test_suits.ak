@@ -5,9 +5,11 @@ use aiken/transaction.{
 }
 use aiken/transaction/credential.{Address, VerificationKeyCredential}
 use aiken/transaction/value.{ada_asset_name, ada_policy_id}
-use lb_v2/types.{Asset, FactoryDatum, OrderDatum, PenaltyConfig, ValidatorHash}
+use lb_v2/types.{
+  Asset, FactoryDatum, OrderDatum, PenaltyConfig, UsingSeller, ValidatorHash,
+}
 use lb_v2/utils.{
-  calculate_penalty, fee_ada, minimum_ada, order_auth_an,
+  calculate_penalty, fee_ada, make_wrapper_redeemer, minimum_ada, order_auth_an,
   sort_two_consecutive_factory_datum,
 }
 use lb_v2/validation.{apply_collecting_orders}
@@ -194,4 +196,9 @@ fn generate_order_output(
     datum: InlineDatum(order_datum),
     reference_script: None,
   }
+}
+
+test test_make_wrapper_redeemer() {
+  let redeemer_wrapper = make_wrapper_redeemer(UsingSeller)
+  builtin.serialise_data(redeemer_wrapper) == #"d87a9fd87980ff"
 }

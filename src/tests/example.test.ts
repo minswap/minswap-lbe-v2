@@ -14,19 +14,15 @@ import {
   deployMinswapValidators,
   collectMinswapValidators,
 } from "../deploy-validators";
-import {
-  generateAccount,
-  quickSubmitBuilder,
-  type GeneratedAccount,
-} from "./utils";
-import type {
-  Emulator,
-  Translucent,
-  UTxO,
-} from "../types";
+import { generateAccount, quickSubmitBuilder, type GeneratedAccount } from "./utils";
+import type { Emulator, Translucent, UTxO } from "../types";
 import { address2PlutusAddress, computeLPAssetName } from "../utils";
 import { LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
-import { FactoryValidateFactory, FeedTypeOrder, type TreasuryValidateTreasurySpending } from "../../plutus";
+import {
+  FactoryValidateFactory,
+  FeedTypeOrder,
+  type TreasuryValidateTreasurySpending,
+} from "../../plutus";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -44,7 +40,7 @@ let baseAsset: {
 let raiseAsset: {
   policyId: string;
   assetName: string;
-}
+};
 
 beforeEach(async () => {
   await T.loadModule();
@@ -57,7 +53,7 @@ beforeEach(async () => {
   raiseAsset = {
     policyId: "",
     assetName: "",
-  }
+  };
   ACCOUNT_0 = await generateAccount({
     lovelace: 2000000000000000000n,
     [T.toUnit(baseAsset.policyId, baseAsset.assetName)]: 69_000_000_000_000n,
@@ -93,29 +89,24 @@ beforeEach(async () => {
   });
   ammDeployedValidators = await deployMinswapValidators(t, ammValidators);
 
-   // registerStake
-   await quickSubmitBuilder(emulator)({
+  // registerStake
+  await quickSubmitBuilder(emulator)({
     txBuilder: t
       .newTx()
-      .registerStake(
-        t.utils.validatorToRewardAddress(validators.sellerValidator),
-      ),
+      .registerStake(t.utils.validatorToRewardAddress(validators.sellerValidator)),
   });
 });
 
-test("quick", async()=>{
-  const lpAssetName = computeLPAssetName(
-    baseAsset.policyId + baseAsset.assetName,
-    "",
-  );
+test("quick", async () => {
+  const lpAssetName = computeLPAssetName(baseAsset.policyId + baseAsset.assetName, "");
   const factoryDatumHead: FactoryValidateFactory["datum"] = {
     head: LBE_INIT_FACTORY_HEAD,
     tail: lpAssetName,
-  }
+  };
   const factoryDatumTail: FactoryValidateFactory["datum"] = {
     head: lpAssetName,
     tail: LBE_INIT_FACTORY_TAIL,
-  }
+  };
   const headRaw = T.Data.to(factoryDatumHead, FactoryValidateFactory.datum);
   const tailRaw = T.Data.to(factoryDatumTail, FactoryValidateFactory.datum);
   expect(headRaw < tailRaw).toBeTruthy();
@@ -170,9 +161,7 @@ test("example flow", async () => {
   };
   builder = new WarehouseBuilder(options);
   let factoryUtxo: UTxO = (
-    await emulator.getUtxos(
-      t.utils.validatorToAddress(validators.factoryValidator),
-    )
+    await emulator.getUtxos(t.utils.validatorToAddress(validators.factoryValidator))
   ).find((u) => !u.scriptRef) as UTxO;
   builder.buildCreateTreasury({ factoryUtxo, treasuryDatum });
   const createTreasuryTx = await quickSubmitBuilder(emulator)({
@@ -184,20 +173,16 @@ test("example flow", async () => {
 
   // deposit orders
   let treasuryRefInput: UTxO = (
-    await emulator.getUtxos(
-      t.utils.validatorToAddress(validators.treasuryValidator),
-    )
+    await emulator.getUtxos(t.utils.validatorToAddress(validators.treasuryValidator))
   ).find((u) => !u.scriptRef) as UTxO;
   let sellerUtxos: UTxO[] = (
-    await emulator.getUtxos(
-      t.utils.validatorToAddress(validators.sellerValidator),
-    )
+    await emulator.getUtxos(t.utils.validatorToAddress(validators.sellerValidator))
   ).filter((u) => !u.scriptRef) as UTxO[];
   let orderDatum: FeedTypeOrder["_datum"] = {
     baseAsset,
-    raiseAsset, 
+    raiseAsset,
     owner: address2PlutusAddress(ACCOUNT_0.address),
-    amount: 100n,
+    amount: 100_000_000n,
     isCollected: false,
     penaltyAmount: 0n,
   };

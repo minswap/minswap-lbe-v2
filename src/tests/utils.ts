@@ -7,9 +7,7 @@ export type GeneratedAccount = {
   assets: Assets;
 };
 
-export async function generateAccount(
-  assets: Assets,
-): Promise<GeneratedAccount> {
+export async function generateAccount(assets: Assets): Promise<GeneratedAccount> {
   const privateKey = T.generatePrivateKey();
   return {
     privateKey,
@@ -49,7 +47,7 @@ export function quickSubmitBuilder(emulator: Emulator) {
         }
       }
       totalCoin /= 1_000_000n;
-      console.log("stats", {txFee, totalCoin});
+      console.log("stats", { txFee, totalCoin });
     }
     const signedTx = completedTx.sign();
     for (const privateKey of extraSignatures || []) {

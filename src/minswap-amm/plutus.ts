@@ -1,14 +1,7 @@
-import {
-  applyParamsToScript,
-  Data,
-  type Validator,
-} from "@minswap/translucent";
+import { applyParamsToScript, Data, type Validator } from "@minswap/translucent";
 
 export interface AuthenMintingPolicyValidateAuthen {
-  new (outRef: {
-    transactionId: { hash: string };
-    outputIndex: bigint;
-  }): Validator;
+  new (outRef: { transactionId: { hash: string }; outputIndex: bigint }): Validator;
   redeemer: "MintFactoryAuthen" | "CreatePool";
 }
 
@@ -159,10 +152,7 @@ export interface OrderValidatorValidateOrder {
   new (
     stakeCredential:
       | {
-          Inline: [
-            | { VerificationKeyCredential: [string] }
-            | { ScriptCredential: [string] },
-          ];
+          Inline: [{ VerificationKeyCredential: [string] } | { ScriptCredential: [string] }];
         }
       | {
           Pointer: {
@@ -180,10 +170,7 @@ export const OrderValidatorValidateOrder = Object.assign(
   function (
     stakeCredential:
       | {
-          Inline: [
-            | { VerificationKeyCredential: [string] }
-            | { ScriptCredential: [string] },
-          ];
+          Inline: [{ VerificationKeyCredential: [string] } | { ScriptCredential: [string] }];
         }
       | {
           Pointer: {

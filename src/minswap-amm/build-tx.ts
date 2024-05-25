@@ -9,11 +9,7 @@ import {
 import { calculateInitialLiquidity } from "./utils";
 import type { Translucent, Tx, UTxO } from "../types";
 import type { DeployedValidators } from "../deploy-validators";
-import {
-  LP_COLATERAL,
-  MINSWAP_V2_DEFAULT_POOL_ADA,
-  MINSWAP_V2_MAX_LIQUIDITY,
-} from "../constants";
+import { LP_COLATERAL, MINSWAP_V2_DEFAULT_POOL_ADA, MINSWAP_V2_MAX_LIQUIDITY } from "../constants";
 
 export type BuildCreatePoolOptions = {
   t: Translucent;
@@ -69,12 +65,8 @@ export function buildCreatePool(options: BuildCreatePoolOptions) {
     [factoryAuthAsset]: 1n,
     [poolLpAsset]: 9_223_372_036_854_775_807n,
   };
-  const initialLiquidity = calculateInitialLiquidity(
-    pool.amountA,
-    pool.amountB,
-  );
-  const remainingLiquidity =
-    MINSWAP_V2_MAX_LIQUIDITY - (initialLiquidity - LP_COLATERAL);
+  const initialLiquidity = calculateInitialLiquidity(pool.amountA, pool.amountB);
+  const remainingLiquidity = MINSWAP_V2_MAX_LIQUIDITY - (initialLiquidity - LP_COLATERAL);
   const poolAssets = {
     lovelace: MINSWAP_V2_DEFAULT_POOL_ADA,
     [toUnit(pool.assetB.policyId, pool.assetB.assetName)]: pool.amountB,
@@ -84,8 +76,7 @@ export function buildCreatePool(options: BuildCreatePoolOptions) {
   if (pool.assetA.policyId === "" && pool.assetA.assetName === "") {
     poolAssets["lovelace"] += pool.amountA;
   } else {
-    poolAssets[toUnit(pool.assetA.policyId, pool.assetA.assetName)] =
-      pool.amountA;
+    poolAssets[toUnit(pool.assetA.policyId, pool.assetA.assetName)] = pool.amountA;
   }
   const poolDatum: PoolValidatorValidatePool["datum"] = {
     poolBatchingStakeCredential: {
@@ -111,31 +102,19 @@ export function buildCreatePool(options: BuildCreatePoolOptions) {
       minswapDeployedValidators["poolValidator"],
       minswapDeployedValidators["factoryValidator"],
     ])
-    .collectFrom(
-      [factoryUTxO],
-      Data.to(factoryRedeemer, FactoryValidatorValidateFactory.redeemer),
-    )
-    .mintAssets(
-      mintAssets,
-      Data.to("CreatePool", AuthenMintingPolicyValidateAuthen.redeemer),
-    )
+    .collectFrom([factoryUTxO], Data.to(factoryRedeemer, FactoryValidatorValidateFactory.redeemer))
+    .mintAssets(mintAssets, Data.to("CreatePool", AuthenMintingPolicyValidateAuthen.redeemer))
     .payToAddressWithData(
       factoryUTxO.address,
       {
-        inline: Data.to(
-          headFactoryDatum,
-          FactoryValidatorValidateFactory.datum,
-        ),
+        inline: Data.to(headFactoryDatum, FactoryValidatorValidateFactory.datum),
       },
       { ...factoryUTxO.assets },
     )
     .payToAddressWithData(
       factoryUTxO.address,
       {
-        inline: Data.to(
-          tailFactoryDatum,
-          FactoryValidatorValidateFactory.datum,
-        ),
+        inline: Data.to(tailFactoryDatum, FactoryValidatorValidateFactory.datum),
       },
       { ...factoryUTxO.assets },
     )

@@ -496,7 +496,7 @@ export class WarehouseBuilder {
     );
   }
 
-  public buildCollectSeller(options: BuildCollectSellersOptions) { }
+  public buildCollectSeller(options: BuildCollectSellersOptions) {}
 
   /************************* PARSER  *************************/
   private fromDatumTreasury(rawDatum: string): TreasuryValidateTreasurySpending["treasuryInDatum"] {
@@ -555,10 +555,7 @@ export class WarehouseBuilder {
     }
     this.tx
       .readFrom([this.deployedValidators["sellerValidator"]])
-      .collectFrom(
-        this.sellerInputs,
-        this.toRedeemerSellerSpend(this.sellerSpendRedeemer),
-      );
+      .collectFrom(this.sellerInputs, this.toRedeemerSellerSpend(this.sellerSpendRedeemer));
   }
 
   private spendingFactoryInput() {
@@ -690,6 +687,7 @@ export class WarehouseBuilder {
     if (this.sellerInputs.length) {
       // Using seller
       invariant(outDatum);
+      innerPay(outDatum);
     } else {
       const cases: Record<number, () => void> = {
         // Create Treasury
@@ -803,8 +801,8 @@ export class WarehouseBuilder {
       .withdraw(
         this.sellerRewardAddress,
         0n,
-        this.toRedeemerSellerSpend({wrapper: "UsingSeller"}),
-      )
+        this.toRedeemerSellerSpend({ wrapper: "UsingSeller" }),
+      );
   }
 
   /************************* MINTING *************************/
@@ -854,14 +852,12 @@ export class WarehouseBuilder {
 
   private mintingOrderToken(count: bigint) {
     const mintAmount = this.treasuryInputs.length ? -1n * BigInt(this.orderInputs.length) : count;
-    this.tx
-      .readFrom([this.deployedValidators["sellerValidator"]])
-      .mintAssets(
-        {
-          [this.orderToken]: mintAmount,
-        },
-        DUMMY_REDEEMER,
-      );
+    this.tx.readFrom([this.deployedValidators["sellerValidator"]]).mintAssets(
+      {
+        [this.orderToken]: mintAmount,
+      },
+      DUMMY_REDEEMER,
+    );
     if (count > 0) {
       this.withdrawFromSeller();
     }
