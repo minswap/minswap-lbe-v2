@@ -585,7 +585,7 @@ export class WarehouseBuilder {
     invariant(this.orderSpendRedeemer);
     const cases: Record<FeedTypeOrder["_redeemer"], () => void> = {
       UpdateOrder: () => {
-        this.withdrawFromSeller();
+        // this.withdrawFromSeller();
       },
       CollectOrder: () => {
         this.withdrawFromTreasury();
@@ -888,9 +888,9 @@ export class WarehouseBuilder {
       },
       DUMMY_REDEEMER,
     );
-    if (count > 0) {
-      this.withdrawFromSeller();
-    }
+    // if (count > 0) {
+    //   this.withdrawFromSeller();
+    // }
   }
 
   private mintingFactoryToken() {

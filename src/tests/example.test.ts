@@ -215,8 +215,8 @@ test("example flow", async () => {
     }
     console.info(`deposit ${depositCount} orders done.`);
   }
-  await depositing();
-  await depositing(10);
+  await depositing(15);
+  // await depositing(10);
 
   // update + orders
   const updatingOrders = async () => {

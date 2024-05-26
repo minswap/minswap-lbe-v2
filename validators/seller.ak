@@ -1,6 +1,4 @@
-use aiken/dict
-use aiken/transaction.{Mint, ScriptContext, Spend, Transaction, WithdrawFrom}
-use aiken/transaction/credential.{Inline, ScriptCredential}
+use aiken/transaction.{Mint, ScriptContext, Spend, Transaction}
 use aiken/transaction/value.{PolicyId}
 use lb_v2/types.{
   CountingSeller, RedeemOrders, SellerDatum, SellerRedeemer, UsingSeller,
@@ -56,37 +54,25 @@ validator(
     _redeemer: Data,
     context: ScriptContext,
   ) {
-    let ScriptContext {
-      purpose,
-      transaction: Transaction { inputs, withdrawals, redeemers, .. },
+    expect ScriptContext {
+      purpose: Mint(policy_id),
+      transaction: Transaction { inputs, redeemers, .. },
     } = context
-    when purpose is {
-      WithdrawFrom(stake_credential) -> {
-        // OrderSpending(UpdateOrder) -> SellerWithdrawal -> SellerSpending
-        expect Inline(ScriptCredential(seller_hash)) = stake_credential
-        validation.has_spend_seller(
-          inputs: inputs,
-          manager_policy_id: manager_hash,
-          seller_hash: seller_hash,
-          redeemers: redeemers,
-          expected_redeemer: UsingSeller,
-        )
-      }
-      Mint(policy_id) ->
-        if dict.has_key(withdrawals, Inline(ScriptCredential(policy_id))) {
-          // forward logic to (Seller - WithdrawFrom) -> (Seller - Spending - UsingSeller)
-          True
-        } else {
-          // forward logic to (Treasury-Spending-RedeemOrders)
-          validation.has_spend_treasury(
-            inputs: inputs,
-            authen_policy_id: authen_policy_id,
-            treasury_hash: treasury_hash,
-            redeemers: redeemers,
-            expected_redeemer: RedeemOrders,
-          )
-        }
-      _ -> False
+    or {
+      validation.has_spend_seller(
+        inputs: inputs,
+        manager_policy_id: manager_hash,
+        seller_hash: policy_id,
+        redeemers: redeemers,
+        expected_redeemer: UsingSeller,
+      ),
+      validation.has_spend_treasury(
+        inputs: inputs,
+        authen_policy_id: authen_policy_id,
+        treasury_hash: treasury_hash,
+        redeemers: redeemers,
+        expected_redeemer: RedeemOrders,
+      ),
     }
   }
 }

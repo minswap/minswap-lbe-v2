@@ -84,7 +84,7 @@ export function collectValidators(options: {
     managerValidatorHash,
   );
   const sellerValidatorHash = t.utils.validatorToScriptHash(sellerValidator);
-  const orderValidator = new OrderValidateOrder(treasuryValidatorHash, sellerValidatorHash);
+  const orderValidator = new OrderValidateOrder(treasuryValidatorHash, sellerValidatorHash, managerValidatorHash);
   const orderValidatorHash = t.utils.validatorToScriptHash(orderValidator);
   const factoryValidator = new FactoryValidateFactory(
     authenValidatorHash,
