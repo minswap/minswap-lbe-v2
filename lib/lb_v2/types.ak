@@ -76,6 +76,8 @@ pub type TreasuryRedeemer {
   CreateAmmPool
   // redeem LP or refund if cancel
   RedeemOrders
+  // redeem LP or refund by project owner
+  RedeemerLPByOwner
   // Close event after refund by cancel or close LBE before discovery phase
   CloseEvent
   // change status to cancel 

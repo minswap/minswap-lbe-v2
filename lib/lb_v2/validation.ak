@@ -1237,8 +1237,7 @@ pub fn validate_cancel_lbe(
       Some(min_raise) -> min_raise
     }
   and {
-    // 1. collected_fund == reserve_raise+penalty(collected all orders) 
-    //          && seller == 0(because when collected_fund == reserve_raise+penalty == 0, it can be Counting phase when trreasury havent collected any seller)
+    // 1. Cancel reason
     if and {
       is_manager_collected,
       collected_fund < min_raise,
@@ -1262,7 +1261,7 @@ pub fn validate_cancel_lbe(
       expect PoolDatum { asset_a, asset_b, .. }: PoolDatum = raw_pool_datum
       utils.sort_two_assets(base_asset, raise_asset) == (asset_a, asset_b)
     },
-    // 3. Treasury
+    // 2. Treasury
     //    - Datum: 
     //      - is_cancelled: 
     //        - Input: False
@@ -1429,6 +1428,42 @@ fn apply_refund_order(
     amount,
     penalty_amount,
   )
+}
+
+pub fn validate_redeem_lp_by_owner(
+  treasury_output: Output,
+  treasury_in_datum: TreasuryDatum,
+  inputs: List<Input>,
+  extra_signatories: List<PubKeyHash>,
+  authen_policy_id: PolicyId,
+) -> Bool {
+  let TreasuryDatum { owner, total_liquidity, collected_fund, .. } =
+    treasury_in_datum
+  let Address { payment_credential: owner_payment_credential, .. } = owner
+
+  expect Output {
+    value: treasury_out_value,
+    datum: InlineDatum(raw_treasury_out_datum),
+    ..
+  } = treasury_output
+  expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
+  and {
+    validate_authorize_by_owner(
+      owner_payment_credential: owner_payment_credential,
+      extra_signatories: extra_signatories,
+      inputs: inputs,
+    ),
+    // create pool sucess
+    total_liquidity > 0,
+    // redeem all orders
+    collected_fund == 0,
+    treasury_out_datum == treasury_in_datum,
+    value.without_lovelace(treasury_out_value) == value.from_asset(
+      authen_policy_id,
+      treasury_auth_an,
+      1,
+    ),
+  }
 }
 
 pub fn validate_manage_seller(
