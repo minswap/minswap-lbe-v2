@@ -324,6 +324,8 @@ validator(
         } = treasury_in
         expect treasury_datum: TreasuryDatum = treasury_datum_raw
         let TreasuryDatum {
+          base_asset: t_base_asset,
+          raise_asset: t_raise_asset,
           owner,
           is_cancelled,
           reserve_raise,
@@ -334,6 +336,8 @@ validator(
         let Address { payment_credential: owner_payment_credential, .. } = owner
 
         and {
+          t_base_asset == base_asset,
+          t_raise_asset == raise_asset,
           value.from_minted_value(mint) == validation.get_value_of_minting_treasury(
             factory_policy_id: factory_hash,
             is_create_treasury: False,
