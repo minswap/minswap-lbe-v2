@@ -120,6 +120,7 @@ export class WarehouseBuilder {
   sellerAddress: Address;
   orderAddress: Address;
   sellerRewardAddress: RewardAddress;
+  treasuryRewardAddress: RewardAddress;
 
   // Auth Token
   factoryToken: string;
@@ -176,6 +177,7 @@ export class WarehouseBuilder {
     this.sellerAddress = t.utils.validatorToAddress(validators.sellerValidator);
     this.orderAddress = t.utils.validatorToAddress(validators.orderValidator);
     this.sellerRewardAddress = t.utils.validatorToRewardAddress(validators.sellerValidator);
+    this.treasuryRewardAddress = t.utils.validatorToRewardAddress(validators.treasuryValidator);
 
     this.factoryToken = T.toUnit(this.authenHash, FACTORY_AUTH_AN);
     this.treasuryToken = T.toUnit(this.authenHash, TREASURY_AUTH_AN);
@@ -581,6 +583,16 @@ export class WarehouseBuilder {
       return;
     }
     invariant(this.orderSpendRedeemer);
+    const cases: Record<FeedTypeOrder["_redeemer"], () => void> = {
+      UpdateOrder: () => {
+        this.withdrawFromSeller();
+      },
+      CollectOrder: () => {
+        this.withdrawFromTreasury();
+      },
+      RedeemOrder: () => { },
+    };
+    cases[this.orderSpendRedeemer]();
     this.tx
       .readFrom([this.deployedValidators["orderValidator"]])
       .collectFrom(this.orderInputs, T.Data.to(this.orderSpendRedeemer, FeedTypeOrder._redeemer));
@@ -802,11 +814,21 @@ export class WarehouseBuilder {
   /************************* WITHDRAW *************************/
   private withdrawFromSeller() {
     this.tx
-      .readFrom([this.deployedValidators["treasuryValidator"]])
+      .readFrom([this.deployedValidators["sellerValidator"]])
       .withdraw(
         this.sellerRewardAddress,
         0n,
-        this.toRedeemerSellerSpend({ wrapper: "UsingSeller" }),
+        DUMMY_REDEEMER,
+      );
+  }
+
+  private withdrawFromTreasury() {
+    this.tx
+      .readFrom([this.deployedValidators["treasuryValidator"]])
+      .withdraw(
+        this.treasuryRewardAddress,
+        0n,
+        DUMMY_REDEEMER,
       );
   }
 
@@ -857,6 +879,9 @@ export class WarehouseBuilder {
 
   private mintingOrderToken(count: bigint) {
     const mintAmount = this.treasuryInputs.length ? -1n * BigInt(this.orderInputs.length) : count;
+    if (mintAmount == 0n) {
+      return;
+    }
     this.tx.readFrom([this.deployedValidators["sellerValidator"]]).mintAssets(
       {
         [this.orderToken]: mintAmount,
