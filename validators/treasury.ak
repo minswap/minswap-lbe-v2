@@ -250,6 +250,9 @@ validator(authen_policy_id: PolicyId) {
             treasury_in_value: treasury_in_value,
             treasury_output: treasury_output,
             ref_inputs: reference_inputs,
+            inputs: inputs,
+            extra_signatories: extra_signatories,
+            end_valid_time_range: end_valid_time_range,
           ),
           mint_value == value.zero(),
         }

@@ -1203,23 +1203,28 @@ fn apply_redeeming_lp_order(
   (amount + penalty_amount, o_lp_amount, o_remaining_raise_amount)
 }
 
-// TODO: support cancel before discovery by owner
 pub fn validate_cancel_lbe(
   treasury_in_datum: TreasuryDatum,
   treasury_in_value: Value,
   treasury_output: Output,
   ref_inputs: List<Input>,
+  inputs: List<Input>,
+  extra_signatories: List<PubKeyHash>,
+  end_valid_time_range: Int,
 ) -> Bool {
   let TreasuryDatum {
     collected_fund,
     base_asset,
     raise_asset,
-    reserve_raise,
     minimum_raise,
-    total_penalty,
     is_cancelled,
+    start_time,
+    owner,
+    is_manager_collected,
     ..
   } = treasury_in_datum
+  let Address { payment_credential: owner_payment_credential, .. } = owner
+
   expect Output {
     value: treasury_out_value,
     datum: InlineDatum(raw_treasury_out_datum),
@@ -1234,9 +1239,19 @@ pub fn validate_cancel_lbe(
   and {
     // 1. collected_fund == reserve_raise+penalty(collected all orders) 
     //          && seller == 0(because when collected_fund == reserve_raise+penalty == 0, it can be Counting phase when trreasury havent collected any seller)
-    collected_fund == reserve_raise + total_penalty,
-    // 2. reason
-    if collected_fund < min_raise {
+    if and {
+      is_manager_collected,
+      collected_fund < min_raise,
+    } {
+      True
+    } else if and {
+      validate_authorize_by_owner(
+        owner_payment_credential,
+        extra_signatories: extra_signatories,
+        inputs: inputs,
+      ),
+      end_valid_time_range < start_time,
+    } {
       True
     } else {
       expect [pool_ref_input] = get_amm_pool_ref_inputs(ref_inputs)
