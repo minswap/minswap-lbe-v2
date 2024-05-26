@@ -133,7 +133,7 @@ test("example flow", async () => {
   console.info("Init Factory done");
 
   // create treasury
-  const discoveryStartSlot = emulator.slot;
+  const discoveryStartSlot = emulator.slot + 60 * 60;
   const discoveryEndSlot = discoveryStartSlot + 60 * 60 * 24 * 2; // 2 days
   const treasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] = {
     sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
@@ -163,10 +163,16 @@ test("example flow", async () => {
   let factoryUtxo: UTxO = (
     await emulator.getUtxos(t.utils.validatorToAddress(validators.factoryValidator))
   ).find((u) => !u.scriptRef) as UTxO;
-  builder.buildCreateTreasury({ factoryUtxo, treasuryDatum });
+  builder.buildCreateTreasury({
+    factoryUtxo,
+    treasuryDatum,
+    validFrom: t.utils.slotToUnixTime(emulator.slot),
+    validTo: t.utils.slotToUnixTime(emulator.slot + 60),
+  });
   const createTreasuryTx = await quickSubmitBuilder(emulator)({
     txBuilder: builder.complete(),
     stats: true,
+    awaitBlock: 60 * 60 + 5,
   });
   expect(createTreasuryTx).toBeTruthy();
   console.info("create treasury done");

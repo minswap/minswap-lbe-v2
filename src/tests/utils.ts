@@ -24,11 +24,13 @@ export function quickSubmitBuilder(emulator: Emulator) {
     extraSignatures,
     debug,
     stats,
+    awaitBlock,
   }: {
     txBuilder: Tx;
     extraSignatures?: PrivateKey[];
     debug?: boolean;
     stats?: boolean;
+    awaitBlock?: number;
   }) {
     const completedTx = await txBuilder.complete();
     if (debug) {
@@ -55,7 +57,7 @@ export function quickSubmitBuilder(emulator: Emulator) {
     }
     const txSigned = await signedTx.complete();
     const txHash = txSigned.submit();
-    emulator.awaitBlock(1);
+    emulator.awaitBlock(awaitBlock ?? 1);
     return txHash;
   };
 }

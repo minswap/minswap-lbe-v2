@@ -47,6 +47,8 @@ export type BuildInitFactoryOptions = {
 export type BuildCreateTreasuryOptions = {
   factoryUtxo: UTxO;
   treasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"];
+  validFrom: UnixTime;
+  validTo: UnixTime;
 };
 
 export type BuildAddSellersOptions = {
@@ -217,7 +219,7 @@ export class WarehouseBuilder {
   }
 
   public buildCreateTreasury(options: BuildCreateTreasuryOptions) {
-    const { factoryUtxo, treasuryDatum } = options;
+    const { factoryUtxo, treasuryDatum, validFrom, validTo } = options;
     const managerDatum: ManagerValidateManagerSpending["managerInDatum"] = {
       orderHash: this.orderHash,
       sellerHash: this.sellerHash,
@@ -262,6 +264,9 @@ export class WarehouseBuilder {
       },
       () => {
         this.payingTreasuryOutput({ treasuryOutDatum: treasuryDatum });
+      },
+      () => {
+        this.tx.validFrom(validFrom).validTo(validTo);
       },
     );
   }
@@ -496,7 +501,7 @@ export class WarehouseBuilder {
     );
   }
 
-  public buildCollectSeller(options: BuildCollectSellersOptions) {}
+  public buildCollectSeller(options: BuildCollectSellersOptions) { }
 
   /************************* PARSER  *************************/
   private fromDatumTreasury(rawDatum: string): TreasuryValidateTreasurySpending["treasuryInDatum"] {
