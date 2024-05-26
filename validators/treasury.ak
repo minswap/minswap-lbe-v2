@@ -117,6 +117,7 @@ validator(authen_policy_id: PolicyId) {
             seller_hash: seller_hash,
             order_hash: order_hash,
             authen_policy_id: authen_policy_id,
+            end_valid_time_range: end_valid_time_range,
           ),
           // mint nothing
           mint_value == value.zero(),

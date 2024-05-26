@@ -1,4 +1,5 @@
 use aiken/builtin
+use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Output, ScriptContext, Spend, Transaction,
@@ -33,7 +34,14 @@ validator(
     context: ScriptContext,
   ) {
     expect ScriptContext {
-      transaction: Transaction { inputs, mint, outputs, extra_signatories, .. },
+      transaction: Transaction {
+        inputs,
+        mint,
+        outputs,
+        extra_signatories,
+        validity_range,
+        ..
+      },
       purpose: Spend(factory_ref),
     } = context
     let FactoryRedeemer { base_asset, raise_asset } = redeemer
@@ -75,6 +83,17 @@ validator(
           payment_credential == factory_payment_credential
         },
       )
+
+    expect Interval {
+      upper_bound: IntervalBound {
+        bound_type: Finite(end_valid_time_range),
+        ..
+      },
+      lower_bound: IntervalBound {
+        bound_type: Finite(_start_valid_time_range),
+        ..
+      },
+    } = validity_range
     when factory_inputs is {
       [factory_input] -> {
         // 1. Validate 1 factory In and 2 Factory Outs
@@ -152,6 +171,7 @@ validator(
             seller_hash: seller_hash,
             order_hash: order_hash,
             authen_policy_id: authen_policy_id,
+            end_valid_time_range: end_valid_time_range,
           )
         // 3. Validate Manager Out
         // manager 

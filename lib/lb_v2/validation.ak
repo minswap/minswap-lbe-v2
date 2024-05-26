@@ -51,6 +51,7 @@ pub fn validate_creating_treasury_out(
   seller_hash: ValidatorHash,
   order_hash: ValidatorHash,
   authen_policy_id: PolicyId,
+  end_valid_time_range: Int,
 ) -> Bool {
   // check all field except owner
   let TreasuryDatum {
@@ -89,7 +90,7 @@ pub fn validate_creating_treasury_out(
     collected_fund == 0,
     t_base_asset == base_asset,
     t_raise_asset == raise_asset,
-    start_time > 0,
+    start_time > end_valid_time_range,
     start_time < end_time,
     when minimum_order_raise is {
       Some(min_order) -> min_order > 0
