@@ -294,8 +294,7 @@ pub fn has_spend_treasury(
       },
     )
   expect Some(raw_redeemer) = dict.get(redeemers, Spend(treasury_out_ref))
-  expect redeemer: TreasuryRedeemer = raw_redeemer
-  redeemer == expected_redeemer
+  make_wrapper_redeemer(expected_redeemer) == raw_redeemer
 }
 
 pub fn has_spend_manager(
@@ -324,8 +323,7 @@ pub fn has_spend_manager(
       },
     )
   expect Some(raw_redeemer) = dict.get(redeemers, Spend(manager_out_ref))
-  expect redeemer: ManagerRedeemer = raw_redeemer
-  redeemer == expected_redeemer
+  make_wrapper_redeemer(expected_redeemer) == raw_redeemer
 }
 
 pub fn has_spend_seller(
