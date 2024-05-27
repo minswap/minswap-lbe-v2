@@ -158,6 +158,7 @@ fn generate_order_output(
     }
   let order_datum =
     OrderDatum {
+      factory_policy_id: seller_hash,
       base_asset,
       raise_asset,
       owner,

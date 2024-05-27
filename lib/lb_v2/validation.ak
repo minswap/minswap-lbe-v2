@@ -147,6 +147,7 @@ pub fn validate_creating_manager_out(
     seller_count,
     reserve_raise,
     total_penalty,
+    ..
   } = manager_out_datum
   and {
     // manager datum
@@ -702,6 +703,7 @@ pub fn validate_using_seller(
     ..
   } = treasury_ref_input
   expect TreasuryDatum {
+    factory_policy_id,
     base_asset,
     raise_asset,
     order_hash,
@@ -743,6 +745,7 @@ pub fn validate_using_seller(
       manager_policy_id: manager_hash,
       seller_hash: seller_hash,
       seller_datum: SellerDatum {
+        factory_policy_id,
         base_asset,
         raise_asset,
         amount: seller_in_datum.amount + delta_amount,
@@ -795,6 +798,7 @@ pub fn apply_order(
           is_collected,
           penalty_amount,
           owner,
+          ..
         }: OrderDatum = raw_o_datum
         let Address { payment_credential: owner_payment_credential, .. } = owner
         let expected_order =
@@ -1398,6 +1402,7 @@ fn apply_refund_order(
     amount,
     penalty_amount,
     is_collected,
+    ..
   } = order_in_datum
 
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
@@ -1546,6 +1551,7 @@ pub fn validate_manage_seller(
             raise_asset: s_raise_asset,
             amount,
             penalty_amount,
+            ..
           } = seller_datum
           expect and {
               s_base_asset == base_asset,

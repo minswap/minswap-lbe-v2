@@ -17,20 +17,18 @@ pub type Asset {
   asset_name: AssetName,
 }
 
-pub type AuthenRedeemer {
-  Initialization
-  // check factory exist in inputs
-  UsingFactory
-}
-
 pub type FactoryDatum {
   head: ByteArray,
   tail: ByteArray,
 }
 
 pub type FactoryRedeemer {
-  base_asset: Asset,
-  raise_asset: Asset,
+  Initialization
+  CreateTreasury { base_asset: Asset, raise_asset: Asset }
+  CloseTreasury { base_asset: Asset, raise_asset: Asset }
+  MintManager
+  MintSeller
+  MintOrder
 }
 
 pub type PenaltyConfig {
@@ -41,6 +39,7 @@ pub type PenaltyConfig {
 
 pub type TreasuryDatum {
   // Protocol Info
+  factory_policy_id: PolicyId,
   manager_hash: ValidatorHash,
   seller_hash: ValidatorHash,
   order_hash: ValidatorHash,
@@ -90,6 +89,7 @@ pub type TreasuryRedeemer {
 }
 
 pub type ManagerDatum {
+  factory_policy_id: PolicyId,
   order_hash: ValidatorHash,
   seller_hash: ValidatorHash,
   base_asset: Asset,
@@ -109,6 +109,7 @@ pub type ManagerRedeemer {
 }
 
 pub type SellerDatum {
+  factory_policy_id: PolicyId,
   base_asset: Asset,
   raise_asset: Asset,
   amount: Int,
@@ -121,6 +122,7 @@ pub type SellerRedeemer {
 }
 
 pub type OrderDatum {
+  factory_policy_id: PolicyId,
   base_asset: Asset,
   raise_asset: Asset,
   owner: Address,

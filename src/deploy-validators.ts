@@ -3,7 +3,6 @@ import path from "path";
 import * as T from "@minswap/translucent";
 import type { OutRef, Script, Translucent, Tx, UTxO } from "./types";
 import {
-  AuthenValidateAuthen,
   FactoryValidateFactory,
   TreasuryValidateTreasurySpending,
   SellerValidateSellerSpending,
@@ -18,7 +17,6 @@ import {
 } from "../amm-plutus";
 
 export type Validators = {
-  authenValidator: Script;
   factoryValidator: Script;
   treasuryValidator: Script;
   sellerValidator: Script;
@@ -66,35 +64,30 @@ export function collectValidators(options: {
     const fileContent = fs.readFileSync(path.resolve("params.json"), "utf-8");
     seedOutRef = JSON.parse(fileContent).seedOutRef;
   }
-  const authenValidator = new AuthenValidateAuthen({
-    transactionId: { hash: seedOutRef!.txHash },
-    outputIndex: BigInt(seedOutRef!.outputIndex),
-  });
-  const authenValidatorHash = t.utils.validatorToScriptHash(authenValidator);
-  const treasuryValidator = new TreasuryValidateTreasurySpending(authenValidatorHash);
+  const treasuryValidator = new TreasuryValidateTreasurySpending();
   const treasuryValidatorHash = t.utils.validatorToScriptHash(treasuryValidator);
   const managerValidator = new ManagerValidateManagerSpending(
-    authenValidatorHash,
     treasuryValidatorHash,
   );
   const managerValidatorHash = t.utils.validatorToScriptHash(managerValidator);
   const sellerValidator = new SellerValidateSellerSpending(
-    authenValidatorHash,
     treasuryValidatorHash,
     managerValidatorHash,
   );
   const sellerValidatorHash = t.utils.validatorToScriptHash(sellerValidator);
-  const orderValidator = new OrderValidateOrder(treasuryValidatorHash, sellerValidatorHash);
+  const orderValidator = new OrderValidateOrder(sellerValidatorHash, treasuryValidatorHash);
   const orderValidatorHash = t.utils.validatorToScriptHash(orderValidator);
   const factoryValidator = new FactoryValidateFactory(
-    authenValidatorHash,
+    {
+      transactionId: { hash: seedOutRef!.txHash },
+      outputIndex: BigInt(seedOutRef!.outputIndex),
+    },
     treasuryValidatorHash,
     orderValidatorHash,
     sellerValidatorHash,
     managerValidatorHash,
   );
   const validators = {
-    authenValidator,
     treasuryValidator,
     orderValidator,
     sellerValidator,
@@ -188,7 +181,6 @@ export async function deployValidators(
   validators: Validators,
 ): Promise<DeployedValidators> {
   const deploymentsChain = [
-    () => processElement(t, "authenValidator", validators.authenValidator),
     () => processElement(t, "treasuryValidator", validators.treasuryValidator),
     () => processElement(t, "managerValidator", validators.managerValidator),
     () => processElement(t, "sellerValidator", validators.sellerValidator),
