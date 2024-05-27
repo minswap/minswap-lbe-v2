@@ -130,7 +130,6 @@ validator(treasury_hash: ValidatorHash) {
           )
         validation.validate_manage_seller(
           factory_policy_id: factory_policy_id,
-          manager_hash: manager_hash,
           manager_in_datum: manager_in_datum,
           manager_out: manager_out,
           validity_range: validity_range,

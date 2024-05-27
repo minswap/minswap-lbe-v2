@@ -1490,12 +1490,9 @@ pub fn validate_redeem_lp_by_owner(
 
 pub fn validate_manage_seller(
   factory_policy_id: PolicyId,
-  manager_hash: ValidatorHash,
-  // manager_in_value: Value,
   manager_in_datum: ManagerDatum,
   manager_out: Output,
   validity_range: ValidityRange,
-  // treasury_ref_input: Input,
   mint_value: Value,
   treasury_datum: TreasuryDatum,
   seller_inputs: List<Input>,
@@ -1586,7 +1583,7 @@ pub fn validate_manage_seller(
       list.length(seller_outputs) == 0,
       // mint value
       value.flatten(mint_value) == [
-        (manager_hash, seller_auth_an, -seller_input_count),
+        (factory_policy_id, seller_auth_an, -seller_input_count),
       ],
       // update datum
       manager_out_datum == ManagerDatum {
