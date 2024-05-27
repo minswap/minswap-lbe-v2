@@ -77,7 +77,7 @@ pub type TreasuryRedeemer {
   // redeem LP or refund if cancel
   RedeemOrders
   // redeem LP or refund by project owner
-  RedeemerLPByOwner
+  RedeemLPByOwner
   // Close event after refund by cancel or close LBE before discovery phase
   CloseEvent
   // change status to cancel 
