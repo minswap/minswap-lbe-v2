@@ -1484,6 +1484,7 @@ pub fn validate_redeem_lp_by_owner(
 }
 
 pub fn validate_manage_seller(
+  factory_policy_id: PolicyId,
   manager_hash: ValidatorHash,
   // manager_in_value: Value,
   manager_in_datum: ManagerDatum,
@@ -1528,7 +1529,7 @@ pub fn validate_manage_seller(
     and {
       // mint value
       mint_value == value.from_asset(
-        manager_hash,
+        factory_policy_id,
         seller_auth_an,
         addition_seller,
       ),
