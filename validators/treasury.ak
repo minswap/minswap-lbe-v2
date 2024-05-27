@@ -7,7 +7,7 @@ use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value
 use lb_v2/types.{
   CancelLBE, CloseEvent, CollectManager, CollectOrders, CreateAmmPool, PoolDatum,
-  RedeemOrders, RedeemerLPByOwner, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
+  RedeemLPByOwner, RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
 }
 use lb_v2/utils.{factory_auth_an}
 use lb_v2/validation
@@ -238,7 +238,7 @@ validator {
           )
         }
       }
-      RedeemerLPByOwner -> {
+      RedeemLPByOwner -> {
         let treasury_output =
           validation.get_treasury_output(
             outputs,

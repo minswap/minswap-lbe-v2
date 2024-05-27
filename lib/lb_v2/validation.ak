@@ -1234,7 +1234,6 @@ pub fn validate_cancel_lbe(
   end_valid_time_range: Int,
 ) -> Bool {
   let TreasuryDatum {
-    collected_fund,
     base_asset,
     raise_asset,
     minimum_raise,
@@ -1242,6 +1241,8 @@ pub fn validate_cancel_lbe(
     start_time,
     owner,
     is_manager_collected,
+    reserve_raise,
+    total_penalty,
     ..
   } = treasury_in_datum
   let Address { payment_credential: owner_payment_credential, .. } = owner
@@ -1261,16 +1262,16 @@ pub fn validate_cancel_lbe(
     // 1. Cancel reason
     if and {
       is_manager_collected,
-      collected_fund < min_raise,
+      reserve_raise + total_penalty < min_raise,
     } {
       True
     } else if and {
+      end_valid_time_range < start_time,
       validate_authorize_by_owner(
         owner_payment_credential,
         extra_signatories: extra_signatories,
         inputs: inputs,
       ),
-      end_valid_time_range < start_time,
     } {
       True
     } else {
