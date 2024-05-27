@@ -1,6 +1,8 @@
 use aiken/dict.{Dict}
 use aiken/hash.{Blake2b_224, Blake2b_256, Hash}
-use aiken/transaction/credential.{Address, Script, VerificationKey}
+use aiken/transaction/credential.{
+  Address, Script, StakeCredential, VerificationKey,
+}
 use aiken/transaction/value.{AssetName, PolicyId}
 
 pub type ValidatorHash =
@@ -139,17 +141,16 @@ pub type OrderRedeemer {
 }
 
 // AMM TYPE
-// Profit Sharing Numerator & Denominator
-pub type ProfitSharing =
-  (Int, Int)
 
 pub type PoolDatum {
+  pool_batching_stake_credential: StakeCredential,
   asset_a: Asset,
   asset_b: Asset,
   total_liquidity: Int,
   reserve_a: Int,
   reserve_b: Int,
-  trading_fee_numerator: Int,
-  trading_fee_denominator: Int,
-  profit_sharing_opt: Option<ProfitSharing>,
+  base_fee_a_numerator: Int,
+  base_fee_b_numerator: Int,
+  fee_sharing_numerator_opt: Option<Int>,
+  allow_dynamic_fee: Bool,
 }

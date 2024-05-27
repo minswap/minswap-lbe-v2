@@ -18,17 +18,17 @@ pub const manager_auth_an = #"4d616e61676572"
 
 pub const default_number_seller = 20
 
-pub const amm_factory_auth_asset_name = #"4d5350"
-
 /// IMPORTANT: This block is code-gen. Please do not edit!
 /// *******************************************
+pub const amm_factory_auth_asset_name = #"4d5346"
+
 pub const amm_pool_auth_asset_name = #"4d5350"
 
 pub const amm_authen_policy_id =
-  #"24ae408cd7234d4b407aeb1f319076c72f9fd5b3fbee9a4094273b43"
+  #"de7c3d0ebf7e841678ae7d90467f4c12a34ded85cc876a6af5d25337"
 
 pub const amm_pool_validation_hash =
-  #"069f1d8556a564324902033d2ca43ae9a060deb0f9806df5af90aecd"
+  #"2eed742000b825c2d9c6db4348d5643d1411c9f90d61ee067f6434a4"
 
 pub const default_burn_liquidity = 10
 
