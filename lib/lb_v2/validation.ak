@@ -27,15 +27,13 @@ use lb_v2/utils.{
 
 pub fn get_value_of_minting_treasury(
   factory_policy_id: PolicyId,
-  treasury_policy_id: PolicyId,
-  manager_policy_id: PolicyId,
   is_create_treasury: Bool,
 ) -> Value {
   if is_create_treasury {
     value.from_asset(factory_policy_id, factory_auth_an, 1)
       |> value.add(factory_policy_id, treasury_auth_an, 1)
-      |> value.add(treasury_policy_id, manager_auth_an, 1)
-      |> value.add(manager_policy_id, seller_auth_an, default_number_seller)
+      |> value.add(factory_policy_id, manager_auth_an, 1)
+      |> value.add(factory_policy_id, seller_auth_an, default_number_seller)
   } else {
     value.from_asset(factory_policy_id, factory_auth_an, -1)
       |> value.add(factory_policy_id, treasury_auth_an, -1)
@@ -55,6 +53,7 @@ pub fn validate_creating_treasury_out(
 ) -> Bool {
   // check all field except owner
   let TreasuryDatum {
+    factory_policy_id: t_factory_policy_id,
     manager_hash: t_manager_hash,
     seller_hash: t_seller_hash,
     order_hash: t_order_hash,
@@ -84,6 +83,7 @@ pub fn validate_creating_treasury_out(
       |> value.add(base_asset_pid, base_asset_an, reserve_base)
   and {
     // treasury datum
+    factory_policy_id == t_factory_policy_id,
     manager_hash == t_manager_hash,
     seller_hash == t_seller_hash,
     order_hash == t_order_hash,
@@ -135,11 +135,12 @@ pub fn validate_creating_manager_out(
   raise_asset: Asset,
   manager_out_value: Value,
   manager_out_datum: ManagerDatum,
-  treasury_hash: ValidatorHash,
+  factory_hash: ValidatorHash,
   seller_hash: ValidatorHash,
   order_hash: ValidatorHash,
 ) -> Bool {
   let ManagerDatum {
+    factory_policy_id: sm_factory_hash,
     seller_hash: sm_seller_hash,
     order_hash: sm_order_hash,
     base_asset: sm_base_asset,
@@ -147,10 +148,10 @@ pub fn validate_creating_manager_out(
     seller_count,
     reserve_raise,
     total_penalty,
-    ..
   } = manager_out_datum
   and {
     // manager datum
+    sm_factory_hash == factory_hash,
     sm_seller_hash == seller_hash,
     sm_order_hash == order_hash,
     sm_base_asset == base_asset,
@@ -160,7 +161,7 @@ pub fn validate_creating_manager_out(
     total_penalty == 0,
     // manager treasury
     value.flatten(value.without_lovelace(manager_out_value)) == [
-      (treasury_hash, manager_auth_an, 1),
+      (factory_hash, manager_auth_an, 1),
     ],
   }
 }
@@ -354,7 +355,7 @@ pub fn has_spend_seller(
 
 pub fn get_seller_inputs(
   inputs: List<Input>,
-  manager_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   seller_hash: ValidatorHash,
 ) -> List<Input> {
   list.filter(
@@ -364,7 +365,7 @@ pub fn get_seller_inputs(
         input
       let Address { payment_credential, .. } = in_addr
       and {
-        value.quantity_of(in_value, manager_policy_id, seller_auth_an) == 1,
+        value.quantity_of(in_value, factory_policy_id, seller_auth_an) == 1,
         when payment_credential is {
           ScriptCredential(hash) -> seller_hash == hash
           _ -> False
@@ -376,7 +377,7 @@ pub fn get_seller_inputs(
 
 pub fn get_order_inputs(
   inputs: List<Input>,
-  seller_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   order_hash: ValidatorHash,
 ) -> List<Input> {
   list.filter(
@@ -386,7 +387,7 @@ pub fn get_order_inputs(
         input
       let Address { payment_credential, .. } = in_addr
       and {
-        value.quantity_of(in_value, seller_policy_id, order_auth_an) == 1,
+        value.quantity_of(in_value, factory_policy_id, order_auth_an) == 1,
         payment_credential == ScriptCredential(order_hash),
       }
     },
@@ -395,7 +396,7 @@ pub fn get_order_inputs(
 
 pub fn get_manager_inputs(
   inputs: List<Input>,
-  treasury_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   manager_hash: ValidatorHash,
 ) -> List<Input> {
   list.filter(
@@ -405,7 +406,7 @@ pub fn get_manager_inputs(
         input
       let Address { payment_credential, .. } = in_addr
       and {
-        value.quantity_of(in_value, treasury_policy_id, manager_auth_an) == 1,
+        value.quantity_of(in_value, factory_policy_id, manager_auth_an) == 1,
         payment_credential == ScriptCredential(manager_hash),
       }
     },
@@ -458,7 +459,7 @@ pub fn get_treasury_input_by_out_ref(
 
 pub fn get_seller_input_by_out_ref(
   inputs: List<Input>,
-  manager_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   out_ref: OutputReference,
 ) -> Input {
   expect [seller_input] =
@@ -468,7 +469,7 @@ pub fn get_seller_input_by_out_ref(
         let Input { output_reference, output: Output { value: out_value, .. } } =
           input
         and {
-          value.quantity_of(out_value, manager_policy_id, seller_auth_an) == 1,
+          value.quantity_of(out_value, factory_policy_id, seller_auth_an) == 1,
           output_reference == out_ref,
         }
       },
@@ -556,7 +557,7 @@ pub fn get_treasury_output(
 
 pub fn get_seller_outputs(
   outputs: List<Output>,
-  manager_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   seller_hash: ValidatorHash,
   seller_datum: Data,
 ) -> List<Output> {
@@ -574,7 +575,7 @@ pub fn get_seller_outputs(
       fn(output) {
         let Output { value: out_value, datum: out_datum, .. } = output
         and {
-          value.quantity_of(out_value, manager_policy_id, seller_auth_an) == 1,
+          value.quantity_of(out_value, factory_policy_id, seller_auth_an) == 1,
           InlineDatum(seller_datum) == out_datum,
         }
       },
@@ -584,7 +585,7 @@ pub fn get_seller_outputs(
 
 pub fn get_order_outputs(
   outputs: List<Output>,
-  seller_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   order_hash: ValidatorHash,
 ) -> List<Output> {
   list.filter(
@@ -596,7 +597,7 @@ pub fn get_order_outputs(
         ..
       } = output
       and {
-        value.quantity_of(out_value, seller_policy_id, order_auth_an) == 1,
+        value.quantity_of(out_value, factory_policy_id, order_auth_an) == 1,
         payment_credential == ScriptCredential(order_hash),
       }
     },
@@ -658,7 +659,6 @@ pub fn validate_using_seller(
   extra_signatories: List<PubKeyHash>,
   mint_value: Value,
   factory_policy_id: PolicyId,
-  manager_hash: ValidatorHash,
 ) -> Bool {
   expect Interval {
     upper_bound: IntervalBound { bound_type: Finite(end_valid_time_range), .. },
@@ -668,7 +668,12 @@ pub fn validate_using_seller(
     },
   } = validity_range
   // Validate always spend exactly 1 Seller UTxO
-  let seller_input = get_seller_input_by_out_ref(inputs, manager_hash, out_ref)
+  let seller_input =
+    get_seller_input_by_out_ref(
+      inputs: inputs,
+      factory_policy_id: factory_policy_id,
+      out_ref: out_ref,
+    )
   expect Input {
     output: Output {
       address: Address { payment_credential: ScriptCredential(seller_hash), .. },
@@ -708,8 +713,18 @@ pub fn validate_using_seller(
     minimum_order_raise,
     ..
   }: TreasuryDatum = raw_treasury_datum
-  let order_inputs = get_order_inputs(inputs, seller_hash, order_hash)
-  let order_outputs = get_order_outputs(outputs, seller_hash, order_hash)
+  let order_inputs =
+    get_order_inputs(
+      inputs: inputs,
+      factory_policy_id: factory_policy_id,
+      order_hash: order_hash,
+    )
+  let order_outputs =
+    get_order_outputs(
+      outputs: outputs,
+      factory_policy_id: factory_policy_id,
+      order_hash: order_hash,
+    )
   let (delta_amount, delta_penalty) =
     apply_order(
       order_inputs: order_inputs,
@@ -717,7 +732,7 @@ pub fn validate_using_seller(
       penalty_config: penalty_config,
       start_valid_time_range: start_valid_time_range,
       end_valid_time_range: end_valid_time_range,
-      seller_hash: seller_hash,
+      factory_policy_id: factory_policy_id,
       base_asset: base_asset,
       raise_asset: raise_asset,
       extra_signatories: extra_signatories,
@@ -737,7 +752,7 @@ pub fn validate_using_seller(
   expect [_] =
     get_seller_outputs(
       outputs: outputs,
-      manager_policy_id: manager_hash,
+      factory_policy_id: factory_policy_id,
       seller_hash: seller_hash,
       seller_datum: SellerDatum {
         factory_policy_id,
@@ -765,7 +780,7 @@ pub fn apply_order(
   penalty_config: Option<PenaltyConfig>,
   start_valid_time_range: Int,
   end_valid_time_range: Int,
-  seller_hash: ValidatorHash,
+  factory_policy_id: PolicyId,
   base_asset: Asset,
   raise_asset: Asset,
   extra_signatories: List<ByteArray>,
@@ -800,7 +815,7 @@ pub fn apply_order(
           get_order_value(
             amount: amount,
             penalty_amount: penalty_amount,
-            seller_policy_id: seller_hash,
+            factory_policy_id: factory_policy_id,
             raise_asset: raise_asset,
           )
         // validate orders
@@ -841,7 +856,7 @@ pub fn apply_order(
           get_order_value(
             amount: amount,
             penalty_amount: penalty_amount,
-            seller_policy_id: seller_hash,
+            factory_policy_id: factory_policy_id,
             raise_asset: raise_asset,
           )
         // validate orders

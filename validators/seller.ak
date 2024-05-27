@@ -45,7 +45,6 @@ validator(treasury_hash: ValidatorHash, manager_hash: ValidatorHash) {
           extra_signatories: extra_signatories,
           mint_value: mint_value,
           factory_policy_id: factory_policy_id,
-          manager_hash: manager_hash,
         )
       }
     }

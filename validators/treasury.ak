@@ -135,7 +135,7 @@ validator {
         expect [manager_input] =
           validation.get_manager_inputs(
             inputs: inputs,
-            treasury_policy_id: treasury_hash,
+            factory_policy_id: factory_policy_id,
             manager_hash: manager_hash,
           )
         validation.validate_collect_manager(
@@ -147,15 +147,15 @@ validator {
         )
       }
       CollectOrders -> {
-        let TreasuryDatum { seller_hash, order_hash, .. } = treasury_in_datum
+        let TreasuryDatum { order_hash, .. } = treasury_in_datum
         let order_inputs =
           validation.get_order_inputs(
             inputs: inputs,
-            seller_policy_id: seller_hash,
+            factory_policy_id: factory_policy_id,
             order_hash: order_hash,
           )
         let order_outputs =
-          validation.get_order_outputs(outputs, seller_hash, order_hash)
+          validation.get_order_outputs(outputs, factory_policy_id, order_hash)
         let treasury_output =
           validation.get_treasury_output(
             outputs,
@@ -203,7 +203,7 @@ validator {
         )
       }
       RedeemOrders -> {
-        let TreasuryDatum { total_liquidity, seller_hash, order_hash, .. } =
+        let TreasuryDatum { total_liquidity, order_hash, .. } =
           treasury_in_datum
         let treasury_output =
           validation.get_treasury_output(
@@ -215,7 +215,7 @@ validator {
         let order_inputs =
           validation.get_order_inputs(
             inputs: inputs,
-            seller_policy_id: seller_hash,
+            factory_policy_id: factory_policy_id,
             order_hash: order_hash,
           )
         if total_liquidity != 0 {

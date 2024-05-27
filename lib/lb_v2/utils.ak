@@ -76,7 +76,7 @@ pub fn compute_lp_asset_name(
 pub fn get_order_value(
   amount: Int,
   penalty_amount: Int,
-  seller_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   raise_asset: Asset,
 ) -> Value {
   let base_ada = minimum_ada + fee_ada * 2
@@ -87,7 +87,7 @@ pub fn get_order_value(
         raise_asset.asset_name,
         amount + penalty_amount,
       )
-    |> value.add(seller_policy_id, order_auth_an, 1)
+    |> value.add(factory_policy_id, order_auth_an, 1)
 }
 
 pub fn calculate_penalty(

@@ -29,12 +29,11 @@ validator(treasury_hash: ValidatorHash) {
       ..
     } = transaction
     let mint_value = value.from_minted_value(mint)
-    let ManagerDatum { seller_hash, order_hash, factory_policy_id, .. } =
-      manager_in_datum
+    let ManagerDatum { order_hash, factory_policy_id, .. } = manager_in_datum
     expect [] =
       validation.get_order_inputs(
         inputs: inputs,
-        seller_policy_id: seller_hash,
+        factory_policy_id: factory_policy_id,
         order_hash: order_hash,
       )
     when redeemer is {
@@ -58,7 +57,11 @@ validator(treasury_hash: ValidatorHash) {
               } = input
               and {
                 out_ref == manager_out_ref,
-                value.quantity_of(sm_in_value, treasury_hash, manager_auth_an) == 1,
+                value.quantity_of(
+                  sm_in_value,
+                  factory_policy_id,
+                  manager_auth_an,
+                ) == 1,
               }
             },
           )
@@ -87,7 +90,7 @@ validator(treasury_hash: ValidatorHash) {
               } = output
               payment_credential == ScriptCredential(manager_hash) && value.quantity_of(
                 sm_in_value,
-                treasury_hash,
+                factory_policy_id,
                 manager_auth_an,
               ) == 1
             },
@@ -109,13 +112,13 @@ validator(treasury_hash: ValidatorHash) {
         let seller_inputs =
           validation.get_seller_inputs(
             inputs: inputs,
-            manager_policy_id: manager_hash,
+            factory_policy_id: factory_policy_id,
             seller_hash: seller_hash,
           )
         let seller_outputs =
           validation.get_seller_outputs(
             outputs: outputs,
-            manager_policy_id: manager_hash,
+            factory_policy_id: factory_policy_id,
             seller_hash: seller_hash,
             seller_datum: SellerDatum {
               factory_policy_id,

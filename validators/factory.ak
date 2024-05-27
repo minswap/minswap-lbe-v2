@@ -195,7 +195,7 @@ validator(
             raise_asset: raise_asset,
             manager_out_value: manager_out_value,
             manager_out_datum: manager_datum,
-            treasury_hash: treasury_hash,
+            factory_hash: factory_hash,
             seller_hash: seller_hash,
             order_hash: order_hash,
           )
@@ -221,7 +221,7 @@ validator(
                 ..
               } = output
               and {
-                value.quantity_of(out_value, manager_hash, seller_auth_an) == 1,
+                value.quantity_of(out_value, factory_hash, seller_auth_an) == 1,
                 payment_credential == ScriptCredential(seller_hash),
                 datum == InlineDatum(default_seller_datum),
               }
@@ -232,8 +232,6 @@ validator(
           // 5. Mint value
           value.from_minted_value(mint) == validation.get_value_of_minting_treasury(
             factory_policy_id: factory_hash,
-            treasury_policy_id: treasury_hash,
-            manager_policy_id: manager_hash,
             is_create_treasury: True,
           ),
           // 6. Base-Raise Asset
@@ -338,8 +336,6 @@ validator(
         and {
           value.from_minted_value(mint) == validation.get_value_of_minting_treasury(
             factory_policy_id: factory_hash,
-            treasury_policy_id: treasury_hash,
-            manager_policy_id: manager_hash,
             is_create_treasury: False,
           ),
           // authorize by owner
