@@ -26,19 +26,19 @@ use lb_v2/utils.{
 }
 
 pub fn get_value_of_minting_treasury(
-  authen_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   treasury_policy_id: PolicyId,
   manager_policy_id: PolicyId,
   is_create_treasury: Bool,
 ) -> Value {
   if is_create_treasury {
-    value.from_asset(authen_policy_id, factory_auth_an, 1)
-      |> value.add(authen_policy_id, treasury_auth_an, 1)
+    value.from_asset(factory_policy_id, factory_auth_an, 1)
+      |> value.add(factory_policy_id, treasury_auth_an, 1)
       |> value.add(treasury_policy_id, manager_auth_an, 1)
       |> value.add(manager_policy_id, seller_auth_an, default_number_seller)
   } else {
-    value.from_asset(authen_policy_id, factory_auth_an, -1)
-      |> value.add(authen_policy_id, treasury_auth_an, -1)
+    value.from_asset(factory_policy_id, factory_auth_an, -1)
+      |> value.add(factory_policy_id, treasury_auth_an, -1)
   }
 }
 
@@ -50,7 +50,7 @@ pub fn validate_creating_treasury_out(
   manager_hash: ValidatorHash,
   seller_hash: ValidatorHash,
   order_hash: ValidatorHash,
-  authen_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   end_valid_time_range: Int,
 ) -> Bool {
   // check all field except owner
@@ -80,7 +80,7 @@ pub fn validate_creating_treasury_out(
   // base_asset must be not ada(already validate in factory)
   let expected_treasury_out_value =
     value.zero()
-      |> value.add(authen_policy_id, treasury_auth_an, 1)
+      |> value.add(factory_policy_id, treasury_auth_an, 1)
       |> value.add(base_asset_pid, base_asset_an, reserve_base)
   and {
     // treasury datum
@@ -299,29 +299,27 @@ pub fn has_spend_treasury(
 
 pub fn has_spend_manager(
   inputs: List<Input>,
-  treasury_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   manager_hash: ValidatorHash,
   redeemers: Dict<ScriptPurpose, Redeemer>,
   expected_redeemer: ManagerRedeemer,
 ) -> Bool {
-  expect [Input { output_reference: manager_out_ref, .. }] =
+  expect [manager_input] =
     list.filter(
       inputs,
       fn(input) {
         let Input {
-          output: Output {
-            address: Address { payment_credential, .. },
-            value: in_value,
-            ..
-          },
+          output: Output { address: Address { payment_credential, .. }, .. },
           ..
         } = input
-        and {
-          value.quantity_of(in_value, treasury_policy_id, manager_auth_an) == 1,
-          payment_credential == ScriptCredential(manager_hash),
-        }
+        payment_credential == ScriptCredential(manager_hash)
       },
     )
+  let Input {
+    output_reference: manager_out_ref,
+    output: Output { value: out_value, .. },
+  } = manager_input
+  expect value.quantity_of(out_value, factory_policy_id, manager_auth_an) == 1
   expect Some(raw_redeemer) = dict.get(redeemers, Spend(manager_out_ref))
   make_wrapper_redeemer(expected_redeemer) == raw_redeemer
 }
@@ -416,7 +414,7 @@ pub fn get_manager_inputs(
 
 pub fn get_treasury_ref_inputs(
   ref_inputs: List<Input>,
-  authen_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   treasury_hash: ValidatorHash,
 ) -> List<Input> {
   list.filter(
@@ -431,7 +429,7 @@ pub fn get_treasury_ref_inputs(
         ..
       } = input
       and {
-        value.quantity_of(in_value, authen_policy_id, treasury_auth_an) == 1,
+        value.quantity_of(in_value, factory_policy_id, treasury_auth_an) == 1,
         payment_credential == ScriptCredential(treasury_hash),
       }
     },
@@ -440,7 +438,7 @@ pub fn get_treasury_ref_inputs(
 
 pub fn get_treasury_input_by_out_ref(
   inputs: List<Input>,
-  authen_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   out_ref: OutputReference,
 ) -> Input {
   expect [treasury_input] =
@@ -450,7 +448,7 @@ pub fn get_treasury_input_by_out_ref(
         let Input { output_reference, output: Output { value: out_value, .. } } =
           input
         and {
-          value.quantity_of(out_value, authen_policy_id, treasury_auth_an) == 1,
+          value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
           output_reference == out_ref,
         }
       },
@@ -532,7 +530,7 @@ pub fn get_amm_pool_ref_inputs(ref_inputs: List<Input>) -> List<Input> {
 
 pub fn get_treasury_output(
   outputs: List<Output>,
-  authen_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   treasury_hash: ValidatorHash,
 ) -> Output {
   expect [treasury_output] =
@@ -545,7 +543,7 @@ pub fn get_treasury_output(
           ..
         } = output
         and {
-          value.quantity_of(out_value, authen_policy_id, treasury_auth_an) == 1,
+          value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
           when payment_credential is {
             ScriptCredential(hash) -> hash == treasury_hash
             _ -> False
@@ -659,7 +657,7 @@ pub fn validate_using_seller(
   validity_range: ValidityRange,
   extra_signatories: List<PubKeyHash>,
   mint_value: Value,
-  authen_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   manager_hash: ValidatorHash,
 ) -> Bool {
   expect Interval {
@@ -694,7 +692,7 @@ pub fn validate_using_seller(
     )
   // Validate Datums
   expect [treasury_ref_input] =
-    get_treasury_ref_inputs(reference_inputs, authen_policy_id, treasury_hash)
+    get_treasury_ref_inputs(reference_inputs, factory_policy_id, treasury_hash)
   expect Input {
     output: Output { datum: InlineDatum(raw_treasury_datum), .. },
     ..
@@ -1438,7 +1436,7 @@ pub fn validate_redeem_lp_by_owner(
   treasury_in_datum: TreasuryDatum,
   inputs: List<Input>,
   extra_signatories: List<PubKeyHash>,
-  authen_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
 ) -> Bool {
   let TreasuryDatum { owner, total_liquidity, collected_fund, .. } =
     treasury_in_datum
@@ -1462,7 +1460,7 @@ pub fn validate_redeem_lp_by_owner(
     collected_fund == 0,
     treasury_out_datum == treasury_in_datum,
     value.without_lovelace(treasury_out_value) == value.from_asset(
-      authen_policy_id,
+      factory_policy_id,
       treasury_auth_an,
       1,
     ),
