@@ -293,7 +293,9 @@ test("example flow", async () => {
       await emulator.getUtxos(t.utils.validatorToAddress(validators.sellerValidator))
     ).filter((u) => !u.scriptRef) as UTxO[];
     maxCount = maxCount ?? sellerUtxos.length;
-
+    while (sellerUtxos.length > maxCount) {
+      sellerUtxos.pop();
+    }
     const options: BuildCollectSellersOptions = {
       treasuryRefInput,
       managerInput: managerUtxo,
@@ -309,7 +311,7 @@ test("example flow", async () => {
     console.info(`collect sellers ${maxCount} done.`);
   };
 
-  await collectingSeller(2);
+  await collectingSeller(15);
 
   // let treasuryUtxo = (
   //   await emulator.getUtxos(
