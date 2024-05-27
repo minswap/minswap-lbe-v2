@@ -140,6 +140,7 @@ validator {
           )
         validation.validate_collect_manager(
           treasury_output: treasury_output,
+          treasury_in_value: treasury_in_value,
           treasury_in_datum: treasury_in_datum,
           manager_input: manager_input,
           mint_value: mint_value,

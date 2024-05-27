@@ -22,6 +22,7 @@ use lb_v2/utils.{
   compute_asset_name_from_base_and_raise, default_burn_liquidity,
   default_number_seller, factory_auth_an, fee_ada, get_order_value,
   manager_auth_an, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
+  treasury_minimum_ada,
 }
 
 pub fn get_value_of_minting_treasury(
@@ -80,6 +81,7 @@ pub fn validate_creating_treasury_out(
     value.zero()
       |> value.add(factory_policy_id, treasury_auth_an, 1)
       |> value.add(base_asset_pid, base_asset_an, reserve_base)
+      |> value.add(ada_policy_id, ada_asset_name, treasury_minimum_ada)
   and {
     // treasury datum
     factory_policy_id == t_factory_policy_id,
@@ -125,7 +127,7 @@ pub fn validate_creating_treasury_out(
     is_cancelled == False,
     is_manager_collected == False,
     // treasury value
-    value.without_lovelace(treasury_out_value) == expected_treasury_out_value,
+    treasury_out_value == expected_treasury_out_value,
   }
 }
 
@@ -204,6 +206,7 @@ pub fn validate_create_dex_pool(
         }
       None -> reserve_raise + total_penalty
     }
+  let Asset { policy_id: raise_pid, asset_name: raise_an } = raise_asset
   // validate LBE status
   expect and {
       start_valid_time_range > end_time,
@@ -258,11 +261,15 @@ pub fn validate_create_dex_pool(
     datum: InlineDatum(treasury_out_datum_raw),
     ..
   } = treasury_output
-  let treasury_total_liquidity =
-    value.quantity_of(treasury_out_value, amm_authen_policy_id, lp_asset_name)
+  let treasury_total_liquidity = pool_total_liquidity - default_burn_liquidity
   expect treasury_out_datum: TreasuryDatum = treasury_out_datum_raw
   and {
-    pool_total_liquidity - default_burn_liquidity == treasury_total_liquidity,
+    treasury_out_value == (
+      value.zero()
+        |> value.add(ada_policy_id, ada_asset_name, treasury_minimum_ada)
+        |> value.add(amm_authen_policy_id, lp_asset_name, treasury_total_liquidity)
+        |> value.add(raise_pid, raise_an, collected_fund - final_reserve_raise)
+    ),
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
       total_liquidity: treasury_total_liquidity,
@@ -608,6 +615,7 @@ pub fn get_order_outputs(
 
 pub fn validate_collect_manager(
   treasury_output: Output,
+  treasury_in_value: Value,
   treasury_in_datum: TreasuryDatum,
   manager_input: Input,
   mint_value: Value,
@@ -615,8 +623,11 @@ pub fn validate_collect_manager(
 ) -> Bool {
   let TreasuryDatum { base_asset, raise_asset, is_manager_collected, .. } =
     treasury_in_datum
-  expect Output { datum: InlineDatum(treasury_out_raw_datum), .. } =
-    treasury_output
+  expect Output {
+    datum: InlineDatum(treasury_out_raw_datum),
+    value: treasury_out_value,
+    ..
+  } = treasury_output
   expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
 
   expect Input {
@@ -647,6 +658,8 @@ pub fn validate_collect_manager(
       total_penalty: total_penalty,
       is_manager_collected: True,
     },
+    // treasury value
+    treasury_in_value == treasury_out_value,
   }
 }
 
@@ -1481,10 +1494,9 @@ pub fn validate_redeem_lp_by_owner(
     // redeem all orders
     collected_fund == 0,
     treasury_out_datum == treasury_in_datum,
-    value.without_lovelace(treasury_out_value) == value.from_asset(
-      factory_policy_id,
-      treasury_auth_an,
-      1,
+    treasury_out_value == (
+      value.from_asset(factory_policy_id, treasury_auth_an, 1)
+        |> value.add(ada_policy_id, ada_asset_name, treasury_minimum_ada)
     ),
   }
 }
