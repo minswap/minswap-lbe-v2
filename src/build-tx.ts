@@ -148,6 +148,7 @@ export class WarehouseBuilder {
   managerRedeemer: ManagerValidateManagerSpending["redeemer"] | undefined;
   sellerRedeemer: SellerValidateSellerSpending["redeemer"] | undefined;
   orderRedeemer: FeedTypeOrder["_redeemer"] | undefined;
+  mintRedeemer: FactoryValidateFactoryMinting["redeemer"] | undefined;
 
   // AMM
   ammValidators: MinswapValidators;
@@ -211,6 +212,7 @@ export class WarehouseBuilder {
     const { seedUtxo } = options;
     this.tasks.push(
       () => {
+        this.mintRedeemer = "Initialization";
         this.tx.collectFrom([seedUtxo]);
       },
       () => {
@@ -246,6 +248,7 @@ export class WarehouseBuilder {
             CreateTreasury: { ...innerFactoryRedeemer }
           }
         };
+        this.mintRedeemer = { CreateTreasury: { ...innerFactoryRedeemer } };
       },
       () => {
         this.spendingFactoryInput();
@@ -254,10 +257,10 @@ export class WarehouseBuilder {
         this.payingFactoryOutput();
       },
       () => {
-        this.mintingFactoryToken();
+        this.mintingFactoryToken(innerFactoryRedeemer);
       },
       () => {
-        this.mintingTreasuryToken(innerFactoryRedeemer);
+        this.mintingTreasuryToken();
       },
       () => {
         this.mintingSellerToken();
@@ -459,7 +462,7 @@ export class WarehouseBuilder {
         this.spendingFactoryInput();
       },
       () => {
-        this.mintingTreasuryToken(innerFactoryRedeemer);
+        this.mintingTreasuryToken();
       },
       () => {
         this.mintingFactoryToken();
@@ -859,30 +862,34 @@ export class WarehouseBuilder {
   }
 
   /************************* MINTING *************************/
-  private mintingTreasuryToken(options: { baseAsset: BluePrintAsset, raiseAsset: BluePrintAsset }) {
-    const cases: Record<number, { amount: bigint, redeemer: FactoryValidateFactoryMinting["redeemer"] }> = {
-      1: { amount: 1n, redeemer: { CreateTreasury: options } },
-      2: { amount: -1n, redeemer: { CloseTreasury: options } },
+  private mintingTreasuryToken() {
+    invariant(this.mintRedeemer);
+    const cases: Record<number, bigint> = {
+      1: 1n,
+      2: -1n,
     };
-    const { amount, redeemer } = cases[this.factoryInputs.length];
+    const amount = cases[this.factoryInputs.length];
     this.tx
       .readFrom([this.deployedValidators["factoryValidator"]])
       .mintAssets(
         {
           [this.treasuryToken]: amount,
         },
-        T.Data.to(redeemer, FactoryValidateFactoryMinting.redeemer),
+        T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
       );
   }
 
   private mintingManagerToken() {
+    invariant(this.mintRedeemer);
     let amount = this.treasuryInputs.length > 0 ? -1n : 1n;
-    this.tx.readFrom([this.deployedValidators["managerValidator"]]).mintAssets(
-      {
-        [this.managerToken]: amount,
-      },
-      DUMMY_REDEEMER,
-    );
+    this.tx
+      .readFrom([this.deployedValidators["factoryValidator"]])
+      .mintAssets(
+        {
+          [this.managerToken]: amount,
+        },
+        T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
+      );
   }
 
   private mintingSellerToken(addSellerCount?: bigint) {

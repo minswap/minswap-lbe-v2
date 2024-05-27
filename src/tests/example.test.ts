@@ -135,6 +135,7 @@ test("example flow", async () => {
   const discoveryStartSlot = emulator.slot + 60 * 60;
   const discoveryEndSlot = discoveryStartSlot + 60 * 60 * 24 * 2; // 2 days
   const treasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] = {
+    factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
     sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
     orderHash: t.utils.validatorToScriptHash(validators.orderValidator),
     managerHash: t.utils.validatorToScriptHash(validators.managerValidator),
@@ -181,6 +182,7 @@ test("example flow", async () => {
     await emulator.getUtxos(t.utils.validatorToAddress(validators.treasuryValidator))
   ).find((u) => !u.scriptRef) as UTxO;
   let orderDatum: FeedTypeOrder["_datum"] = {
+    factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
     baseAsset,
     raiseAsset,
     owner: address2PlutusAddress(ACCOUNT_0.address),

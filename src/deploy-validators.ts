@@ -83,9 +83,9 @@ export function collectValidators(options: {
       outputIndex: BigInt(seedOutRef!.outputIndex),
     },
     treasuryValidatorHash,
-    orderValidatorHash,
-    sellerValidatorHash,
     managerValidatorHash,
+    sellerValidatorHash,
+    orderValidatorHash,
   );
   const validators = {
     treasuryValidator,
