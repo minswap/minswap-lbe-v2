@@ -322,7 +322,8 @@ pub fn has_spend_manager(
   } = manager_input
   expect value.quantity_of(out_value, factory_policy_id, manager_auth_an) == 1
   expect Some(raw_redeemer) = dict.get(redeemers, Spend(manager_out_ref))
-  make_wrapper_redeemer(expected_redeemer) == raw_redeemer
+  expect redeemer: ManagerRedeemer = raw_redeemer
+  expected_redeemer == redeemer
 }
 
 pub fn has_spend_seller(
