@@ -296,6 +296,7 @@ export class WarehouseBuilder {
       () => {
         this.managerInputs = [managerUtxo];
         this.managerRedeemer = "ManageSeller";
+        this.mintRedeemer = "MintSeller";
       },
       () => {
         this.spendingManagerInput();
@@ -360,6 +361,9 @@ export class WarehouseBuilder {
         this.treasuryRefInput = treasuryRefInput;
         this.orderInputs = orderInputs;
         this.orderRedeemer = "UpdateOrder";
+        if (mintingSellerCount !== 0n) {
+          this.mintRedeemer = "MintOrder";
+        }
         for (const owner of owners) {
           this.tx.addSigner(owner);
         }
@@ -731,43 +735,36 @@ export class WarehouseBuilder {
       // Using seller
       invariant(outDatum);
       innerPay(outDatum);
-    } else {
-      const cases: Record<number, () => void> = {
-        // Create Treasury
-        0: () => {
-          invariant(this.factoryRedeemer);
-          const baseAsset = (this.factoryRedeemer.wrapper as any)["CreateTreasury"].baseAsset;
-          const raiseAsset = (this.factoryRedeemer.wrapper as any)["CreateTreasury"].raiseAsset;
-          const sellerDatum: SellerValidateSellerSpending["sellerInDatum"] = {
-            factoryPolicyId: this.factoryHash,
-            baseAsset,
-            raiseAsset,
-            amount: 0n,
-            penaltyAmount: 0n,
-          };
-          for (let i = 0; i < DEFAULT_NUMBER_SELLER; i++) {
-            innerPay(sellerDatum);
-          }
-        },
-        // Add Sellers
-        1: () => {
-          invariant(this.treasuryInputs.length > 0);
-          invariant(this.treasuryInputs[0].datum);
-          const treasuryDatum = this.fromDatumTreasury(this.treasuryInputs[0].datum);
-          const sellerDatum: SellerValidateSellerSpending["sellerInDatum"] = {
-            factoryPolicyId: this.factoryHash,
-            baseAsset: treasuryDatum.baseAsset,
-            raiseAsset: treasuryDatum.raiseAsset,
-            amount: 0n,
-            penaltyAmount: 0n,
-          };
-          invariant(addSellerCount);
-          for (let i = 0n; i < addSellerCount; i++) {
-            innerPay(sellerDatum);
-          }
-        },
+    } else if (this.managerInputs.length) {
+      invariant(this.managerInputs.length == 1);
+      invariant(this.managerInputs[0].datum);
+      const managerDatum = this.fromDatumManager(this.managerInputs[0].datum);
+      const sellerDatum: SellerValidateSellerSpending["sellerInDatum"] = {
+        factoryPolicyId: this.factoryHash,
+        baseAsset: managerDatum.baseAsset,
+        raiseAsset: managerDatum.raiseAsset,
+        amount: 0n,
+        penaltyAmount: 0n,
       };
-      cases[this.treasuryInputs.length]();
+      invariant(addSellerCount);
+      for (let i = 0n; i < addSellerCount; i++) {
+        innerPay(sellerDatum);
+      }
+    } else {
+      invariant(this.treasuryInputs.length === 0);
+      invariant(this.factoryRedeemer);
+      const baseAsset = (this.factoryRedeemer.wrapper as any)["CreateTreasury"].baseAsset;
+      const raiseAsset = (this.factoryRedeemer.wrapper as any)["CreateTreasury"].raiseAsset;
+      const sellerDatum: SellerValidateSellerSpending["sellerInDatum"] = {
+        factoryPolicyId: this.factoryHash,
+        baseAsset,
+        raiseAsset,
+        amount: 0n,
+        penaltyAmount: 0n,
+      };
+      for (let i = 0; i < DEFAULT_NUMBER_SELLER; i++) {
+        innerPay(sellerDatum);
+      }
     }
   }
 
@@ -903,12 +900,15 @@ export class WarehouseBuilder {
         : addSellerCount;
     }
     if (mintAmount) {
-      this.tx.readFrom([this.deployedValidators["treasuryValidator"]]).mintAssets(
-        {
-          [this.sellerToken]: mintAmount,
-        },
-        DUMMY_REDEEMER,
-      );
+      invariant(this.mintRedeemer);
+      this.tx
+        .readFrom([this.deployedValidators["factoryValidator"]])
+        .mintAssets(
+          {
+            [this.sellerToken]: mintAmount,
+          },
+          T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
+        );
     }
   }
 

@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "bun:test";
 import * as T from "@minswap/translucent";
 import {
   WarehouseBuilder,
+  type BuildAddSellersOptions,
   type BuildUsingSellerOptions,
   type WarehouseBuilderOptions,
 } from "../build-tx";
@@ -113,14 +114,14 @@ test("quick", async () => {
 });
 
 test("example flow", async () => {
-  const options: WarehouseBuilderOptions = {
+  const warehouseOptions: WarehouseBuilderOptions = {
     t,
     validators,
     deployedValidators,
     ammValidators,
     ammDeployedValidators,
   };
-  let builder = new WarehouseBuilder(options);
+  let builder = new WarehouseBuilder(warehouseOptions);
   builder.buildInitFactory({ seedUtxo });
   const tx = builder.complete();
   const initFactoryTx = await quickSubmitBuilder(emulator)({
@@ -159,7 +160,7 @@ test("example flow", async () => {
     minimumOrderRaise: null,
     isManagerCollected: false,
   };
-  builder = new WarehouseBuilder(options);
+  builder = new WarehouseBuilder(warehouseOptions);
   let factoryUtxo: UTxO = (
     await emulator.getUtxos(t.utils.validatorToAddress(validators.factoryValidator))
   ).find((u) => !u.scriptRef) as UTxO;
@@ -191,6 +192,26 @@ test("example flow", async () => {
     penaltyAmount: 0n,
   };
 
+  const addingSeller = async (addSellerCount: bigint = 1n) => {
+    const managerUtxo: UTxO = (
+      await emulator.getUtxos(t.utils.validatorToAddress(validators.managerValidator))
+    ).find((u) => !u.scriptRef) as UTxO;
+    const buildAddSellersOptions: BuildAddSellersOptions = {
+      treasuryRefUtxo: treasuryRefInput,
+      managerUtxo,
+      addSellerCount,
+      validFrom: t.utils.slotToUnixTime(emulator.slot),
+      validTo: t.utils.slotToUnixTime(emulator.slot + 100),
+    };
+    builder = new WarehouseBuilder(warehouseOptions);
+    builder.buildAddSeller(buildAddSellersOptions);
+    await quickSubmitBuilder(emulator)({
+      txBuilder: builder.complete(),
+    });
+    console.info(`adding Seller ${addSellerCount} done.`);
+  }
+  await addingSeller(10n);
+
   const depositing = async (maxCount?: number) => {
     const sellerUtxos: UTxO[] = (
       await emulator.getUtxos(t.utils.validatorToAddress(validators.sellerValidator))
@@ -200,7 +221,7 @@ test("example flow", async () => {
     for (const sellerUtxo of sellerUtxos) {
       if (depositCount >= maxCount) break;
       depositCount += 1;
-      builder = new WarehouseBuilder(options);
+      builder = new WarehouseBuilder(warehouseOptions);
       const buildUsingSellerOptions: BuildUsingSellerOptions = {
         treasuryRefInput,
         sellerUtxo: sellerUtxo,
@@ -217,7 +238,7 @@ test("example flow", async () => {
     }
     console.info(`deposit ${depositCount} orders done.`);
   }
-  await depositing();
+  await depositing(20);
   await depositing(10);
 
   // update + orders
@@ -229,7 +250,7 @@ test("example flow", async () => {
       await emulator.getUtxos(t.utils.validatorToAddress(validators.orderValidator))
     ).filter((u) => !u.scriptRef) as UTxO[];
     console.log(`trying to update ${orderUtxos.length} orders`);
-    builder = new WarehouseBuilder(options);
+    builder = new WarehouseBuilder(warehouseOptions);
     const newOrderDatums = Array.from(
       { length: orderUtxos.length },
       () => ({ ...orderDatum, amount: 80n })
