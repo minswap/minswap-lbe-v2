@@ -68,7 +68,8 @@ test test_apply_collecting_orders() {
     }
   let raise_asset =
     Asset { policy_id: ada_policy_id, asset_name: ada_asset_name }
-  let seller_hash = #"4ad61bf61971298e1aba4e71ce34cac02cddf8030b6fce35c2693a70"
+  let factory_policy_id =
+    #"4ad61bf61971298e1aba4e71ce34cac02cddf8030b6fce35c2693a70"
   //total_amount+total_penalty
   let amount =
     apply_collecting_orders(
@@ -77,7 +78,7 @@ test test_apply_collecting_orders() {
           123,
           12,
           False,
-          seller_hash,
+          factory_policy_id,
           base_asset,
           raise_asset,
         ),
@@ -85,7 +86,7 @@ test test_apply_collecting_orders() {
           122223,
           2222,
           False,
-          seller_hash,
+          factory_policy_id,
           base_asset,
           raise_asset,
         ),
@@ -95,7 +96,7 @@ test test_apply_collecting_orders() {
           123,
           12,
           True,
-          seller_hash,
+          factory_policy_id,
           base_asset,
           raise_asset,
         ),
@@ -103,14 +104,14 @@ test test_apply_collecting_orders() {
           122223,
           2222,
           True,
-          seller_hash,
+          factory_policy_id,
           base_asset,
           raise_asset,
         ),
       ],
       base_asset: base_asset,
       raise_asset: raise_asset,
-      seller_hash: seller_hash,
+      factory_policy_id: factory_policy_id,
     )
   amount == 124580
 }

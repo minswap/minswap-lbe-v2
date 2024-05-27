@@ -4,6 +4,7 @@ import {
   WarehouseBuilder,
   type BuildAddSellersOptions,
   type BuildCollectManagerOptions,
+  type BuildCollectOrdersOptions,
   type BuildCollectSellersOptions,
   type BuildUsingSellerOptions,
   type WarehouseBuilderOptions,
@@ -20,7 +21,7 @@ import {
 import { generateAccount, quickSubmitBuilder, type GeneratedAccount } from "./utils";
 import type { Emulator, Translucent, UTxO } from "../types";
 import { address2PlutusAddress, computeLPAssetName } from "../utils";
-import { DEFAULT_NUMBER_SELLER, LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
+import { LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
 import {
   FactoryValidateFactory,
   FeedTypeOrder,
@@ -243,7 +244,7 @@ test("example flow", async () => {
     }
     console.info(`deposit ${depositCount} orders done.`);
   };
-  await depositing(30);
+  await depositing(15);
 
   // update + orders
   const updatingOrders = async (maxCount?: number) => {
@@ -337,6 +338,49 @@ test("example flow", async () => {
     console.info(`collect manager done`);
   }
   await collectingManager();
+
+  const collectingOrders = async (maxCount?: number) => {
+    const treasuryUtxo: UTxO = (
+      await emulator.getUtxos(t.utils.validatorToAddress(validators.treasuryValidator))
+    ).find((u) => !u.scriptRef) as UTxO;
+    console.log({
+      treasuryAddress: treasuryUtxo.address,
+      t_value: treasuryUtxo.assets,
+    })
+    const orderUtxos: UTxO[] = (
+      await emulator.getUtxos(t.utils.validatorToAddress(validators.orderValidator))
+    )
+      .filter((u) => !u.scriptRef)
+      .filter((u) => {
+        const datum = T.Data.from(u.datum!, FeedTypeOrder._datum);
+        return datum.isCollected == false;
+      }) as UTxO[];
+    maxCount = maxCount ?? orderUtxos.length;
+    maxCount = maxCount > orderUtxos.length ? orderUtxos.length : maxCount;
+    if (maxCount == 0) {
+      return;
+    }
+    while (orderUtxos.length > maxCount) {
+      orderUtxos.pop();
+    }
+    const options: BuildCollectOrdersOptions = {
+      treasuryInput: treasuryUtxo,
+      orderInputs: orderUtxos,
+      validFrom: t.utils.slotToUnixTime(emulator.slot),
+      validTo: t.utils.slotToUnixTime(emulator.slot + 100),
+    };
+    builder = new WarehouseBuilder(warehouseOptions);
+    builder.buildCollectOrders(options);
+    await quickSubmitBuilder(emulator)({
+      txBuilder: builder.complete(),
+      debug: true,
+    });
+    console.info(`collect order ${maxCount} done.`);
+  };
+  await collectingOrders(1);
+  // await collectingOrders(15);
+  // await collectingOrders(15);
+  // await collectingOrders(15);
 
   // let treasuryUtxo = (
   //   await emulator.getUtxos(

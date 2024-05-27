@@ -31,6 +31,7 @@ import {
   ORDER_AUTH_AN,
   SELLER_AUTH_AN,
   TREASURY_AUTH_AN,
+  TREASURY_MIN_ADA,
 } from "./constants.ts";
 import type { DeployedValidators, MinswapValidators, Validators } from "./deploy-validators.ts";
 import { calculateInitialLiquidity } from "./minswap-amm/utils.ts";
@@ -91,6 +92,8 @@ export type BuildCollectSellersOptions = {
 export type BuildCollectOrdersOptions = {
   treasuryInput: UTxO;
   orderInputs: UTxO[];
+  validFrom: UnixTime;
+  validTo: UnixTime;
 };
 
 export type BuildCancelLBEOptions = {
@@ -485,8 +488,8 @@ export class WarehouseBuilder {
     );
   }
 
-  public buildCollectOrder(options: BuildCollectOrdersOptions) {
-    const { treasuryInput, orderInputs } = options;
+  public buildCollectOrders(options: BuildCollectOrdersOptions) {
+    const { treasuryInput, orderInputs, validFrom, validTo } = options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
     const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] = {
@@ -525,6 +528,9 @@ export class WarehouseBuilder {
       () => {
         this.payingOrderOutput(...orderOutDatums);
       },
+      () => {
+        this.tx.validFrom(validFrom).validTo(validTo);
+      }
     );
   }
 
@@ -748,11 +754,16 @@ export class WarehouseBuilder {
     };
 
     if (this.treasuryRedeemer === undefined) {
+      const baseAsset = T.toUnit(
+        treasuryOutDatum.baseAsset.policyId,
+        treasuryOutDatum.baseAsset.assetName,
+      );
       const assets = {
         [this.treasuryToken]: 1n,
-        [T.toUnit(treasuryOutDatum.baseAsset.policyId, treasuryOutDatum.baseAsset.assetName)]:
+        [baseAsset]:
           treasuryOutDatum.reserveBase,
       };
+      assets["lovelace"] = (assets["lovelace"] ?? 0n) + TREASURY_MIN_ADA;
       innerPay(assets);
     } else {
       invariant(this.treasuryInputs.length > 0);
@@ -788,8 +799,11 @@ export class WarehouseBuilder {
         lovelace: LBE_MIN_OUTPUT_ADA + (datum.isCollected ? LBE_FEE : LBE_FEE * 2n),
       };
       const raiseAsset = T.toUnit(datum.raiseAsset.policyId, datum.raiseAsset.assetName);
-      assets[raiseAsset] = (assets[raiseAsset] ?? 0n) + datum.amount + datum.penaltyAmount;
-
+      if (this.treasuryInputs.length > 0) {
+        // collecting orders
+      } else {
+        assets[raiseAsset] = (assets[raiseAsset] ?? 0n) + datum.amount + datum.penaltyAmount;
+      }
       this.tx.payToAddressWithData(
         this.orderAddress,
         {
