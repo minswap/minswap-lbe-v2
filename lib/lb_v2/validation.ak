@@ -21,8 +21,7 @@ use lb_v2/utils.{
   amm_pool_validation_hash, calculate_penalty,
   compute_asset_name_from_base_and_raise, default_burn_liquidity,
   default_number_seller, factory_auth_an, fee_ada, get_order_value,
-  make_wrapper_redeemer, manager_auth_an, minimum_ada, order_auth_an,
-  seller_auth_an, treasury_auth_an,
+  manager_auth_an, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
 }
 
 pub fn get_value_of_minting_treasury(
@@ -295,7 +294,8 @@ pub fn has_spend_treasury(
   } = treasury_input
   expect value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1
   expect Some(raw_redeemer) = dict.get(redeemers, Spend(treasury_out_ref))
-  make_wrapper_redeemer(expected_redeemer) == raw_redeemer
+  expect redeemer: TreasuryRedeemer = raw_redeemer
+  expected_redeemer == redeemer
 }
 
 pub fn has_spend_manager(
@@ -611,7 +611,7 @@ pub fn validate_collect_manager(
   treasury_in_datum: TreasuryDatum,
   manager_input: Input,
   mint_value: Value,
-  treasury_hash: ValidatorHash,
+  factory_policy_id: PolicyId,
 ) -> Bool {
   let TreasuryDatum { base_asset, raise_asset, is_manager_collected, .. } =
     treasury_in_datum
@@ -634,7 +634,7 @@ pub fn validate_collect_manager(
   and {
     is_manager_collected == False,
     // validate Mint Amount
-    mint_value == value.from_asset(treasury_hash, manager_auth_an, -1),
+    mint_value == value.from_asset(factory_policy_id, manager_auth_an, -1),
     // validate seller manager datum 
     sm_base_asset == base_asset,
     sm_raise_asset == raise_asset,

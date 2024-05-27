@@ -143,7 +143,7 @@ validator {
           treasury_in_datum: treasury_in_datum,
           manager_input: manager_input,
           mint_value: mint_value,
-          treasury_hash: treasury_hash,
+          factory_policy_id: factory_policy_id,
         )
       }
       CollectOrders -> {
