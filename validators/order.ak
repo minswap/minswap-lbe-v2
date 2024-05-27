@@ -1,11 +1,9 @@
-use aiken/dict
 use aiken/transaction.{ScriptContext, Spend, Transaction}
-use aiken/transaction/credential.{Inline, ScriptCredential}
-use aiken/transaction/value
 use lb_v2/types.{
-  CollectOrder, OrderRedeemer, RedeemOrder, UpdateOrder, ValidatorHash,
+  CollectOrder, CollectOrders, OrderDatum, OrderRedeemer, RedeemOrder,
+  RedeemOrders, UpdateOrder, UsingSeller, ValidatorHash,
 }
-use lb_v2/utils.{order_auth_an}
+use lb_v2/validation
 
 validator(
   // ValidatorHash of Saller Contract
@@ -14,30 +12,40 @@ validator(
   treasury_hash: ValidatorHash,
 ) {
   fn validate_order(
-    _raw_datum: Data,
-    raw_redeemer: Data,
+    datum: OrderDatum,
+    redeemer: OrderRedeemer,
     context: ScriptContext,
   ) {
-    True
-    // expect ScriptContext {
-    //   transaction: Transaction { mint, withdrawals, .. },
-    //   purpose: Spend(_),
-    // } = context
-    // expect redeemer: OrderRedeemer = raw_redeemer
-    // when redeemer is {
-    //   UpdateOrder ->
-    //     // -> SellerWithdrawal
-    //     dict.has_key(withdrawals, Inline(ScriptCredential(seller_hash)))
-    //   CollectOrder ->
-    //     // -> TreasuryWithdrawal -> TreasurySpending(others spending need to check no orders)
-    //     dict.has_key(withdrawals, Inline(ScriptCredential(treasury_hash)))
-    //   RedeemOrder ->
-    //     // -> SellerMinting -> TreasurySpending(others spending need to check no orders)
-    //     value.quantity_of(
-    //       value.from_minted_value(mint),
-    //       seller_hash,
-    //       order_auth_an,
-    //     ) < 0
-    // }
+    expect ScriptContext {
+      transaction: Transaction { inputs, redeemers, .. },
+      purpose: Spend(_),
+    } = context
+    let OrderDatum { factory_policy_id, .. } = datum
+    when redeemer is {
+      UpdateOrder ->
+        validation.has_spend_seller(
+          inputs: inputs,
+          factory_policy_id: factory_policy_id,
+          seller_hash: seller_hash,
+          redeemers: redeemers,
+          expected_redeemer: UsingSeller,
+        )
+      CollectOrder ->
+        validation.has_spend_treasury(
+          inputs: inputs,
+          factory_policy_id: factory_policy_id,
+          treasury_hash: treasury_hash,
+          redeemers: redeemers,
+          expected_redeemer: CollectOrders,
+        )
+      RedeemOrder ->
+        validation.has_spend_treasury(
+          inputs: inputs,
+          factory_policy_id: factory_policy_id,
+          treasury_hash: treasury_hash,
+          redeemers: redeemers,
+          expected_redeemer: RedeemOrders,
+        )
+    }
   }
 }

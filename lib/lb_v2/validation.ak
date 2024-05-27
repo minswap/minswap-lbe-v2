@@ -272,29 +272,27 @@ pub fn validate_create_dex_pool(
 
 pub fn has_spend_treasury(
   inputs: List<Input>,
-  authen_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   treasury_hash: ValidatorHash,
   redeemers: Dict<ScriptPurpose, Redeemer>,
   expected_redeemer: TreasuryRedeemer,
 ) -> Bool {
-  expect [Input { output_reference: treasury_out_ref, .. }] =
+  expect [treasury_input] =
     list.filter(
       inputs,
       fn(input) {
         let Input {
-          output: Output { address: in_addr, value: in_value, .. },
+          output: Output { address: Address { payment_credential, .. }, .. },
           ..
         } = input
-        let Address { payment_credential, .. } = in_addr
-        and {
-          value.quantity_of(in_value, authen_policy_id, treasury_auth_an) == 1,
-          when payment_credential is {
-            ScriptCredential(hash) -> treasury_hash == hash
-            _ -> False
-          },
-        }
+        payment_credential == ScriptCredential(treasury_hash)
       },
     )
+  let Input {
+    output_reference: treasury_out_ref,
+    output: Output { value: out_value, .. },
+  } = treasury_input
+  expect value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1
   expect Some(raw_redeemer) = dict.get(redeemers, Spend(treasury_out_ref))
   make_wrapper_redeemer(expected_redeemer) == raw_redeemer
 }
@@ -330,29 +328,28 @@ pub fn has_spend_manager(
 
 pub fn has_spend_seller(
   inputs: List<Input>,
-  manager_policy_id: PolicyId,
+  factory_policy_id: PolicyId,
   seller_hash: ValidatorHash,
   redeemers: Dict<ScriptPurpose, Redeemer>,
   expected_redeemer: SellerRedeemer,
 ) -> Bool {
-  expect [Input { output_reference: seller_out_ref, .. }] =
+  expect [seller_input] =
     list.filter(
       inputs,
       fn(input) {
         let Input {
-          output: Output { address: in_addr, value: in_value, .. },
+          output: Output { address: Address { payment_credential, .. }, .. },
           ..
         } = input
-        let Address { payment_credential, .. } = in_addr
-        and {
-          value.quantity_of(in_value, manager_policy_id, seller_auth_an) == 1,
-          when payment_credential is {
-            ScriptCredential(hash) -> seller_hash == hash
-            _ -> False
-          },
-        }
+        payment_credential == ScriptCredential(seller_hash)
       },
     )
+  let Input {
+    output_reference: seller_out_ref,
+    output: Output { value: seller_out_value, .. },
+  } = seller_input
+  expect
+    value.quantity_of(seller_out_value, factory_policy_id, seller_auth_an) == 1
   expect Some(raw_redeemer) = dict.get(redeemers, Spend(seller_out_ref))
   make_wrapper_redeemer(expected_redeemer) == raw_redeemer
 }
