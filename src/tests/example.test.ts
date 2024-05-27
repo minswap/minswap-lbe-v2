@@ -3,6 +3,8 @@ import * as T from "@minswap/translucent";
 import {
   WarehouseBuilder,
   type BuildAddSellersOptions,
+  type BuildCollectManagerOptions,
+  type BuildCollectSellersOptions,
   type BuildUsingSellerOptions,
   type WarehouseBuilderOptions,
 } from "../build-tx";
@@ -18,7 +20,7 @@ import {
 import { generateAccount, quickSubmitBuilder, type GeneratedAccount } from "./utils";
 import type { Emulator, Translucent, UTxO } from "../types";
 import { address2PlutusAddress, computeLPAssetName } from "../utils";
-import { LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
+import { DEFAULT_NUMBER_SELLER, LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
 import {
   FactoryValidateFactory,
   FeedTypeOrder,
@@ -212,8 +214,8 @@ test("example flow", async () => {
       txBuilder: builder.complete(),
     });
     console.info(`adding Seller ${addSellerCount} done.`);
-  }
-  await addingSeller(10n);
+  };
+  await addingSeller(20n);
 
   const depositing = async (maxCount?: number) => {
     const sellerUtxos: UTxO[] = (
@@ -240,7 +242,7 @@ test("example flow", async () => {
       });
     }
     console.info(`deposit ${depositCount} orders done.`);
-  }
+  };
   await depositing(30);
 
   // update + orders
@@ -257,10 +259,10 @@ test("example flow", async () => {
     }
     console.log(`trying to update ${orderUtxos.length} orders`);
     builder = new WarehouseBuilder(warehouseOptions);
-    const newOrderDatums = Array.from(
-      { length: orderUtxos.length },
-      () => ({ ...orderDatum, amount: 80n })
-    );
+    const newOrderDatums = Array.from({ length: orderUtxos.length }, () => ({
+      ...orderDatum,
+      amount: 80n,
+    }));
     const buildUsingSellerOptions: BuildUsingSellerOptions = {
       treasuryRefInput,
       sellerUtxo: sellerUtxo,
@@ -274,9 +276,40 @@ test("example flow", async () => {
     await quickSubmitBuilder(emulator)({
       txBuilder: builder.complete(),
     });
-    console.info(`updating ${orderUtxos.length} orders done.`);
+    console.info(`update ${orderUtxos.length} orders done.`);
+  };
+  await updatingOrders(15);
+
+  // collect manager
+  while (emulator.slot <= discoveryEndSlot) {
+    emulator.awaitBlock(100);
   }
-  await updatingOrders(18);
+
+  const collectingSeller = async (maxCount?: number) => {
+    const managerUtxo: UTxO = (
+      await emulator.getUtxos(t.utils.validatorToAddress(validators.managerValidator))
+    ).find((u) => !u.scriptRef) as UTxO;
+    const sellerUtxos: UTxO[] = (
+      await emulator.getUtxos(t.utils.validatorToAddress(validators.sellerValidator))
+    ).filter((u) => !u.scriptRef) as UTxO[];
+    maxCount = maxCount ?? sellerUtxos.length;
+
+    const options: BuildCollectSellersOptions = {
+      treasuryRefInput,
+      managerInput: managerUtxo,
+      sellerInputs: sellerUtxos,
+      validFrom: t.utils.slotToUnixTime(emulator.slot),
+      validTo: t.utils.slotToUnixTime(emulator.slot + 100),
+    };
+    builder = new WarehouseBuilder(warehouseOptions);
+    builder.buildCollectSeller(options);
+    await quickSubmitBuilder(emulator)({
+      txBuilder: builder.complete(),
+    });
+    console.info(`collect sellers ${maxCount} done.`);
+  };
+
+  await collectingSeller(2);
 
   // let treasuryUtxo = (
   //   await emulator.getUtxos(

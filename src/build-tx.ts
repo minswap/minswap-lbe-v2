@@ -73,8 +73,14 @@ export type BuildUsingSellerOptions = {
   orderOutputDatums: FeedTypeOrder["_datum"][];
 };
 
-export type BuildCollectSellersOptions = {
+export type BuildCollectManagerOptions = {
   treasuryInput: UTxO;
+  managerInput: UTxO;
+};
+
+export type BuildCollectSellersOptions = {
+  treasuryRefInput: UTxO;
+  managerInput: UTxO;
   sellerInputs: UTxO[];
   validFrom: UnixTime;
   validTo: UnixTime;
@@ -263,7 +269,7 @@ export class WarehouseBuilder {
         this.mintingTreasuryToken();
       },
       () => {
-        this.mintingSellerToken();
+        this.mintingSellerToken(DEFAULT_NUMBER_SELLER);
       },
       () => {
         this.payingManagerOutput(managerDatum);
@@ -520,7 +526,53 @@ export class WarehouseBuilder {
     );
   }
 
-  public buildCollectSeller(options: BuildCollectSellersOptions) { }
+  public buildCollectSeller(options: BuildCollectSellersOptions) {
+    const { treasuryRefInput, managerInput, sellerInputs, validFrom, validTo } = options;
+    invariant(managerInput.datum);
+    const managerInDatum: ManagerValidateManagerSpending["managerInDatum"] = this.fromDatumManager(managerInput.datum);
+    let totalReserveRaise = 0n;
+    let totalPenalty = 0n;
+    for (const seller of sellerInputs) {
+      invariant(seller.datum);
+      const datum = this.fromDatumSeller(seller.datum);
+      totalReserveRaise += datum.amount;
+      totalPenalty += datum.penaltyAmount;
+    }
+    const managerOutDatum: ManagerValidateManagerSpending["managerInDatum"] = {
+      ...managerInDatum,
+      sellerCount: managerInDatum.sellerCount - BigInt(sellerInputs.length),
+      reserveRaise: managerInDatum.reserveRaise + totalReserveRaise,
+      totalPenalty: managerInDatum.totalPenalty + totalPenalty,
+    };
+    const mintSellerCount = -1n * BigInt(sellerInputs.length);
+    this.tasks.push(
+      () => {
+        this.managerRedeemer = "ManageSeller";
+        this.managerInputs = [managerInput];
+        this.treasuryRefInput = treasuryRefInput;
+        this.sellerInputs = sellerInputs;
+        this.sellerRedeemer = "CountingSeller";
+        this.mintRedeemer = "MintSeller";
+      },
+      () => {
+        this.spendingManagerInput();
+      },
+      () => {
+        this.spendingSellerInput();
+      },
+      () => {
+        this.mintingSellerToken(mintSellerCount);
+      },
+      () => {
+        this.payingManagerOutput(managerOutDatum);
+      },
+      () => {
+        this.tx
+          .validFrom(validFrom)
+          .validTo(validTo);
+      },
+    );
+  }
 
   /************************* PARSER  *************************/
   private fromDatumTreasury(rawDatum: string): TreasuryValidateTreasurySpending["treasuryInDatum"] {
@@ -586,11 +638,9 @@ export class WarehouseBuilder {
       return;
     }
     invariant(this.sellerRedeemer);
-    if (this.sellerRedeemer === "UsingSeller") {
-      invariant(this.treasuryRefInput);
-      this.tx.readFrom([this.treasuryRefInput]);
-    }
+    invariant(this.treasuryRefInput);
     this.tx
+      .readFrom([this.treasuryRefInput])
       .readFrom([this.deployedValidators["sellerValidator"]])
       .collectFrom(this.sellerInputs, this.toRedeemerSellerSpend(this.sellerRedeemer));
   }
@@ -895,27 +945,19 @@ export class WarehouseBuilder {
       );
   }
 
-  private mintingSellerToken(addSellerCount?: bigint) {
-    let mintAmount = 0n;
-    if (this.factoryInputs.length) {
-      mintAmount = DEFAULT_NUMBER_SELLER;
-    } else {
-      invariant(addSellerCount);
-      mintAmount = this.sellerInputs.length
-        ? -1n * BigInt(this.sellerInputs.length)
-        : addSellerCount;
+  private mintingSellerToken(mintAmount: bigint) {
+    if (!mintAmount) {
+      return;
     }
-    if (mintAmount) {
-      invariant(this.mintRedeemer);
-      this.tx
-        .readFrom([this.deployedValidators["factoryValidator"]])
-        .mintAssets(
-          {
-            [this.sellerToken]: mintAmount,
-          },
-          T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
-        );
-    }
+    invariant(this.mintRedeemer);
+    this.tx
+      .readFrom([this.deployedValidators["factoryValidator"]])
+      .mintAssets(
+        {
+          [this.sellerToken]: mintAmount,
+        },
+        T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
+      );
   }
 
   private mintingOrderToken(count: bigint) {
