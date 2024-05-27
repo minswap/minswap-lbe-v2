@@ -11,8 +11,8 @@ use aiken/transaction/value.{Value, ada_policy_id}
 use lb_v2/types.{
   Asset, CloseTreasury, CollectManager, CreateTreasury, FactoryDatum,
   FactoryRedeemer, Initialization, ManageSeller, ManagerDatum, MintManager,
-  MintOrder, MintSeller, RedeemOrders, SellerDatum, TreasuryDatum, UsingSeller,
-  ValidatorHash,
+  MintOrder, MintRedeemOrders, MintSeller, RedeemOrders, SellerDatum,
+  TreasuryDatum, UsingSeller, ValidatorHash,
 }
 use lb_v2/utils.{
   compute_lp_asset_name, default_number_seller, factory_auth_an,
@@ -392,22 +392,22 @@ validator(
           redeemers: redeemers,
           expected_redeemer: ManageSeller,
         )
-      MintOrder -> or {
-          validation.has_spend_treasury(
-            inputs: inputs,
-            factory_policy_id: factory_hash,
-            treasury_hash: treasury_hash,
-            redeemers: redeemers,
-            expected_redeemer: RedeemOrders,
-          ),
-          validation.has_spend_seller(
-            inputs: inputs,
-            factory_policy_id: factory_hash,
-            seller_hash: seller_hash,
-            redeemers: redeemers,
-            expected_redeemer: UsingSeller,
-          ),
-        }
+      MintOrder ->
+        validation.has_spend_seller(
+          inputs: inputs,
+          factory_policy_id: factory_hash,
+          seller_hash: seller_hash,
+          redeemers: redeemers,
+          expected_redeemer: UsingSeller,
+        )
+      MintRedeemOrders ->
+        validation.has_spend_treasury(
+          inputs: inputs,
+          factory_policy_id: factory_hash,
+          treasury_hash: treasury_hash,
+          redeemers: redeemers,
+          expected_redeemer: RedeemOrders,
+        )
     }
   }
 }

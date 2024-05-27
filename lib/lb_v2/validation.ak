@@ -351,7 +351,8 @@ pub fn has_spend_seller(
   expect
     value.quantity_of(seller_out_value, factory_policy_id, seller_auth_an) == 1
   expect Some(raw_redeemer) = dict.get(redeemers, Spend(seller_out_ref))
-  make_wrapper_redeemer(expected_redeemer) == raw_redeemer
+  expect redeemer: SellerRedeemer = raw_redeemer
+  expected_redeemer == redeemer
 }
 
 pub fn get_seller_inputs(
@@ -747,7 +748,11 @@ pub fn validate_using_seller(
       value.flatten(mint_value) == []
     } else {
       value.flatten(mint_value) == [
-        (seller_hash, order_auth_an, order_output_count - order_input_count),
+        (
+          factory_policy_id,
+          order_auth_an,
+          order_output_count - order_input_count,
+        ),
       ]
     }
   expect [_] =

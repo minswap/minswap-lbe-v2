@@ -29,6 +29,7 @@ pub type FactoryRedeemer {
   MintManager
   MintSeller
   MintOrder
+  MintRedeemOrders
 }
 
 pub type PenaltyConfig {
