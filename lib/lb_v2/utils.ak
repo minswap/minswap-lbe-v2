@@ -25,10 +25,10 @@ pub const amm_factory_auth_asset_name = #"4d5350"
 pub const amm_pool_auth_asset_name = #"4d5350"
 
 pub const amm_authen_policy_id =
-  #"4ad61bf61971298e8aba4e71ce34cac02cddf8030b6fce35c4693a70"
+  #"24ae408cd7234d4b407aeb1f319076c72f9fd5b3fbee9a4094273b43"
 
 pub const amm_pool_validation_hash =
-  #"295cd9f0691f9a09c13e38b475142042edbd78680af336a5c3e4afcb"
+  #"069f1d8556a564324902033d2ca43ae9a060deb0f9806df5af90aecd"
 
 pub const default_burn_liquidity = 10
 
