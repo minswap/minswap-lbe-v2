@@ -193,6 +193,9 @@ test("example flow", async () => {
   };
 
   const addingSeller = async (addSellerCount: bigint = 1n) => {
+    if (!addSellerCount) {
+      return;
+    }
     const managerUtxo: UTxO = (
       await emulator.getUtxos(t.utils.validatorToAddress(validators.managerValidator))
     ).find((u) => !u.scriptRef) as UTxO;
@@ -238,17 +241,20 @@ test("example flow", async () => {
     }
     console.info(`deposit ${depositCount} orders done.`);
   }
-  await depositing(20);
-  await depositing(10);
+  await depositing(30);
 
   // update + orders
-  const updatingOrders = async () => {
+  const updatingOrders = async (maxCount?: number) => {
     const sellerUtxo: UTxO = (
       await emulator.getUtxos(t.utils.validatorToAddress(validators.sellerValidator))
     ).find((u) => !u.scriptRef) as UTxO;
     const orderUtxos: UTxO[] = (
       await emulator.getUtxos(t.utils.validatorToAddress(validators.orderValidator))
     ).filter((u) => !u.scriptRef) as UTxO[];
+    maxCount = maxCount ?? orderUtxos.length;
+    while (orderUtxos.length > maxCount) {
+      orderUtxos.pop();
+    }
     console.log(`trying to update ${orderUtxos.length} orders`);
     builder = new WarehouseBuilder(warehouseOptions);
     const newOrderDatums = Array.from(
@@ -270,7 +276,7 @@ test("example flow", async () => {
     });
     console.info(`updating ${orderUtxos.length} orders done.`);
   }
-  await updatingOrders();
+  await updatingOrders(18);
 
   // let treasuryUtxo = (
   //   await emulator.getUtxos(

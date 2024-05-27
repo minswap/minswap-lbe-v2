@@ -613,16 +613,16 @@ export class WarehouseBuilder {
       return;
     }
     invariant(this.orderRedeemer);
-    const cases: Record<FeedTypeOrder["_redeemer"], () => void> = {
-      UpdateOrder: () => {
-        this.withdrawFromSeller();
-      },
-      CollectOrder: () => {
-        this.withdrawFromTreasury();
-      },
-      RedeemOrder: () => { },
-    };
-    cases[this.orderRedeemer]();
+    // const cases: Record<FeedTypeOrder["_redeemer"], () => void> = {
+    //   UpdateOrder: () => {
+    //     this.withdrawFromSeller();
+    //   },
+    //   CollectOrder: () => {
+    //     this.withdrawFromTreasury();
+    //   },
+    //   RedeemOrder: () => { },
+    // };
+    // cases[this.orderRedeemer]();
     this.tx
       .readFrom([this.deployedValidators["orderValidator"]])
       .collectFrom(this.orderInputs, T.Data.to(this.orderRedeemer, FeedTypeOrder._redeemer));
