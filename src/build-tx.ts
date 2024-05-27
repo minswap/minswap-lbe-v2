@@ -838,6 +838,9 @@ export class WarehouseBuilder {
   }
 
   /************************* WITHDRAW *************************/
+  /**
+   * @deprecated
+   */
   private withdrawFromSeller() {
     this.tx
       .readFrom([this.deployedValidators["sellerValidator"]])
@@ -848,6 +851,9 @@ export class WarehouseBuilder {
       );
   }
 
+  /**
+ * @deprecated
+ */
   private withdrawFromTreasury() {
     this.tx
       .readFrom([this.deployedValidators["treasuryValidator"]])
@@ -917,15 +923,16 @@ export class WarehouseBuilder {
     if (mintAmount == 0n) {
       return;
     }
-    this.tx.readFrom([this.deployedValidators["sellerValidator"]]).mintAssets(
+    invariant(this.mintRedeemer);
+    this.tx.readFrom([this.deployedValidators["factoryValidator"]]).mintAssets(
       {
         [this.orderToken]: mintAmount,
       },
-      DUMMY_REDEEMER,
+      T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
     );
-    if (count > 0) {
-      this.withdrawFromSeller();
-    }
+    // if (count > 0) {
+    //   this.withdrawFromSeller();
+    // }
   }
 
   private mintingFactoryToken(options?: { baseAsset: BluePrintAsset, raiseAsset: BluePrintAsset }) {
