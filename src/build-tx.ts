@@ -76,6 +76,8 @@ export type BuildUsingSellerOptions = {
 export type BuildCollectManagerOptions = {
   treasuryInput: UTxO;
   managerInput: UTxO;
+  validFrom: UnixTime;
+  validTo: UnixTime;
 };
 
 export type BuildCollectSellersOptions = {
@@ -524,6 +526,44 @@ export class WarehouseBuilder {
         this.payingOrderOutput(...orderOutDatums);
       },
     );
+  }
+
+  public buildCollectManager(options: BuildCollectManagerOptions) {
+    const { treasuryInput, managerInput, validFrom, validTo } = options;
+    invariant(treasuryInput.datum);
+    const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
+    invariant(managerInput.datum);
+    const managerInDatum = this.fromDatumManager(managerInput.datum);
+    const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] = {
+      ...treasuryInDatum,
+      reserveRaise: managerInDatum.reserveRaise,
+      totalPenalty: managerInDatum.totalPenalty,
+      isManagerCollected: true,
+    };
+    this.tasks.push(
+      () => {
+        this.treasuryInputs = [treasuryInput];
+        this.treasuryRedeemer = "CollectManager";
+        this.managerInputs = [managerInput];
+        this.managerRedeemer = "SpendManager";
+        this.mintRedeemer = "MintManager";
+      },
+      () => {
+        this.spendingManagerInput();
+      },
+      () => {
+        this.spendingTreasuryInput();
+      },
+      () => {
+        this.mintingManagerToken();
+      },
+      () => {
+        this.payingTreasuryOutput({ treasuryOutDatum, });
+      },
+      () => {
+        this.tx.validFrom(validFrom).validTo(validTo);
+      }
+    )
   }
 
   public buildCollectSeller(options: BuildCollectSellersOptions) {

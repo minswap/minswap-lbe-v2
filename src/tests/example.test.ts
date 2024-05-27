@@ -293,6 +293,10 @@ test("example flow", async () => {
       await emulator.getUtxos(t.utils.validatorToAddress(validators.sellerValidator))
     ).filter((u) => !u.scriptRef) as UTxO[];
     maxCount = maxCount ?? sellerUtxos.length;
+    maxCount = maxCount > sellerUtxos.length ? sellerUtxos.length : maxCount;
+    if (maxCount == 0) {
+      return;
+    }
     while (sellerUtxos.length > maxCount) {
       sellerUtxos.pop();
     }
@@ -310,8 +314,29 @@ test("example flow", async () => {
     });
     console.info(`collect sellers ${maxCount} done.`);
   };
-
   await collectingSeller(15);
+  await collectingSeller(15);
+  await collectingSeller(15);
+  await collectingSeller(15);
+
+  const collectingManager = async () => {
+    const managerUtxo: UTxO = (
+      await emulator.getUtxos(t.utils.validatorToAddress(validators.managerValidator))
+    ).find((u) => !u.scriptRef) as UTxO;
+    const options: BuildCollectManagerOptions = {
+      treasuryInput: treasuryRefInput,
+      managerInput: managerUtxo,
+      validFrom: t.utils.slotToUnixTime(emulator.slot),
+      validTo: t.utils.slotToUnixTime(emulator.slot + 100),
+    }
+    builder = new WarehouseBuilder(warehouseOptions);
+    builder.buildCollectManager(options);
+    await quickSubmitBuilder(emulator)({
+      txBuilder: builder.complete(),
+    });
+    console.info(`collect manager done`);
+  }
+  await collectingManager();
 
   // let treasuryUtxo = (
   //   await emulator.getUtxos(
