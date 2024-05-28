@@ -1,5 +1,5 @@
 import * as T from "@minswap/translucent";
-import { computeLPAssetName, plutusAddress2Address } from "./utils.ts";
+import { calculateInitialLiquidity, computeLPAssetName, plutusAddress2Address } from "./utils";
 import {
   FactoryValidateFactory,
   FactoryValidateFactoryMinting,
@@ -8,12 +8,12 @@ import {
   ManagerValidateManagerSpending,
   SellerValidateSellerSpending,
   TreasuryValidateTreasurySpending,
-} from "../plutus.ts";
+} from "../plutus";
 import {
   AuthenMintingPolicyValidateAuthen as AmmValidateAuthen,
   FactoryValidatorValidateFactory as AmmValidateFactory,
-} from "../amm-plutus.ts";
-import type { Address, Assets, BluePrintAsset, RewardAddress, Translucent, Tx, UTxO, UnixTime } from "./types.ts";
+} from "../amm-plutus";
+import type { Address, Assets, BluePrintAsset, RewardAddress, Translucent, Tx, UTxO, UnixTime } from "./types";
 import {
   DEFAULT_NUMBER_SELLER,
   DUMMY_REDEEMER,
@@ -32,9 +32,8 @@ import {
   SELLER_AUTH_AN,
   TREASURY_AUTH_AN,
   TREASURY_MIN_ADA,
-} from "./constants.ts";
-import type { DeployedValidators, MinswapValidators, Validators } from "./deploy-validators.ts";
-import { calculateInitialLiquidity } from "./minswap-amm/utils.ts";
+} from "./constants";
+import type { DeployedValidators, MinswapValidators, Validators } from "./deploy-validators";
 import invariant from "@minswap/tiny-invariant";
 
 export type WarehouseBuilderOptions = {
@@ -106,6 +105,9 @@ export type BuildCreateAmmPoolOptions = {
   treasuryInput: UTxO;
   ammFactoryInput: UTxO;
   ammPoolDatum: FeedTypeAmmPool["_datum"];
+  validFrom: UnixTime;
+  validTo: UnixTime;
+  totalLiquidity: bigint;
 };
 
 export type BuildCloseEventOptions = {
@@ -171,6 +173,7 @@ export class WarehouseBuilder {
   ammFactoryHash: string;
   ammPoolToken: string;
   ammFactoryToken: string;
+  ammLpToken: string | undefined;
 
   constructor(options: WarehouseBuilderOptions) {
     const { t, validators, deployedValidators, ammValidators, ammDeployedValidators } = options;
@@ -201,14 +204,14 @@ export class WarehouseBuilder {
 
     // AMM
     this.ammValidators = ammValidators;
-    this.ammFactoryAddress = t.utils.validatorToAddress(ammValidators.authenValidator);
+    this.ammFactoryAddress = t.utils.validatorToAddress(ammValidators.factoryValidator);
     this.ammPoolAddress = t.utils.validatorToAddress(ammValidators.poolValidator);
     this.ammDeployedValidators = ammDeployedValidators;
     this.ammAuthenHash = t.utils.validatorToScriptHash(ammValidators.authenValidator);
     this.ammPoolHash = t.utils.validatorToScriptHash(ammValidators.poolValidator);
     this.ammFactoryHash = t.utils.validatorToScriptHash(ammValidators.factoryValidator);
-    this.ammPoolToken = T.toUnit(this.ammPoolHash, MINSWAP_V2_POOL_AUTH_AN);
-    this.ammFactoryToken = T.toUnit(this.ammPoolHash, MINSWAP_V2_FACTORY_AUTH_AN);
+    this.ammPoolToken = T.toUnit(this.ammAuthenHash, MINSWAP_V2_POOL_AUTH_AN);
+    this.ammFactoryToken = T.toUnit(this.ammAuthenHash, MINSWAP_V2_FACTORY_AUTH_AN);
   }
 
   public complete(): Tx {
@@ -431,13 +434,18 @@ export class WarehouseBuilder {
   }
 
   public buildCreateAmmPool(options: BuildCreateAmmPoolOptions) {
-    const { treasuryInput, ammFactoryInput, ammPoolDatum } = options;
-    let treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"];
-
+    const { treasuryInput, ammFactoryInput, ammPoolDatum, validFrom, validTo, totalLiquidity } = options;
+    invariant(treasuryInput.datum);
+    const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
+    const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] = {
+      ...treasuryInDatum,
+      totalLiquidity: totalLiquidity - LP_COLATERAL,
+    }
     this.tasks.push(
       () => {
         this.treasuryInputs = [treasuryInput];
         this.treasuryRedeemer = "CreateAmmPool";
+        this.setAmmLpToken(treasuryInDatum.baseAsset, treasuryInDatum.raiseAsset);
       },
       () => {
         this.spendingTreasuryInput();
@@ -450,6 +458,9 @@ export class WarehouseBuilder {
       },
       () => {
         this.payingTreasuryOutput({ treasuryOutDatum });
+      },
+      () => {
+        this.tx.validFrom(validFrom).validTo(validTo);
       },
     );
   }
@@ -665,6 +676,23 @@ export class WarehouseBuilder {
     return T.Data.to(redeemer, SellerValidateSellerSpending.redeemer);
   }
 
+  private calFinalReserveRaise(datum: TreasuryValidateTreasurySpending["treasuryInDatum"]) {
+    if (datum.maximumRaise && datum.reserveRaise + datum.totalPenalty > datum.maximumRaise) {
+      return datum.maximumRaise;
+    } else {
+      return datum.reserveRaise + datum.totalPenalty;
+    }
+  }
+
+  private setAmmLpToken(baseAsset: BluePrintAsset, raiseAsset: BluePrintAsset) {
+    const lpAssetName = computeLPAssetName(
+      baseAsset.policyId + baseAsset.assetName,
+      raiseAsset.policyId + raiseAsset.assetName,
+    );
+    const lpToken = T.toUnit(this.ammAuthenHash, lpAssetName);
+    this.ammLpToken = lpToken;
+  }
+
   /************************* SPENDING  *************************/
   private spendingManagerInput() {
     if (this.managerInputs.length == 0) {
@@ -764,6 +792,21 @@ export class WarehouseBuilder {
           treasuryOutDatum.reserveBase,
       };
       assets["lovelace"] = (assets["lovelace"] ?? 0n) + TREASURY_MIN_ADA;
+      innerPay(assets);
+    } else if (this.treasuryRedeemer === "CreateAmmPool") {
+      invariant(this.ammLpToken);
+      const assets = {
+        "lovelace": TREASURY_MIN_ADA,
+        [this.treasuryToken]: 1n,
+        [this.ammLpToken]: treasuryOutDatum.totalLiquidity,
+      };
+      const raiseAsset = T.toUnit(
+        treasuryOutDatum.raiseAsset.policyId,
+        treasuryOutDatum.raiseAsset.assetName,
+      );
+      assets[raiseAsset] =
+        (assets[raiseAsset] ?? 0n) +
+        (treasuryOutDatum.collectedFund - this.calFinalReserveRaise(treasuryOutDatum));
       innerPay(assets);
     } else {
       invariant(this.treasuryInputs.length > 0);
@@ -1075,11 +1118,12 @@ export class WarehouseBuilder {
       poolDatum.assetA.policyId + poolDatum.assetA.assetName,
       poolDatum.assetB.policyId + poolDatum.assetB.assetName,
     );
-    const lpToken = T.toUnit(this.ammPoolHash, lpAssetName);
+    const lpToken = T.toUnit(this.ammAuthenHash, lpAssetName);
+    invariant(this.ammLpToken);
     const mintAssets: Assets = {
       [this.ammFactoryToken]: 1n,
       [this.ammPoolToken]: 1n,
-      [lpToken]: MINSWAP_V2_MAX_LIQUIDITY,
+      [this.ammLpToken]: MINSWAP_V2_MAX_LIQUIDITY,
     };
     const headFactoryDatum: AmmValidateFactory["datum"] = {
       head: factoryDatum.head,
@@ -1100,7 +1144,6 @@ export class WarehouseBuilder {
     const unitB = T.toUnit(poolDatum.assetB.policyId, poolDatum.assetB.assetName);
     poolAssets[unitA] = (poolAssets[unitA] ?? 0n) + poolDatum.reserveA;
     poolAssets[unitB] = (poolAssets[unitB] ?? 0n) + poolDatum.reserveB;
-
     this.tx
       .readFrom([
         this.ammDeployedValidators["authenValidator"],

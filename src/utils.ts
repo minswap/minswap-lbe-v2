@@ -1,6 +1,7 @@
 import * as T from "@minswap/translucent";
 import { SHA3 } from "sha3";
 import type { Translucent, UTxO, Tx, PrivateKey, Address, Network } from "./types";
+import { sqrt } from "./sqrt";
 
 export function quickSubmit(t: Translucent) {
   return async function ({
@@ -55,31 +56,31 @@ export function computeLPAssetName(a: string, b: string): string {
 
 export type PlutusAddress = {
   paymentCredential:
-    | {
+  | {
+    VerificationKeyCredential: [string];
+  }
+  | {
+    ScriptCredential: [string];
+  };
+  stakeCredential:
+  | {
+    Inline: [
+      | {
         VerificationKeyCredential: [string];
       }
-    | {
+      | {
         ScriptCredential: [string];
-      };
-  stakeCredential:
-    | {
-        Inline: [
-          | {
-              VerificationKeyCredential: [string];
-            }
-          | {
-              ScriptCredential: [string];
-            },
-        ];
-      }
-    | {
-        Pointer: {
-          slotNumber: bigint;
-          transactionIndex: bigint;
-          certificateIndex: bigint;
-        };
-      }
-    | null;
+      },
+    ];
+  }
+  | {
+    Pointer: {
+      slotNumber: bigint;
+      transactionIndex: bigint;
+      certificateIndex: bigint;
+    };
+  }
+  | null;
 };
 
 export function address2PlutusAddress(address: Address): PlutusAddress {
@@ -90,24 +91,24 @@ export function address2PlutusAddress(address: Address): PlutusAddress {
     paymentCredential:
       paymentCredential.type === "Key"
         ? {
-            VerificationKeyCredential: [paymentCredential.hash],
-          }
+          VerificationKeyCredential: [paymentCredential.hash],
+        }
         : {
-            ScriptCredential: [paymentCredential.hash],
-          },
+          ScriptCredential: [paymentCredential.hash],
+        },
     stakeCredential:
       stakeCredential !== undefined
         ? {
-            Inline: [
-              stakeCredential.type === "Key"
-                ? {
-                    VerificationKeyCredential: [paymentCredential.hash],
-                  }
-                : {
-                    ScriptCredential: [paymentCredential.hash],
-                  },
-            ],
-          }
+          Inline: [
+            stakeCredential.type === "Key"
+              ? {
+                VerificationKeyCredential: [paymentCredential.hash],
+              }
+              : {
+                ScriptCredential: [paymentCredential.hash],
+              },
+          ],
+        }
         : null,
   };
 }
@@ -177,4 +178,12 @@ export function sortUTxOs(utxos: UTxO[]) {
     }
   });
   return sortedUTxOs;
+}
+
+export function calculateInitialLiquidity(amountA: bigint, amountB: bigint): bigint {
+  let x = sqrt(amountA * amountB);
+  if (x * x < amountA * amountB) {
+    x += 1n;
+  }
+  return x;
 }

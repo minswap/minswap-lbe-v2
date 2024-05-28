@@ -14,7 +14,9 @@ import {
   AuthenMintingPolicyValidateAuthen as MinswapAuthen,
   PoolValidatorValidatePool as MinswapPool,
   FactoryValidatorValidateFactory as MinswapFactory,
+  PoolValidatorValidatePoolBatching as MinswapPoolBatching,
 } from "../amm-plutus";
+import { address2PlutusAddress } from "./utils";
 
 export type Validators = {
   factoryValidator: Script;
@@ -28,6 +30,7 @@ export type MinswapValidators = {
   authenValidator: Script;
   factoryValidator: Script;
   poolValidator: Script;
+  poolBatchingValidator: Script;
 };
 
 export function collectMinswapValidators(options: {
@@ -44,13 +47,27 @@ export function collectMinswapValidators(options: {
 
   const poolValidator = new MinswapPool(authenValidatorHash);
   const poolValidatorHash = t.utils.validatorToScriptHash(poolValidator);
-
-  const factoryValidator = new MinswapFactory(authenValidatorHash, poolValidatorHash);
-
+  const poolBatchingValidator = new MinswapPoolBatching(
+    authenValidatorHash,
+    { ScriptCredential: [poolValidatorHash] },
+  );
+  const poolBatchingValidatorHash = t.utils.validatorToScriptHash(poolBatchingValidator);
+  const poolAddress = t.utils.validatorToAddress(poolValidator);
+  const plutusPoolAddress = address2PlutusAddress(poolAddress);
+  const factoryValidator = new MinswapFactory(
+    authenValidatorHash,
+    plutusPoolAddress,
+    {
+      Inline: [
+        { ScriptCredential: [poolBatchingValidatorHash] }
+      ]
+    }
+  );
   return {
     authenValidator,
     factoryValidator,
     poolValidator,
+    poolBatchingValidator,
   };
 }
 
@@ -208,6 +225,7 @@ export async function deployMinswapValidators(
     () => processElement(t, "authenValidator", validators.authenValidator),
     () => processElement(t, "poolValidator", validators.poolValidator),
     () => processElement(t, "factoryValidator", validators.factoryValidator),
+    () => processElement(t, "poolBatchingValidator", validators.poolBatchingValidator),
   ];
   let res: DeployedValidators = {};
 

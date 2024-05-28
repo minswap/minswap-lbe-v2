@@ -6,6 +6,7 @@ import {
   type BuildCollectManagerOptions,
   type BuildCollectOrdersOptions,
   type BuildCollectSellersOptions,
+  type BuildCreateAmmPoolOptions,
   type BuildUsingSellerOptions,
   type WarehouseBuilderOptions,
 } from "../build-tx";
@@ -19,14 +20,19 @@ import {
   collectMinswapValidators,
 } from "../deploy-validators";
 import { generateAccount, quickSubmitBuilder, type GeneratedAccount } from "./utils";
-import type { Emulator, Translucent, UTxO } from "../types";
-import { address2PlutusAddress, computeLPAssetName } from "../utils";
+import type { Address, Assets, Emulator, OutputData, Translucent, UTxO } from "../types";
+import { address2PlutusAddress, calculateInitialLiquidity, computeLPAssetName } from "../utils";
 import { LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
 import {
   FactoryValidateFactory,
+  FeedTypeAmmPool,
   FeedTypeOrder,
-  type TreasuryValidateTreasurySpending,
+  TreasuryValidateTreasurySpending,
 } from "../../plutus";
+import {
+  FactoryValidatorValidateFactory as AmmValidateFactory,
+} from "../../amm-plutus";
+import invariant from "@minswap/tiny-invariant";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -45,11 +51,46 @@ let raiseAsset: {
   policyId: string;
   assetName: string;
 };
+let ammFactoryAddress: string;
 
 beforeEach(async () => {
   await T.loadModule();
   await T.CModuleLoader.load();
-
+  emulator = new T.Emulator([]);
+  t = await T.Translucent.new(emulator);
+  ammValidators = collectMinswapValidators({
+    t,
+    seedOutRef: {
+      txHash: "5428517bd92102ce1af705f8b66560d445e620aead488b47fb824426484912f8", // dummy
+      outputIndex: 0,
+    },
+  });
+  // console.log("AMM Authen Policy Id", t.utils.validatorToScriptHash(ammValidators.authenValidator));
+  // console.log("AMM Pool Validator Hash", t.utils.validatorToScriptHash(ammValidators.poolValidator));
+  ammFactoryAddress = t.utils.validatorToAddress(ammValidators.factoryValidator);
+  const factoryAccount: {
+    address: Address;
+    outputData: OutputData;
+    assets: Assets;
+  } = {
+    address: ammFactoryAddress,
+    outputData: {
+      inline: T.Data.to(
+        {
+          head: "00",
+          tail: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
+        },
+        AmmValidateFactory.datum,
+      ),
+    },
+    assets: {
+      lovelace: 10_000_000n,
+      [T.toUnit(
+        t.utils.validatorToScriptHash(ammValidators.authenValidator),
+        "4d5346",
+      )]: 1n,
+    },
+  };
   baseAsset = {
     policyId: "e16c2dc8ae937e8d3790c7fd7168d7b994621ba14ca11415f39fed72",
     assetName: "4d494e",
@@ -65,7 +106,7 @@ beforeEach(async () => {
   ACCOUNT_1 = await generateAccount({
     lovelace: 2000000000000000000n,
   });
-  emulator = new T.Emulator([ACCOUNT_0, ACCOUNT_1]);
+  emulator = new T.Emulator([ACCOUNT_0, ACCOUNT_1, factoryAccount]);
   t = await T.Translucent.new(emulator);
   emulator.awaitBlock(10_000); // For validity ranges to be valid
   t.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
@@ -82,15 +123,6 @@ beforeEach(async () => {
   deployedValidators = await deployValidators(t, validators);
   emulator.awaitBlock(10);
 
-  let ammSeedUtxo = (await emulator.getUtxos(ACCOUNT_1.address))[utxos.length - 1];
-
-  ammValidators = collectMinswapValidators({
-    t,
-    seedOutRef: {
-      txHash: ammSeedUtxo.txHash,
-      outputIndex: ammSeedUtxo.outputIndex,
-    },
-  });
   ammDeployedValidators = await deployMinswapValidators(t, ammValidators);
 
   // registerStake
@@ -262,7 +294,7 @@ test("example flow", async () => {
     builder = new WarehouseBuilder(warehouseOptions);
     const newOrderDatums = Array.from({ length: orderUtxos.length }, () => ({
       ...orderDatum,
-      amount: 80n,
+      amount: 80_000_000n,
     }));
     const buildUsingSellerOptions: BuildUsingSellerOptions = {
       treasuryRefInput,
@@ -343,10 +375,6 @@ test("example flow", async () => {
     const treasuryUtxo: UTxO = (
       await emulator.getUtxos(t.utils.validatorToAddress(validators.treasuryValidator))
     ).find((u) => !u.scriptRef) as UTxO;
-    console.log({
-      treasuryAddress: treasuryUtxo.address,
-      t_value: treasuryUtxo.assets,
-    })
     const orderUtxos: UTxO[] = (
       await emulator.getUtxos(t.utils.validatorToAddress(validators.orderValidator))
     )
@@ -373,15 +401,59 @@ test("example flow", async () => {
     builder.buildCollectOrders(options);
     await quickSubmitBuilder(emulator)({
       txBuilder: builder.complete(),
-      debug: true,
     });
     console.info(`collect order ${maxCount} done.`);
   };
   await collectingOrders(1);
-  // await collectingOrders(15);
-  // await collectingOrders(15);
-  // await collectingOrders(15);
+  await collectingOrders(15);
+  await collectingOrders(15);
+  await collectingOrders(15);
 
+  const creatingPool = async () => {
+    const ammFactoryInput: UTxO = (
+      await emulator.getUtxos(ammFactoryAddress)
+    ).find((u) => !u.scriptRef) as UTxO;
+    const treasuryUtxo: UTxO = (
+      await emulator.getUtxos(t.utils.validatorToAddress(validators.treasuryValidator))
+    ).find((u) => !u.scriptRef) as UTxO;
+    invariant(treasuryUtxo.datum);
+    const treasuryDatum = T.Data.from(treasuryUtxo.datum, TreasuryValidateTreasurySpending.treasuryInDatum);
+    const reserveA = treasuryDatum.reserveBase;
+    const reserveB = treasuryDatum.reserveRaise + treasuryDatum.totalPenalty;
+    const totalLiquidity = calculateInitialLiquidity(reserveA, reserveB);
+    const poolDatum: FeedTypeAmmPool["_datum"] = {
+      poolBatchingStakeCredential: {
+        Inline: [
+          { ScriptCredential: [t.utils.validatorToScriptHash(ammValidators.poolBatchingValidator)] }
+        ]
+      },
+      assetA: treasuryDatum.raiseAsset,
+      assetB: treasuryDatum.baseAsset,
+      totalLiquidity: totalLiquidity,
+      reserveA: reserveB,
+      reserveB: reserveA,
+      baseFeeANumerator: 30n,
+      baseFeeBNumerator: 30n,
+      feeSharingNumeratorOpt: null,
+      allowDynamicFee: false
+    };
+
+    const options: BuildCreateAmmPoolOptions = {
+      treasuryInput: treasuryUtxo,
+      ammFactoryInput: ammFactoryInput,
+      ammPoolDatum: poolDatum,
+      validFrom: t.utils.slotToUnixTime(emulator.slot),
+      validTo: t.utils.slotToUnixTime(emulator.slot + 100),
+      totalLiquidity,
+    };
+    builder = new WarehouseBuilder(warehouseOptions);
+    builder.buildCreateAmmPool(options);
+    await quickSubmitBuilder(emulator)({
+      txBuilder: builder.complete(),
+    });
+    console.info(`create AMM pool done.`);
+  }
+  await creatingPool();
   // let treasuryUtxo = (
   //   await emulator.getUtxos(
   //     t.utils.validatorToAddress(validators.treasuryValidator),
