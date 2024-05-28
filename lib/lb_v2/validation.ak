@@ -1234,7 +1234,7 @@ fn apply_redeeming_lp_order(
     penalty_amount,
     ..
   } = order_in_datum
-  let o_lp_amount = total_lp * amount / reserve_raise
+  let o_lp_amount = total_lp * amount / reserve_raise / 2
   let o_remaining_raise_amount = remaing_raise * amount / reserve_raise
 
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
