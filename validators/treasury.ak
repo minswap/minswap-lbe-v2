@@ -7,7 +7,7 @@ use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value
 use lb_v2/types.{
   CancelLBE, CloseEvent, CollectManager, CollectOrders, CreateAmmPool, PoolDatum,
-  RedeemLPByOwner, RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
+  RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
 }
 use lb_v2/utils.{factory_auth_an}
 use lb_v2/validation
@@ -188,6 +188,15 @@ validator {
         let pool_output = validation.get_amm_pool_output(outputs)
         expect Output { datum: InlineDatum(pool_raw_datum), .. } = pool_output
         expect amm_pool_datum: PoolDatum = pool_raw_datum
+        let TreasuryDatum { owner: project_owner, .. } = treasury_in_datum
+        expect [owner_output] =
+          list.filter(
+            outputs,
+            fn(output) {
+              let Output { address, .. } = output
+              address == project_owner
+            },
+          )
         validation.validate_create_dex_pool(
           treasury_in_datum: treasury_in_datum,
           treasury_output: treasury_output,
@@ -195,6 +204,7 @@ validator {
           mint_value: mint_value,
           amm_pool_datum: amm_pool_datum,
           factory_policy_id: factory_policy_id,
+          project_owner_output: owner_output,
         )
       }
       RedeemOrders -> {
@@ -232,21 +242,6 @@ validator {
             mint_value: mint_value,
           )
         }
-      }
-      RedeemLPByOwner -> {
-        let treasury_output =
-          validation.get_treasury_output(
-            outputs,
-            factory_policy_id,
-            treasury_hash,
-          )
-        validation.validate_redeem_lp_by_owner(
-          treasury_output: treasury_output,
-          treasury_in_datum: treasury_in_datum,
-          inputs: inputs,
-          extra_signatories: extra_signatories,
-          factory_policy_id: factory_policy_id,
-        )
       }
 
       CancelLBE -> {

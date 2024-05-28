@@ -182,6 +182,7 @@ pub fn validate_create_dex_pool(
   mint_value: Value,
   amm_pool_datum: PoolDatum,
   factory_policy_id: PolicyId,
+  project_owner_output: Output,
 ) -> Bool {
   let TreasuryDatum {
     collected_fund,
@@ -270,19 +271,26 @@ pub fn validate_create_dex_pool(
     ..
   } = treasury_output
   let treasury_total_liquidity = pool_total_liquidity - default_burn_liquidity
+  let owner_liquidity_amount = treasury_total_liquidity / 2
   expect treasury_out_datum: TreasuryDatum = treasury_out_datum_raw
+  let Output { value: owner_out_value, .. } = project_owner_output
   and {
     treasury_out_value == (
       value.zero()
         |> value.add(factory_policy_id, treasury_auth_an, 1)
         |> value.add(ada_policy_id, ada_asset_name, treasury_minimum_ada)
-        |> value.add(amm_authen_policy_id, lp_asset_name, treasury_total_liquidity) // remaining fund
+        |> value.add(
+            amm_authen_policy_id,
+            lp_asset_name,
+            treasury_total_liquidity - owner_liquidity_amount,
+          )
         |> value.add(raise_pid, raise_an, collected_fund - final_reserve_raise)
     ),
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
-      total_liquidity: treasury_total_liquidity,
+      total_liquidity: treasury_total_liquidity - owner_liquidity_amount,
     },
+    value.quantity_of(owner_out_value, amm_authen_policy_id, lp_asset_name) == owner_liquidity_amount,
   }
 }
 
@@ -1234,7 +1242,7 @@ fn apply_redeeming_lp_order(
     penalty_amount,
     ..
   } = order_in_datum
-  let o_lp_amount = total_lp * amount / reserve_raise / 2
+  let o_lp_amount = total_lp * amount / reserve_raise
   let o_remaining_raise_amount = remaing_raise * amount / reserve_raise
 
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
@@ -1482,41 +1490,6 @@ fn apply_refund_order(
     amount,
     penalty_amount,
   )
-}
-
-pub fn validate_redeem_lp_by_owner(
-  treasury_output: Output,
-  treasury_in_datum: TreasuryDatum,
-  inputs: List<Input>,
-  extra_signatories: List<PubKeyHash>,
-  factory_policy_id: PolicyId,
-) -> Bool {
-  let TreasuryDatum { owner, total_liquidity, collected_fund, .. } =
-    treasury_in_datum
-  let Address { payment_credential: owner_payment_credential, .. } = owner
-
-  expect Output {
-    value: treasury_out_value,
-    datum: InlineDatum(raw_treasury_out_datum),
-    ..
-  } = treasury_output
-  expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
-  and {
-    validate_authorize_by_owner(
-      owner_payment_credential: owner_payment_credential,
-      extra_signatories: extra_signatories,
-      inputs: inputs,
-    ),
-    // create pool sucess
-    total_liquidity > 0,
-    // redeem all orders
-    collected_fund == 0,
-    treasury_out_datum == treasury_in_datum,
-    treasury_out_value == (
-      value.from_asset(factory_policy_id, treasury_auth_an, 1)
-        |> value.add(ada_policy_id, ada_asset_name, treasury_minimum_ada)
-    ),
-  }
 }
 
 pub fn validate_manage_seller(
