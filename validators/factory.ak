@@ -145,25 +145,11 @@ validator(
         // 2. Validate Treasury Out
         // validate that there's only 1 Treasury UTxO in the Transaction Outputs
         // Treasury UTxO must contain treasury_token in the value
-        expect [treasury_out] =
-          list.filter(
-            outputs,
-            fn(output) {
-              let Output { address: Address { payment_credential, .. }, .. } =
-                output
-              payment_credential == ScriptCredential(treasury_hash)
-            },
-          )
-        expect Output {
-          value: treasury_out_value,
-          datum: InlineDatum(treasury_out_raw_datum),
-          ..
-        } = treasury_out
-        expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
+        let treasury_output =
+          validation.get_treasury_output(outputs, factory_hash, treasury_hash)
         expect
           validation.validate_creating_treasury_out(
-            treasury_out_value: treasury_out_value,
-            treasury_out_datum: treasury_out_datum,
+            treasury_out: treasury_output,
             base_asset: base_asset,
             raise_asset: raise_asset,
             manager_hash: manager_hash,

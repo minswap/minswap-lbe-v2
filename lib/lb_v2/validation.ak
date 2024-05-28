@@ -41,8 +41,7 @@ pub fn get_value_of_minting_treasury(
 }
 
 pub fn validate_creating_treasury_out(
-  treasury_out_value: Value,
-  treasury_out_datum: TreasuryDatum,
+  treasury_out: Output,
   base_asset: Asset,
   raise_asset: Asset,
   manager_hash: ValidatorHash,
@@ -51,6 +50,13 @@ pub fn validate_creating_treasury_out(
   factory_policy_id: PolicyId,
   end_valid_time_range: Int,
 ) -> Bool {
+  expect Output {
+    value: treasury_out_value,
+    datum: InlineDatum(treasury_out_raw_datum),
+    reference_script,
+    ..
+  } = treasury_out
+  expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
   // check all field except owner
   let TreasuryDatum {
     factory_policy_id: t_factory_policy_id,
@@ -128,6 +134,8 @@ pub fn validate_creating_treasury_out(
     is_manager_collected == False,
     // treasury value
     treasury_out_value == expected_treasury_out_value,
+    // reference_script
+    reference_script == None,
   }
 }
 
@@ -167,7 +175,6 @@ pub fn validate_creating_manager_out(
   }
 }
 
-// TODO: validate this logic
 pub fn validate_create_dex_pool(
   treasury_in_datum: TreasuryDatum,
   treasury_output: Output,
@@ -267,7 +274,7 @@ pub fn validate_create_dex_pool(
     treasury_out_value == (
       value.zero()
         |> value.add(ada_policy_id, ada_asset_name, treasury_minimum_ada)
-        |> value.add(amm_authen_policy_id, lp_asset_name, treasury_total_liquidity)
+        |> value.add(amm_authen_policy_id, lp_asset_name, treasury_total_liquidity) // remaining fund
         |> value.add(raise_pid, raise_an, collected_fund - final_reserve_raise)
     ),
     treasury_out_datum == TreasuryDatum {
@@ -550,14 +557,17 @@ pub fn get_treasury_output(
         let Output {
           address: Address { payment_credential, .. },
           value: out_value,
+          reference_script,
           ..
         } = output
-        and {
-          value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
-          when payment_credential is {
-            ScriptCredential(hash) -> hash == treasury_hash
-            _ -> False
-          },
+        if payment_credential == ScriptCredential(treasury_hash) {
+          expect and {
+              reference_script == None,
+              value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
+            }
+          True
+        } else {
+          False
         }
       },
     )
@@ -603,11 +613,17 @@ pub fn get_order_outputs(
       let Output {
         address: Address { payment_credential, .. },
         value: out_value,
+        reference_script,
         ..
       } = output
-      and {
-        value.quantity_of(out_value, factory_policy_id, order_auth_an) == 1,
-        payment_credential == ScriptCredential(order_hash),
+      if payment_credential == ScriptCredential(order_hash) {
+        expect and {
+            value.quantity_of(out_value, factory_policy_id, order_auth_an) == 1,
+            reference_script == None,
+          }
+        True
+      } else {
+        False
       }
     },
   )

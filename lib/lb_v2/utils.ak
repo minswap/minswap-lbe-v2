@@ -6,6 +6,7 @@ use aiken/transaction/value.{
 }
 use lb_v2/types.{Asset, PenaltyConfig}
 
+// TODO: change to shorter token name
 pub const factory_auth_an = #"666163746f7279"
 
 pub const treasury_auth_an = #"7472656173757279"

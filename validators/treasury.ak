@@ -92,12 +92,6 @@ validator {
             factory_policy_id,
             treasury_hash,
           )
-        expect Output {
-          value: treasury_out_value,
-          datum: InlineDatum(raw_treasury_out_datum),
-          ..
-        } = treasury_output
-        expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
         and {
           // before discovery phase
           end_valid_time_range < start_time,
@@ -109,8 +103,7 @@ validator {
           ),
           // create new one
           validation.validate_creating_treasury_out(
-            treasury_out_value: treasury_out_value,
-            treasury_out_datum: treasury_out_datum,
+            treasury_out: treasury_output,
             base_asset: base_asset,
             raise_asset: raise_asset,
             manager_hash: manager_hash,
