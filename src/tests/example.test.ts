@@ -460,7 +460,6 @@ test("example flow", async () => {
     const treasuryUtxo: UTxO = (
       await emulator.getUtxos(t.utils.validatorToAddress(validators.treasuryValidator))
     ).find((u) => !u.scriptRef) as UTxO;
-    console.log("treasuryUtxo", treasuryUtxo);
     const orderUtxos: UTxO[] = (
       await emulator.getUtxos(t.utils.validatorToAddress(validators.orderValidator))
     ).filter((u) => !u.scriptRef) as UTxO[];
