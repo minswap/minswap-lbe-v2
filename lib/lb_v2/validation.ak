@@ -181,6 +181,7 @@ pub fn validate_create_dex_pool(
   validity_range: ValidityRange,
   mint_value: Value,
   amm_pool_datum: PoolDatum,
+  factory_policy_id: PolicyId,
 ) -> Bool {
   let TreasuryDatum {
     collected_fund,
@@ -273,6 +274,7 @@ pub fn validate_create_dex_pool(
   and {
     treasury_out_value == (
       value.zero()
+        |> value.add(factory_policy_id, treasury_auth_an, 1)
         |> value.add(ada_policy_id, ada_asset_name, treasury_minimum_ada)
         |> value.add(amm_authen_policy_id, lp_asset_name, treasury_total_liquidity) // remaining fund
         |> value.add(raise_pid, raise_an, collected_fund - final_reserve_raise)

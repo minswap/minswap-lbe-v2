@@ -194,6 +194,7 @@ validator {
           validity_range: validity_range,
           mint_value: mint_value,
           amm_pool_datum: amm_pool_datum,
+          factory_policy_id: factory_policy_id,
         )
       }
       RedeemOrders -> {
