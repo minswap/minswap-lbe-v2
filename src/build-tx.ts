@@ -1,5 +1,5 @@
 import * as T from "@minswap/translucent";
-import { calculateInitialLiquidity, computeLPAssetName, plutusAddress2Address } from "./utils";
+import { calculateInitialLiquidity, computeLPAssetName, plutusAddress2Address, sortUTxOs } from "./utils";
 import {
   FactoryValidateFactory,
   FactoryValidateFactoryMinting,
@@ -109,6 +109,13 @@ export type BuildCreateAmmPoolOptions = {
   validTo: UnixTime;
   totalLiquidity: bigint;
 };
+
+export type BuildRedeemOrdersOptions = {
+  treasuryInput: UTxO;
+  orderInputs: UTxO[];
+  validFrom: UnixTime;
+  validTo: UnixTime;
+}
 
 export type BuildCloseEventOptions = {
   treasuryInput: UTxO;
@@ -499,6 +506,66 @@ export class WarehouseBuilder {
     );
   }
 
+  public buildRedeemOrders(options: BuildRedeemOrdersOptions) {
+    const { treasuryInput, orderInputs, validFrom, validTo } = options;
+    invariant(treasuryInput.datum);
+    const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
+    this.setAmmLpToken(treasuryInDatum.baseAsset, treasuryInDatum.raiseAsset);
+    invariant(this.ammLpToken);
+    const sortedOrders = sortUTxOs(orderInputs);
+    let totalFund = 0n;
+    let totalLiquidity = 0n;
+    const userOutputs: { address: Address, assets: Assets }[] = [];
+    for (const order of sortedOrders) {
+      invariant(order.datum);
+      const datum = this.fromDatumOrder(order.datum);
+      const lpAmount = (datum.amount * treasuryInDatum.totalLiquidity / 2n) / treasuryInDatum.reserveRaise;
+      const output: { address: Address, assets: Assets } = {
+        address: plutusAddress2Address(this.t.network, datum.owner),
+        assets: {
+          "lovelace": LBE_MIN_OUTPUT_ADA,
+          [this.ammLpToken]: lpAmount,
+        }
+      };
+      totalFund += datum.amount;
+      totalLiquidity += lpAmount;
+      userOutputs.push(output);
+    }
+    const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] = {
+      ...treasuryInDatum,
+      collectedFund: treasuryInDatum.collectedFund - totalFund,
+    };
+    this.tasks.push(
+      () => {
+        this.treasuryInputs = [treasuryInput];
+        this.treasuryRedeemer = "RedeemOrders";
+        this.orderInputs = orderInputs;
+        this.orderRedeemer = "RedeemOrder";
+        this.mintRedeemer = "MintRedeemOrders";
+      },
+      () => {
+        for (const output of userOutputs) {
+          this.tx.payToAddress(output.address, output.assets);
+        }
+      },
+      () => {
+        this.spendingTreasuryInput();
+      },
+      () => {
+        this.spendingOrderInput();
+      },
+      () => {
+        this.payingTreasuryOutput({ treasuryOutDatum, deltaLp: totalLiquidity });
+      },
+      () => {
+        this.mintingOrderToken(-1n * BigInt(orderInputs.length));
+      },
+      () => {
+        this.tx.validFrom(validFrom).validTo(validTo);
+      }
+    );
+  }
+
   public buildCollectOrders(options: BuildCollectOrdersOptions) {
     const { treasuryInput, orderInputs, validFrom, validTo } = options;
     invariant(treasuryInput.datum);
@@ -769,8 +836,9 @@ export class WarehouseBuilder {
   private payingTreasuryOutput(options: {
     treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"];
     deltaCollectedFund?: bigint;
+    deltaLp?: bigint;
   }) {
-    const { treasuryOutDatum, deltaCollectedFund } = options;
+    const { treasuryOutDatum, deltaCollectedFund, deltaLp } = options;
     const innerPay = (assets: Assets) => {
       this.tx.payToAddressWithData(
         this.treasuryAddress,
@@ -780,20 +848,12 @@ export class WarehouseBuilder {
         assets,
       );
     };
-
-    if (this.treasuryRedeemer === undefined) {
-      const baseAsset = T.toUnit(
-        treasuryOutDatum.baseAsset.policyId,
-        treasuryOutDatum.baseAsset.assetName,
-      );
-      const assets = {
-        [this.treasuryToken]: 1n,
-        [baseAsset]:
-          treasuryOutDatum.reserveBase,
-      };
-      assets["lovelace"] = (assets["lovelace"] ?? 0n) + TREASURY_MIN_ADA;
-      innerPay(assets);
-    } else if (this.treasuryRedeemer === "CreateAmmPool") {
+    const defaultAssets = () => {
+      invariant(this.treasuryInputs.length > 0);
+      const assets = { ...this.treasuryInputs[0].assets };
+      return assets;
+    };
+    const createPoolAssets = () => {
       invariant(this.ammLpToken);
       const assets = {
         "lovelace": TREASURY_MIN_ADA,
@@ -807,20 +867,54 @@ export class WarehouseBuilder {
       assets[raiseAsset] =
         (assets[raiseAsset] ?? 0n) +
         (treasuryOutDatum.collectedFund - this.calFinalReserveRaise(treasuryOutDatum));
-      innerPay(assets);
-    } else {
+      return assets;
+    };
+    const redeemAssets = () => {
+      invariant(this.treasuryInputs.length > 0);
+      invariant(this.ammLpToken);
+      invariant(deltaLp);
+      const assets = { ...this.treasuryInputs[0].assets };
+      assets[this.ammLpToken] -= deltaLp;
+      return assets;
+    }
+    const collectOrders = () => {
       invariant(this.treasuryInputs.length > 0);
       const assets = { ...this.treasuryInputs[0].assets };
-      if (this.treasuryRedeemer === "CollectOrders") {
-        invariant(deltaCollectedFund);
-        const raiseAsset = T.toUnit(
-          treasuryOutDatum.raiseAsset.policyId,
-          treasuryOutDatum.raiseAsset.assetName,
-        );
-        assets[raiseAsset] = (assets[raiseAsset] ?? 0n) + deltaCollectedFund;
-      }
-      innerPay(assets);
+      invariant(deltaCollectedFund);
+      const raiseAsset = T.toUnit(
+        treasuryOutDatum.raiseAsset.policyId,
+        treasuryOutDatum.raiseAsset.assetName,
+      );
+      assets[raiseAsset] = (assets[raiseAsset] ?? 0n) + deltaCollectedFund;
+      return assets;
     }
+    const createTreasury = () => {
+      const baseAsset = T.toUnit(
+        treasuryOutDatum.baseAsset.policyId,
+        treasuryOutDatum.baseAsset.assetName,
+      );
+      const assets = {
+        [this.treasuryToken]: 1n,
+        [baseAsset]:
+          treasuryOutDatum.reserveBase,
+      };
+      assets["lovelace"] = (assets["lovelace"] ?? 0n) + TREASURY_MIN_ADA;
+      return assets;
+    }
+    const cases: Record<string, () => Assets> = {
+      "": createTreasury,
+      "CollectManager": defaultAssets,
+      "RedeemOrders": redeemAssets,
+      "RedeemLPByOwner": () => {
+        throw Error("not implement!");
+      },
+      "CancelLBE": defaultAssets,
+      "UpdateLBE": defaultAssets,
+      "CreateAmmPool": createPoolAssets,
+      "CollectOrders": collectOrders,
+    }
+    const assets = cases[this.treasuryRedeemer ?? ""]();
+    innerPay(assets);
   }
 
   private payingManagerOutput(datum: ManagerValidateManagerSpending["managerInDatum"]) {
@@ -1057,8 +1151,7 @@ export class WarehouseBuilder {
       );
   }
 
-  private mintingOrderToken(count: bigint) {
-    const mintAmount = this.treasuryInputs.length ? -1n * BigInt(this.orderInputs.length) : count;
+  private mintingOrderToken(mintAmount: bigint) {
     if (mintAmount == 0n) {
       return;
     }

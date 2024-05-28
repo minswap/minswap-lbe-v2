@@ -7,6 +7,7 @@ import {
   type BuildCollectOrdersOptions,
   type BuildCollectSellersOptions,
   type BuildCreateAmmPoolOptions,
+  type BuildRedeemOrdersOptions,
   type BuildUsingSellerOptions,
   type WarehouseBuilderOptions,
 } from "../build-tx";
@@ -276,7 +277,7 @@ test("example flow", async () => {
     }
     console.info(`deposit ${depositCount} orders done.`);
   };
-  await depositing(15);
+  await depositing(1);
 
   // update + orders
   const updatingOrders = async (maxCount?: number) => {
@@ -311,7 +312,7 @@ test("example flow", async () => {
     });
     console.info(`update ${orderUtxos.length} orders done.`);
   };
-  await updatingOrders(15);
+  await updatingOrders(0);
 
   // collect manager
   while (emulator.slot <= discoveryEndSlot) {
@@ -454,6 +455,42 @@ test("example flow", async () => {
     console.info(`create AMM pool done.`);
   }
   await creatingPool();
+
+  const redeemingOrders = async (maxCount?: number) => {
+    const treasuryUtxo: UTxO = (
+      await emulator.getUtxos(t.utils.validatorToAddress(validators.treasuryValidator))
+    ).find((u) => !u.scriptRef) as UTxO;
+    console.log("treasuryUtxo", treasuryUtxo);
+    const orderUtxos: UTxO[] = (
+      await emulator.getUtxos(t.utils.validatorToAddress(validators.orderValidator))
+    ).filter((u) => !u.scriptRef) as UTxO[];
+    maxCount = maxCount ?? orderUtxos.length;
+    maxCount = maxCount > orderUtxos.length ? orderUtxos.length : maxCount;
+    if (maxCount == 0) {
+      return;
+    }
+    while (orderUtxos.length > maxCount) {
+      orderUtxos.pop();
+    }
+    const options: BuildRedeemOrdersOptions = {
+      treasuryInput: treasuryUtxo,
+      orderInputs: orderUtxos,
+      validFrom: t.utils.slotToUnixTime(emulator.slot),
+      validTo: t.utils.slotToUnixTime(emulator.slot + 100),
+    };
+    builder = new WarehouseBuilder(warehouseOptions);
+    builder.buildRedeemOrders(options);
+    await quickSubmitBuilder(emulator)({
+      txBuilder: builder.complete(),
+      stats: true
+    });
+    console.info(`Redeem order ${maxCount} done.`);
+  };
+  await redeemingOrders(1);
+  // await redeemingOrders(15);
+  // await redeemingOrders(15);
+  // await redeemingOrders(15);
+
   // let treasuryUtxo = (
   //   await emulator.getUtxos(
   //     t.utils.validatorToAddress(validators.treasuryValidator),
