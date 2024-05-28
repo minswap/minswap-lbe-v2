@@ -444,9 +444,10 @@ export class WarehouseBuilder {
     const { treasuryInput, ammFactoryInput, ammPoolDatum, validFrom, validTo, totalLiquidity } = options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
+    const projectOwnerLp = (totalLiquidity - LP_COLATERAL) / 2n;
     const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] = {
       ...treasuryInDatum,
-      totalLiquidity: totalLiquidity - LP_COLATERAL,
+      totalLiquidity: (totalLiquidity - LP_COLATERAL) - projectOwnerLp,
     }
     this.tasks.push(
       () => {
@@ -465,6 +466,16 @@ export class WarehouseBuilder {
       },
       () => {
         this.payingTreasuryOutput({ treasuryOutDatum });
+      },
+      () => {
+        invariant(this.ammLpToken);
+        const projectOwner = plutusAddress2Address(this.t.network, treasuryInDatum.owner);
+        this.tx.payToAddress(
+          projectOwner,
+          {
+            [this.ammLpToken]: projectOwnerLp,
+          }
+        )
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
@@ -519,7 +530,7 @@ export class WarehouseBuilder {
     for (const order of sortedOrders) {
       invariant(order.datum);
       const datum = this.fromDatumOrder(order.datum);
-      const lpAmount = (datum.amount * treasuryInDatum.totalLiquidity / 2n) / treasuryInDatum.reserveRaise;
+      const lpAmount = (datum.amount * treasuryInDatum.totalLiquidity) / treasuryInDatum.reserveRaise;
       const output: { address: Address, assets: Assets } = {
         address: plutusAddress2Address(this.t.network, datum.owner),
         assets: {
