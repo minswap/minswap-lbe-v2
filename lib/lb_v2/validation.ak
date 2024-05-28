@@ -182,7 +182,7 @@ pub fn validate_create_dex_pool(
   mint_value: Value,
   amm_pool_datum: PoolDatum,
   factory_policy_id: PolicyId,
-  project_owner_output: Output,
+  project_owner_outputs: List<Output>,
 ) -> Bool {
   let TreasuryDatum {
     collected_fund,
@@ -270,27 +270,32 @@ pub fn validate_create_dex_pool(
     datum: InlineDatum(treasury_out_datum_raw),
     ..
   } = treasury_output
-  let treasury_total_liquidity = pool_total_liquidity - default_burn_liquidity
-  let owner_liquidity_amount = treasury_total_liquidity / 2
+  let total_lbe_lp = pool_total_liquidity - default_burn_liquidity
+  let expected_owner_lp_outputs = total_lbe_lp / 2
+  let treasury_lp_amount = total_lbe_lp - expected_owner_lp_outputs
   expect treasury_out_datum: TreasuryDatum = treasury_out_datum_raw
-  let Output { value: owner_out_value, .. } = project_owner_output
+  let owner_lp_amount =
+    list.foldl(
+      project_owner_outputs,
+      0,
+      fn(output, acc) {
+        let Output { value, .. } = output
+        acc + value.quantity_of(value, amm_authen_policy_id, lp_asset_name)
+      },
+    )
   and {
     treasury_out_value == (
       value.zero()
         |> value.add(factory_policy_id, treasury_auth_an, 1)
         |> value.add(ada_policy_id, ada_asset_name, treasury_minimum_ada)
-        |> value.add(
-            amm_authen_policy_id,
-            lp_asset_name,
-            treasury_total_liquidity - owner_liquidity_amount,
-          )
+        |> value.add(amm_authen_policy_id, lp_asset_name, treasury_lp_amount)
         |> value.add(raise_pid, raise_an, collected_fund - final_reserve_raise)
     ),
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
-      total_liquidity: treasury_total_liquidity - owner_liquidity_amount,
+      total_liquidity: treasury_lp_amount,
     },
-    value.quantity_of(owner_out_value, amm_authen_policy_id, lp_asset_name) == owner_liquidity_amount,
+    owner_lp_amount == expected_owner_lp_outputs,
   }
 }
 

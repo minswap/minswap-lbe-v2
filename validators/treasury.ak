@@ -189,7 +189,7 @@ validator {
         expect Output { datum: InlineDatum(pool_raw_datum), .. } = pool_output
         expect amm_pool_datum: PoolDatum = pool_raw_datum
         let TreasuryDatum { owner: project_owner, .. } = treasury_in_datum
-        expect [owner_output] =
+        let owner_outputs =
           list.filter(
             outputs,
             fn(output) {
@@ -204,7 +204,7 @@ validator {
           mint_value: mint_value,
           amm_pool_datum: amm_pool_datum,
           factory_policy_id: factory_policy_id,
-          project_owner_output: owner_output,
+          project_owner_outputs: owner_outputs,
         )
       }
       RedeemOrders -> {

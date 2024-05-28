@@ -538,7 +538,7 @@ export class WarehouseBuilder {
           [this.ammLpToken]: lpAmount,
         }
       };
-      totalFund += datum.amount;
+      totalFund += datum.amount + datum.penaltyAmount;
       totalLiquidity += lpAmount;
       userOutputs.push(output);
     }
@@ -886,6 +886,9 @@ export class WarehouseBuilder {
       invariant(deltaLp);
       const assets = { ...this.treasuryInputs[0].assets };
       assets[this.ammLpToken] -= deltaLp;
+      if(assets[this.ammLpToken] === 0n){
+        delete assets[this.ammLpToken]
+      }
       return assets;
     }
     const collectOrders = () => {
