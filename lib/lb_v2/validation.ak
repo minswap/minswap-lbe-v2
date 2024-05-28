@@ -1089,6 +1089,7 @@ pub fn validate_redeem_lp(
   treasury_in_datum: TreasuryDatum,
   treasury_in_value: Value,
   mint_value: Value,
+  factory_policy_id: PolicyId,
 ) -> Bool {
   let TreasuryDatum {
     collected_fund,
@@ -1098,7 +1099,6 @@ pub fn validate_redeem_lp(
     total_liquidity,
     maximum_raise,
     total_penalty,
-    seller_hash,
     ..
   } = treasury_in_datum
   expect Output {
@@ -1139,7 +1139,6 @@ pub fn validate_redeem_lp(
       remaing_raise: total_remaining_raise,
       lp_asset_name: lp_asset_name,
     )
-
   and {
     // 2. validate treasury.
     //    - treasury_datum
@@ -1159,7 +1158,7 @@ pub fn validate_redeem_lp(
     ),
     // 3. Mint: burn order NFT
     value.flatten(mint_value) == [
-      (seller_hash, order_auth_an, -list.length(order_inputs)),
+      (factory_policy_id, order_auth_an, -list.length(order_inputs)),
     ],
   }
   // this function dont need to check collected beacause treasury must collect before create pool

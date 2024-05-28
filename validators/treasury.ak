@@ -221,6 +221,7 @@ validator {
             treasury_in_datum: treasury_in_datum,
             treasury_in_value: treasury_in_value,
             mint_value: mint_value,
+            factory_policy_id: factory_policy_id,
           )
         } else {
           validation.validate_refund(
