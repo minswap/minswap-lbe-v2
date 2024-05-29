@@ -18,7 +18,7 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
-  amm_pool_validation_hash, calculate_penalty,
+  amm_pool_validation_hash, assert, calculate_penalty,
   compute_asset_name_from_base_and_raise, default_burn_liquidity,
   default_number_seller, factory_auth_an, fee_ada, get_order_value,
   manager_auth_an, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
@@ -305,6 +305,7 @@ pub fn has_spend_treasury(
   redeemers: Dict<ScriptPurpose, Redeemer>,
   expected_redeemer: TreasuryRedeemer,
 ) -> Bool {
+  // Transaction always contain exactly 1 Treasury Input
   expect [treasury_input] =
     list.filter(
       inputs,
@@ -320,10 +321,18 @@ pub fn has_spend_treasury(
     output_reference: treasury_out_ref,
     output: Output { value: out_value, .. },
   } = treasury_input
-  expect value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1
   expect Some(raw_redeemer) = dict.get(redeemers, Spend(treasury_out_ref))
   expect redeemer: TreasuryRedeemer = raw_redeemer
-  expected_redeemer == redeemer
+  and {
+    assert(
+      value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
+      @"Treasury UTxO must contain 1 Treasury Token",
+    ),
+    assert(
+      expected_redeemer == redeemer,
+      @"Spending Treasury must be correct redeemer!",
+    ),
+  }
 }
 
 pub fn has_spend_manager(
@@ -424,6 +433,7 @@ pub fn get_order_inputs(
   )
 }
 
+// Getting Legit Manager Inputs from Transaction's Inputs
 pub fn get_manager_inputs(
   inputs: List<Input>,
   factory_policy_id: PolicyId,
@@ -432,11 +442,18 @@ pub fn get_manager_inputs(
   list.filter(
     inputs,
     fn(input) {
-      let Input { output: Output { address: in_addr, value: in_value, .. }, .. } =
-        input
-      let Address { payment_credential, .. } = in_addr
+      let Input {
+        output: Output {
+          address: Address { payment_credential, .. },
+          value: in_value,
+          ..
+        },
+        ..
+      } = input
       and {
+        // Has 1 Manager Token
         value.quantity_of(in_value, factory_policy_id, manager_auth_an) == 1,
+        // output belongs Manager Address
         payment_credential == ScriptCredential(manager_hash),
       }
     },
@@ -559,6 +576,8 @@ pub fn get_amm_pool_ref_inputs(ref_inputs: List<Input>) -> List<Input> {
   pool_ref_inputs
 }
 
+// If a transaction needs to pay the Treasury,
+// its outputs must contain exactly 1 Legit Treasury Output.
 pub fn get_treasury_output(
   outputs: List<Output>,
   factory_policy_id: PolicyId,
@@ -574,14 +593,13 @@ pub fn get_treasury_output(
           reference_script,
           ..
         } = output
-        if payment_credential == ScriptCredential(treasury_hash) {
-          expect and {
-              reference_script == None,
-              value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
-            }
-          True
-        } else {
-          False
+        and {
+          // output belongs Treasury Address
+          payment_credential == ScriptCredential(treasury_hash),
+          // No ref_script to avoid increase minimum ADA
+          reference_script == None,
+          // Has 1 Treasury Token
+          value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
         }
       },
     )
@@ -643,53 +661,89 @@ pub fn get_order_outputs(
   )
 }
 
+// Checking Condition to collect manager
+// Assertions:
+// - 1 Treasury Ouput needs to be paid
+// - 1 Manager Input needs to be spent
+// - Treasury Input and Manager Input must be the same LBE ID.
+// - The Treasury Values have no changes.
+// - All Sellers must be collected before collecting Manager.
+// - Burn 1 Manager Token
+// - Treasury In Datum must be correct!
+// - Treasury Out Datum must be correct!
 pub fn validate_collect_manager(
-  treasury_output: Output,
+  inputs: List<Input>,
+  outputs: List<Output>,
   treasury_in_value: Value,
   treasury_in_datum: TreasuryDatum,
-  manager_input: Input,
   mint_value: Value,
   factory_policy_id: PolicyId,
+  manager_hash: ValidatorHash,
+  treasury_hash: ValidatorHash,
 ) -> Bool {
-  let TreasuryDatum { base_asset, raise_asset, is_manager_collected, .. } =
-    treasury_in_datum
+  // get 1 Legit Treasury Output
+  let treasury_output =
+    get_treasury_output(outputs, factory_policy_id, treasury_hash)
+  // get 1 Legit Manager Input
+  expect [manager_input] =
+    get_manager_inputs(
+      inputs: inputs,
+      factory_policy_id: factory_policy_id,
+      manager_hash: manager_hash,
+    )
+  // Extract some necessary data.
   expect Output {
     datum: InlineDatum(treasury_out_raw_datum),
     value: treasury_out_value,
     ..
   } = treasury_output
   expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
-
   expect Input {
     output: Output { datum: InlineDatum(raw_manager_datum), .. },
     ..
   } = manager_input
   expect ManagerDatum {
-    base_asset: sm_base_asset,
-    raise_asset: sm_raise_asset,
+    base_asset,
+    raise_asset,
     seller_count,
     reserve_raise,
     total_penalty,
     ..
   }: ManagerDatum = raw_manager_datum
   and {
-    is_manager_collected == False,
-    // validate Mint Amount
-    mint_value == value.from_asset(factory_policy_id, manager_auth_an, -1),
-    // validate seller manager datum 
-    sm_base_asset == base_asset,
-    sm_raise_asset == raise_asset,
-    // seller_count == 0 that mean LBE is already cancelled or finish
-    seller_count == 0,
+    // Both treasury, manager share the same LBE ID.
+    // The Manager must not have been collected yet.
+    assert(
+      treasury_in_datum == TreasuryDatum {
+        ..treasury_in_datum,
+        is_manager_collected: False,
+        base_asset: base_asset,
+        raise_asset: raise_asset,
+      },
+      @"Treasury In Datum must be correct!",
+    ),
+    assert(
+      mint_value == value.from_asset(factory_policy_id, manager_auth_an, -1),
+      @"Must burn 1 Manager Token",
+    ),
+    assert(
+      seller_count == 0,
+      @"All sellers must be collected before collecting the manager.",
+    ),
     // validate treasury output
-    treasury_out_datum == TreasuryDatum {
-      ..treasury_in_datum,
-      reserve_raise: reserve_raise,
-      total_penalty: total_penalty,
-      is_manager_collected: True,
-    },
-    // treasury value
-    treasury_in_value == treasury_out_value,
+    assert(
+      treasury_out_datum == TreasuryDatum {
+        ..treasury_in_datum,
+        reserve_raise: reserve_raise,
+        total_penalty: total_penalty,
+        is_manager_collected: True,
+      },
+      @"Treasury Out Datum must be correct!",
+    ),
+    assert(
+      treasury_in_value == treasury_out_value,
+      @"Treasury Value must no changes",
+    ),
   }
 }
 

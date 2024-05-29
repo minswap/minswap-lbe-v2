@@ -139,7 +139,13 @@ validator(treasury_hash: ValidatorHash) {
           seller_outputs: seller_outputs,
         )
       }
+      // Collect Manager Transaction note:
+      //   1 Manager Token needs to be burned (trigger Factory Minting)
+      //   1 Manager Input needs to be spent
+      //   1 Treasury Input needs to be spent
+      //   1 Treasury Output needs to be paid
       SpendManager ->
+        // Delegate validation logic to the Treasury Validator.
         validation.has_spend_treasury(
           inputs: inputs,
           factory_policy_id: factory_policy_id,

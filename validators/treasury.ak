@@ -9,7 +9,7 @@ use lb_v2/types.{
   CancelLBE, CloseEvent, CollectManager, CollectOrders, CreateAmmPool, PoolDatum,
   RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
 }
-use lb_v2/utils.{factory_auth_an}
+use lb_v2/utils.{assert, factory_auth_an, treasury_auth_an}
 use lb_v2/validation
 
 validator {
@@ -28,13 +28,16 @@ validator {
       extra_signatories,
       ..
     } = transaction
-    let TreasuryDatum { factory_policy_id, .. } = treasury_in_datum
-    let treasury_input =
-      validation.get_treasury_input_by_out_ref(
+    // get input being spent (aka treasury input)
+    expect Some(treasury_input) =
+      list.find(
         inputs,
-        factory_policy_id,
-        out_ref,
+        fn(input) {
+          let Input { output_reference, .. } = input
+          output_reference == out_ref
+        },
       )
+    // Extract some necessary data.
     expect Input {
       output: Output {
         address: Address {
@@ -46,21 +49,8 @@ validator {
       },
       ..
     } = treasury_input
-    // Always spend exactly 1 Treasury UTxO
-    expect [_] =
-      list.filter(
-        inputs,
-        fn(input) {
-          let Input {
-            output: Output { address: Address { payment_credential, .. }, .. },
-            ..
-          } = input
-          when payment_credential is {
-            ScriptCredential(hash) -> hash == treasury_hash
-            _ -> False
-          }
-        },
-      )
+    let TreasuryDatum { factory_policy_id, manager_hash, .. } =
+      treasury_in_datum
     let mint_value = value.from_minted_value(mint)
     expect Interval {
       upper_bound: IntervalBound {
@@ -72,6 +62,32 @@ validator {
         ..
       },
     } = validity_range
+    expect and {
+        assert(
+          value.quantity_of(
+            treasury_in_value,
+            factory_policy_id,
+            treasury_auth_an,
+          ) == 1,
+          @"Treasury Input must contains 1 Treasury Token",
+        ),
+        assert(
+          list.filter(
+            inputs,
+            fn(input) {
+              let Input {
+                output: Output {
+                  address: Address { payment_credential, .. },
+                  ..
+                },
+                ..
+              } = input
+              payment_credential == ScriptCredential(treasury_hash)
+            },
+          ) == [treasury_input],
+          @"Always spend exactly 1 Treasury Input!",
+        ),
+      }
     when redeemer is {
       // UpdateLBE before discovery phase
       UpdateLBE -> {
@@ -80,7 +96,6 @@ validator {
           raise_asset,
           owner,
           start_time,
-          manager_hash,
           seller_hash,
           order_hash,
           ..
@@ -116,30 +131,17 @@ validator {
           mint_value == value.zero(),
         }
       }
-      CollectManager -> {
-        let TreasuryDatum { manager_hash, .. } = treasury_in_datum
-        let treasury_output =
-          validation.get_treasury_output(
-            outputs,
-            factory_policy_id,
-            treasury_hash,
-          )
-
-        expect [manager_input] =
-          validation.get_manager_inputs(
-            inputs: inputs,
-            factory_policy_id: factory_policy_id,
-            manager_hash: manager_hash,
-          )
+      CollectManager ->
         validation.validate_collect_manager(
-          treasury_output: treasury_output,
+          inputs: inputs,
+          outputs: outputs,
           treasury_in_value: treasury_in_value,
           treasury_in_datum: treasury_in_datum,
-          manager_input: manager_input,
           mint_value: mint_value,
           factory_policy_id: factory_policy_id,
+          manager_hash: manager_hash,
+          treasury_hash: treasury_hash,
         )
-      }
       CollectOrders -> {
         let TreasuryDatum { order_hash, .. } = treasury_in_datum
         let order_inputs =

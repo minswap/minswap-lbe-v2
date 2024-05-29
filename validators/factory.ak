@@ -364,7 +364,13 @@ validator(
         has_spend_factory(inputs, factory_policy_id, redeemers, redeemer)
       CloseTreasury { .. } ->
         has_spend_factory(inputs, factory_policy_id, redeemers, redeemer)
+      // Collect Manager Transaction note:
+      //   1 Manager Token needs to be burned (trigger Factory Minting)
+      //   1 Manager Input needs to be spent
+      //   1 Treasury Input needs to be spent
+      //   1 Treasury Output needs to be paid
       MintManager ->
+        // Delegate validation logic to the Treasury Validator.
         validation.has_spend_treasury(
           inputs: inputs,
           factory_policy_id: factory_policy_id,

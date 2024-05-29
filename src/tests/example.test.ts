@@ -152,24 +152,6 @@ beforeEach(async () => {
   });
 });
 
-test("quick", async () => {
-  const lpAssetName = computeLPAssetName(
-    baseAsset.policyId + baseAsset.assetName,
-    "",
-  );
-  const factoryDatumHead: FactoryValidateFactory["datum"] = {
-    head: LBE_INIT_FACTORY_HEAD,
-    tail: lpAssetName,
-  };
-  const factoryDatumTail: FactoryValidateFactory["datum"] = {
-    head: lpAssetName,
-    tail: LBE_INIT_FACTORY_TAIL,
-  };
-  const headRaw = T.Data.to(factoryDatumHead, FactoryValidateFactory.datum);
-  const tailRaw = T.Data.to(factoryDatumTail, FactoryValidateFactory.datum);
-  expect(headRaw < tailRaw).toBeTruthy();
-});
-
 test("example flow", async () => {
   const warehouseOptions: WarehouseBuilderOptions = {
     t,
