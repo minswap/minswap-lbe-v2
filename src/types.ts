@@ -15,4 +15,4 @@ export type OutputData = T.OutputData;
 export type UnixTime = T.UnixTime;
 export type Network = T.Network;
 export type Provider = T.Provider;
-export type BluePrintAsset = { policyId: string, assetName: string };
+export type BluePrintAsset = { policyId: string; assetName: string };

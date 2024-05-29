@@ -7,7 +7,9 @@ export type GeneratedAccount = {
   assets: Assets;
 };
 
-export async function generateAccount(assets: Assets): Promise<GeneratedAccount> {
+export async function generateAccount(
+  assets: Assets,
+): Promise<GeneratedAccount> {
   const privateKey = T.generatePrivateKey();
   return {
     privateKey,
@@ -42,7 +44,9 @@ export function quickSubmitBuilder(emulator: Emulator) {
       let totalCoin = 0n;
       for (let i = 0; i < body.outputs().len(); i++) {
         const output = body.outputs().get(i);
-        const addressDetails = T.getAddressDetails(output.address().to_bech32());
+        const addressDetails = T.getAddressDetails(
+          output.address().to_bech32(),
+        );
         if (addressDetails.paymentCredential?.type == "Script") {
           const coin = BigInt(output.amount().coin().to_str());
           totalCoin += coin;

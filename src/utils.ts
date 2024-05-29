@@ -1,6 +1,13 @@
 import * as T from "@minswap/translucent";
 import { SHA3 } from "sha3";
-import type { Translucent, UTxO, Tx, PrivateKey, Address, Network } from "./types";
+import type {
+  Translucent,
+  UTxO,
+  Tx,
+  PrivateKey,
+  Address,
+  Network,
+} from "./types";
 import { sqrt } from "./sqrt";
 
 export function quickSubmit(t: Translucent) {
@@ -56,31 +63,31 @@ export function computeLPAssetName(a: string, b: string): string {
 
 export type PlutusAddress = {
   paymentCredential:
-  | {
-    VerificationKeyCredential: [string];
-  }
-  | {
-    ScriptCredential: [string];
-  };
-  stakeCredential:
-  | {
-    Inline: [
-      | {
+    | {
         VerificationKeyCredential: [string];
       }
-      | {
+    | {
         ScriptCredential: [string];
-      },
-    ];
-  }
-  | {
-    Pointer: {
-      slotNumber: bigint;
-      transactionIndex: bigint;
-      certificateIndex: bigint;
-    };
-  }
-  | null;
+      };
+  stakeCredential:
+    | {
+        Inline: [
+          | {
+              VerificationKeyCredential: [string];
+            }
+          | {
+              ScriptCredential: [string];
+            },
+        ];
+      }
+    | {
+        Pointer: {
+          slotNumber: bigint;
+          transactionIndex: bigint;
+          certificateIndex: bigint;
+        };
+      }
+    | null;
 };
 
 export function address2PlutusAddress(address: Address): PlutusAddress {
@@ -91,48 +98,60 @@ export function address2PlutusAddress(address: Address): PlutusAddress {
     paymentCredential:
       paymentCredential.type === "Key"
         ? {
-          VerificationKeyCredential: [paymentCredential.hash],
-        }
+            VerificationKeyCredential: [paymentCredential.hash],
+          }
         : {
-          ScriptCredential: [paymentCredential.hash],
-        },
+            ScriptCredential: [paymentCredential.hash],
+          },
     stakeCredential:
       stakeCredential !== undefined
         ? {
-          Inline: [
-            stakeCredential.type === "Key"
-              ? {
-                VerificationKeyCredential: [paymentCredential.hash],
-              }
-              : {
-                ScriptCredential: [paymentCredential.hash],
-              },
-          ],
-        }
+            Inline: [
+              stakeCredential.type === "Key"
+                ? {
+                    VerificationKeyCredential: [paymentCredential.hash],
+                  }
+                : {
+                    ScriptCredential: [paymentCredential.hash],
+                  },
+            ],
+          }
         : null,
   };
 }
 
-export function plutusAddress2Address(network: Network, data: PlutusAddress): Address {
+export function plutusAddress2Address(
+  network: Network,
+  data: PlutusAddress,
+): Address {
   const C = T.CModuleLoader.get;
   const networkId = network === "Mainnet" ? 1 : 0;
   let payment;
   if ("VerificationKeyCredential" in data.paymentCredential) {
     const keyHash = data.paymentCredential.VerificationKeyCredential[0];
-    payment = C.StakeCredential.from_keyhash(C.Ed25519KeyHash.from_hex(keyHash));
+    payment = C.StakeCredential.from_keyhash(
+      C.Ed25519KeyHash.from_hex(keyHash),
+    );
   } else if ("ScriptCredential" in data.paymentCredential) {
     const scriptHash = data.paymentCredential.ScriptCredential[0];
-    payment = C.StakeCredential.from_scripthash(C.Ed25519KeyHash.from_hex(scriptHash));
+    payment = C.StakeCredential.from_scripthash(
+      C.Ed25519KeyHash.from_hex(scriptHash),
+    );
   }
 
   let stake = undefined;
   if (data.stakeCredential && "Inline" in data.stakeCredential) {
     if ("VerificationKeyCredential" in data.stakeCredential.Inline[0]) {
-      const keyHash = data.stakeCredential.Inline[0].VerificationKeyCredential[0];
-      stake = C.StakeCredential.from_keyhash(C.Ed25519KeyHash.from_hex(keyHash));
+      const keyHash =
+        data.stakeCredential.Inline[0].VerificationKeyCredential[0];
+      stake = C.StakeCredential.from_keyhash(
+        C.Ed25519KeyHash.from_hex(keyHash),
+      );
     } else if ("ScriptCredential" in data.stakeCredential.Inline[0]) {
       const scriptHash = data.stakeCredential.Inline[0].ScriptCredential[0];
-      stake = C.StakeCredential.from_scripthash(C.Ed25519KeyHash.from_hex(scriptHash));
+      stake = C.StakeCredential.from_scripthash(
+        C.Ed25519KeyHash.from_hex(scriptHash),
+      );
     }
   }
   if (stake) {
@@ -163,7 +182,9 @@ function compareInput(a: UTxO, b: UTxO): number {
 export function findInputIndex(inputs: UTxO[], val: UTxO): number | undefined {
   return [...inputs]
     .sort(compareInput)
-    .findIndex((u) => u.txHash === val.txHash && u.outputIndex === val.outputIndex);
+    .findIndex(
+      (u) => u.txHash === val.txHash && u.outputIndex === val.outputIndex,
+    );
 }
 
 export function sortUTxOs(utxos: UTxO[]) {
@@ -180,7 +201,10 @@ export function sortUTxOs(utxos: UTxO[]) {
   return sortedUTxOs;
 }
 
-export function calculateInitialLiquidity(amountA: bigint, amountB: bigint): bigint {
+export function calculateInitialLiquidity(
+  amountA: bigint,
+  amountB: bigint,
+): bigint {
   let x = sqrt(amountA * amountB);
   if (x * x < amountA * amountB) {
     x += 1n;

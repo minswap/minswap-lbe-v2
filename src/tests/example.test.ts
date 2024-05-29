@@ -20,9 +20,24 @@ import {
   deployMinswapValidators,
   collectMinswapValidators,
 } from "../deploy-validators";
-import { generateAccount, quickSubmitBuilder, type GeneratedAccount } from "./utils";
-import type { Address, Assets, Emulator, OutputData, Translucent, UTxO } from "../types";
-import { address2PlutusAddress, calculateInitialLiquidity, computeLPAssetName } from "../utils";
+import {
+  generateAccount,
+  quickSubmitBuilder,
+  type GeneratedAccount,
+} from "./utils";
+import type {
+  Address,
+  Assets,
+  Emulator,
+  OutputData,
+  Translucent,
+  UTxO,
+} from "../types";
+import {
+  address2PlutusAddress,
+  calculateInitialLiquidity,
+  computeLPAssetName,
+} from "../utils";
 import { LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
 import {
   FactoryValidateFactory,
@@ -30,9 +45,7 @@ import {
   FeedTypeOrder,
   TreasuryValidateTreasurySpending,
 } from "../../plutus";
-import {
-  FactoryValidatorValidateFactory as AmmValidateFactory,
-} from "../../amm-plutus";
+import { FactoryValidatorValidateFactory as AmmValidateFactory } from "../../amm-plutus";
 import invariant from "@minswap/tiny-invariant";
 
 let ACCOUNT_0: GeneratedAccount;
@@ -62,13 +75,16 @@ beforeEach(async () => {
   ammValidators = collectMinswapValidators({
     t,
     seedOutRef: {
-      txHash: "5428517bd92102ce1af705f8b66560d445e620aead488b47fb824426484912f8", // dummy
+      txHash:
+        "5428517bd92102ce1af705f8b66560d445e620aead488b47fb824426484912f8", // dummy
       outputIndex: 0,
     },
   });
   // console.log("AMM Authen Policy Id", t.utils.validatorToScriptHash(ammValidators.authenValidator));
   // console.log("AMM Pool Validator Hash", t.utils.validatorToScriptHash(ammValidators.poolValidator));
-  ammFactoryAddress = t.utils.validatorToAddress(ammValidators.factoryValidator);
+  ammFactoryAddress = t.utils.validatorToAddress(
+    ammValidators.factoryValidator,
+  );
   const factoryAccount: {
     address: Address;
     outputData: OutputData;
@@ -130,12 +146,17 @@ beforeEach(async () => {
   await quickSubmitBuilder(emulator)({
     txBuilder: t
       .newTx()
-      .registerStake(t.utils.validatorToRewardAddress(validators.sellerValidator)),
+      .registerStake(
+        t.utils.validatorToRewardAddress(validators.sellerValidator),
+      ),
   });
 });
 
 test("quick", async () => {
-  const lpAssetName = computeLPAssetName(baseAsset.policyId + baseAsset.assetName, "");
+  const lpAssetName = computeLPAssetName(
+    baseAsset.policyId + baseAsset.assetName,
+    "",
+  );
   const factoryDatumHead: FactoryValidateFactory["datum"] = {
     head: LBE_INIT_FACTORY_HEAD,
     tail: lpAssetName,
@@ -198,7 +219,9 @@ test("example flow", async () => {
   };
   builder = new WarehouseBuilder(warehouseOptions);
   let factoryUtxo: UTxO = (
-    await emulator.getUtxos(t.utils.validatorToAddress(validators.factoryValidator))
+    await emulator.getUtxos(
+      t.utils.validatorToAddress(validators.factoryValidator),
+    )
   ).find((u) => !u.scriptRef) as UTxO;
   builder.buildCreateTreasury({
     factoryUtxo,
@@ -216,7 +239,9 @@ test("example flow", async () => {
 
   // deposit orders
   let treasuryRefInput: UTxO = (
-    await emulator.getUtxos(t.utils.validatorToAddress(validators.treasuryValidator))
+    await emulator.getUtxos(
+      t.utils.validatorToAddress(validators.treasuryValidator),
+    )
   ).find((u) => !u.scriptRef) as UTxO;
   let orderDatum: FeedTypeOrder["_datum"] = {
     factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
@@ -233,7 +258,9 @@ test("example flow", async () => {
       return;
     }
     const managerUtxo: UTxO = (
-      await emulator.getUtxos(t.utils.validatorToAddress(validators.managerValidator))
+      await emulator.getUtxos(
+        t.utils.validatorToAddress(validators.managerValidator),
+      )
     ).find((u) => !u.scriptRef) as UTxO;
     const buildAddSellersOptions: BuildAddSellersOptions = {
       treasuryRefUtxo: treasuryRefInput,
@@ -253,7 +280,9 @@ test("example flow", async () => {
 
   const depositing = async (maxCount?: number) => {
     const sellerUtxos: UTxO[] = (
-      await emulator.getUtxos(t.utils.validatorToAddress(validators.sellerValidator))
+      await emulator.getUtxos(
+        t.utils.validatorToAddress(validators.sellerValidator),
+      )
     ).filter((u) => !u.scriptRef) as UTxO[];
     maxCount = maxCount ?? sellerUtxos.length;
     let depositCount = 0;
@@ -282,10 +311,14 @@ test("example flow", async () => {
   // update + orders
   const updatingOrders = async (maxCount?: number) => {
     const sellerUtxo: UTxO = (
-      await emulator.getUtxos(t.utils.validatorToAddress(validators.sellerValidator))
+      await emulator.getUtxos(
+        t.utils.validatorToAddress(validators.sellerValidator),
+      )
     ).find((u) => !u.scriptRef) as UTxO;
     const orderUtxos: UTxO[] = (
-      await emulator.getUtxos(t.utils.validatorToAddress(validators.orderValidator))
+      await emulator.getUtxos(
+        t.utils.validatorToAddress(validators.orderValidator),
+      )
     ).filter((u) => !u.scriptRef) as UTxO[];
     maxCount = maxCount ?? orderUtxos.length;
     while (orderUtxos.length > maxCount) {
@@ -321,10 +354,14 @@ test("example flow", async () => {
 
   const collectingSeller = async (maxCount?: number) => {
     const managerUtxo: UTxO = (
-      await emulator.getUtxos(t.utils.validatorToAddress(validators.managerValidator))
+      await emulator.getUtxos(
+        t.utils.validatorToAddress(validators.managerValidator),
+      )
     ).find((u) => !u.scriptRef) as UTxO;
     const sellerUtxos: UTxO[] = (
-      await emulator.getUtxos(t.utils.validatorToAddress(validators.sellerValidator))
+      await emulator.getUtxos(
+        t.utils.validatorToAddress(validators.sellerValidator),
+      )
     ).filter((u) => !u.scriptRef) as UTxO[];
     maxCount = maxCount ?? sellerUtxos.length;
     maxCount = maxCount > sellerUtxos.length ? sellerUtxos.length : maxCount;
@@ -355,29 +392,35 @@ test("example flow", async () => {
 
   const collectingManager = async () => {
     const managerUtxo: UTxO = (
-      await emulator.getUtxos(t.utils.validatorToAddress(validators.managerValidator))
+      await emulator.getUtxos(
+        t.utils.validatorToAddress(validators.managerValidator),
+      )
     ).find((u) => !u.scriptRef) as UTxO;
     const options: BuildCollectManagerOptions = {
       treasuryInput: treasuryRefInput,
       managerInput: managerUtxo,
       validFrom: t.utils.slotToUnixTime(emulator.slot),
       validTo: t.utils.slotToUnixTime(emulator.slot + 100),
-    }
+    };
     builder = new WarehouseBuilder(warehouseOptions);
     builder.buildCollectManager(options);
     await quickSubmitBuilder(emulator)({
       txBuilder: builder.complete(),
     });
     console.info(`collect manager done`);
-  }
+  };
   await collectingManager();
 
   const collectingOrders = async (maxCount?: number) => {
     const treasuryUtxo: UTxO = (
-      await emulator.getUtxos(t.utils.validatorToAddress(validators.treasuryValidator))
+      await emulator.getUtxos(
+        t.utils.validatorToAddress(validators.treasuryValidator),
+      )
     ).find((u) => !u.scriptRef) as UTxO;
     const orderUtxos: UTxO[] = (
-      await emulator.getUtxos(t.utils.validatorToAddress(validators.orderValidator))
+      await emulator.getUtxos(
+        t.utils.validatorToAddress(validators.orderValidator),
+      )
     )
       .filter((u) => !u.scriptRef)
       .filter((u) => {
@@ -415,18 +458,29 @@ test("example flow", async () => {
       await emulator.getUtxos(ammFactoryAddress)
     ).find((u) => !u.scriptRef) as UTxO;
     const treasuryUtxo: UTxO = (
-      await emulator.getUtxos(t.utils.validatorToAddress(validators.treasuryValidator))
+      await emulator.getUtxos(
+        t.utils.validatorToAddress(validators.treasuryValidator),
+      )
     ).find((u) => !u.scriptRef) as UTxO;
     invariant(treasuryUtxo.datum);
-    const treasuryDatum = T.Data.from(treasuryUtxo.datum, TreasuryValidateTreasurySpending.treasuryInDatum);
+    const treasuryDatum = T.Data.from(
+      treasuryUtxo.datum,
+      TreasuryValidateTreasurySpending.treasuryInDatum,
+    );
     const reserveA = treasuryDatum.reserveBase;
     const reserveB = treasuryDatum.reserveRaise + treasuryDatum.totalPenalty;
     const totalLiquidity = calculateInitialLiquidity(reserveA, reserveB);
     const poolDatum: FeedTypeAmmPool["_datum"] = {
       poolBatchingStakeCredential: {
         Inline: [
-          { ScriptCredential: [t.utils.validatorToScriptHash(ammValidators.poolBatchingValidator)] }
-        ]
+          {
+            ScriptCredential: [
+              t.utils.validatorToScriptHash(
+                ammValidators.poolBatchingValidator,
+              ),
+            ],
+          },
+        ],
       },
       assetA: treasuryDatum.raiseAsset,
       assetB: treasuryDatum.baseAsset,
@@ -436,7 +490,7 @@ test("example flow", async () => {
       baseFeeANumerator: 30n,
       baseFeeBNumerator: 30n,
       feeSharingNumeratorOpt: null,
-      allowDynamicFee: false
+      allowDynamicFee: false,
     };
 
     const options: BuildCreateAmmPoolOptions = {
@@ -453,15 +507,19 @@ test("example flow", async () => {
       txBuilder: builder.complete(),
     });
     console.info(`create AMM pool done.`);
-  }
+  };
   await creatingPool();
 
   const redeemingOrders = async (maxCount?: number) => {
     const treasuryUtxo: UTxO = (
-      await emulator.getUtxos(t.utils.validatorToAddress(validators.treasuryValidator))
+      await emulator.getUtxos(
+        t.utils.validatorToAddress(validators.treasuryValidator),
+      )
     ).find((u) => !u.scriptRef) as UTxO;
     const orderUtxos: UTxO[] = (
-      await emulator.getUtxos(t.utils.validatorToAddress(validators.orderValidator))
+      await emulator.getUtxos(
+        t.utils.validatorToAddress(validators.orderValidator),
+      )
     ).filter((u) => !u.scriptRef) as UTxO[];
     maxCount = maxCount ?? orderUtxos.length;
     maxCount = maxCount > orderUtxos.length ? orderUtxos.length : maxCount;
@@ -481,7 +539,7 @@ test("example flow", async () => {
     builder.buildRedeemOrders(options);
     await quickSubmitBuilder(emulator)({
       txBuilder: builder.complete(),
-      stats: true
+      stats: true,
     });
     console.info(`Redeem order ${maxCount} done.`);
   };

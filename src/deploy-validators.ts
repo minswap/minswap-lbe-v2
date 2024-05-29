@@ -47,21 +47,20 @@ export function collectMinswapValidators(options: {
 
   const poolValidator = new MinswapPool(authenValidatorHash);
   const poolValidatorHash = t.utils.validatorToScriptHash(poolValidator);
-  const poolBatchingValidator = new MinswapPoolBatching(
-    authenValidatorHash,
-    { ScriptCredential: [poolValidatorHash] },
+  const poolBatchingValidator = new MinswapPoolBatching(authenValidatorHash, {
+    ScriptCredential: [poolValidatorHash],
+  });
+  const poolBatchingValidatorHash = t.utils.validatorToScriptHash(
+    poolBatchingValidator,
   );
-  const poolBatchingValidatorHash = t.utils.validatorToScriptHash(poolBatchingValidator);
   const poolAddress = t.utils.validatorToAddress(poolValidator);
   const plutusPoolAddress = address2PlutusAddress(poolAddress);
   const factoryValidator = new MinswapFactory(
     authenValidatorHash,
     plutusPoolAddress,
     {
-      Inline: [
-        { ScriptCredential: [poolBatchingValidatorHash] }
-      ]
-    }
+      Inline: [{ ScriptCredential: [poolBatchingValidatorHash] }],
+    },
   );
   return {
     authenValidator,
@@ -82,7 +81,8 @@ export function collectValidators(options: {
     seedOutRef = JSON.parse(fileContent).seedOutRef;
   }
   const treasuryValidator = new TreasuryValidateTreasurySpending();
-  const treasuryValidatorHash = t.utils.validatorToScriptHash(treasuryValidator);
+  const treasuryValidatorHash =
+    t.utils.validatorToScriptHash(treasuryValidator);
   const managerValidator = new ManagerValidateManagerSpending(
     treasuryValidatorHash,
   );
@@ -92,7 +92,10 @@ export function collectValidators(options: {
     managerValidatorHash,
   );
   const sellerValidatorHash = t.utils.validatorToScriptHash(sellerValidator);
-  const orderValidator = new OrderValidateOrder(sellerValidatorHash, treasuryValidatorHash);
+  const orderValidator = new OrderValidateOrder(
+    sellerValidatorHash,
+    treasuryValidatorHash,
+  );
   const orderValidatorHash = t.utils.validatorToScriptHash(orderValidator);
   const factoryValidator = new FactoryValidateFactory(
     {
@@ -225,7 +228,12 @@ export async function deployMinswapValidators(
     () => processElement(t, "authenValidator", validators.authenValidator),
     () => processElement(t, "poolValidator", validators.poolValidator),
     () => processElement(t, "factoryValidator", validators.factoryValidator),
-    () => processElement(t, "poolBatchingValidator", validators.poolBatchingValidator),
+    () =>
+      processElement(
+        t,
+        "poolBatchingValidator",
+        validators.poolBatchingValidator,
+      ),
   ];
   let res: DeployedValidators = {};
 
