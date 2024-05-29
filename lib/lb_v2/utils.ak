@@ -18,6 +18,9 @@ pub const manager_auth_an = #"4d616e61676572"
 
 pub const default_number_seller = 20
 
+// 2 days in milliseconds = 24 * 60 * 60 * 1000
+pub const two_days = 172800000
+
 /// IMPORTANT: This block is code-gen. Please do not edit!
 /// *******************************************
 pub const amm_factory_auth_asset_name = #"4d5346"

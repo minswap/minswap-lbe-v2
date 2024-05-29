@@ -1,4 +1,5 @@
 use aiken/dict.{Dict}
+use aiken/cbor
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
@@ -22,7 +23,7 @@ use lb_v2/utils.{
   compute_asset_name_from_base_and_raise, default_burn_liquidity,
   default_number_seller, factory_auth_an, fee_ada, get_order_value,
   manager_auth_an, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
-  treasury_minimum_ada,
+  treasury_minimum_ada,two_days
 }
 
 pub fn get_value_of_minting_treasury(
@@ -121,8 +122,7 @@ pub fn validate_creating_treasury_out(
     when penalty_config is {
       Some(PenaltyConfig { penalty_start_time, percent }) -> and {
           penalty_start_time >= start_time,
-          // 2D
-          end_time - penalty_start_time <= 2,
+          end_time - penalty_start_time <= two_days,
           percent > 0,
           percent <= 25,
         }
@@ -810,6 +810,7 @@ pub fn validate_using_seller(
     start_time,
     end_time,
     minimum_order_raise,
+    is_cancelled,
     ..
   }: TreasuryDatum = raw_treasury_datum
   let order_inputs =
@@ -869,10 +870,12 @@ pub fn validate_using_seller(
     base_asset == seller_in_datum.base_asset,
     raise_asset == seller_in_datum.raise_asset,
     // validate time frame
-    start_time < start_valid_time_range,
-    end_time > end_valid_time_range,
+    start_time <= start_valid_time_range,
+    end_time >= end_valid_time_range,
     // validate minting
     is_valid_minting,
+    // not cancelled yet
+    is_cancelled == False,
   }
 }
 
