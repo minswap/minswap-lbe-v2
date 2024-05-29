@@ -12,6 +12,8 @@ import { TREASURY_MIN_ADA } from "../constants";
 import { address2PlutusAddress } from "../utils";
 import { genWarehouseOptions, generateAccount, loadModule } from "./utils";
 import * as T from "@minswap/translucent";
+import { genWarehouse } from "./warehouse";
+import type { UTxO } from "../types";
 
 let warehouse: {
   t: T.Translucent;
@@ -21,10 +23,11 @@ let warehouse: {
   };
   warehouseOptions: WarehouseBuilderOptions;
   treasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"];
-  treasuryUTxO: T.UTxO;
+  treasuryUTxO: UTxO;
   sellerDatum: SellerValidateSellerSpending["sellerInDatum"];
-  sellerUTxO: T.UTxO;
-  owner: string;
+  sellerUTxO: UTxO;
+  orderOutDatums: FeedTypeOrder["_datum"][];
+  orderInDatums: UTxO;
 };
 let utxoIndex = 0;
 beforeAll(async () => {
@@ -32,48 +35,17 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  const baseAsset = {
-    policyId: "e16c2dc8ae937e8d3790c7fd7168d7b994621ba14ca11415f39fed72",
-    assetName: "4d494e",
-  };
-  const ACCOUNT_0 = await generateAccount({
-    lovelace: 2000000000000000000n,
-    [T.toUnit(baseAsset.policyId, baseAsset.assetName)]: 69_000_000_000_000n,
-  });
-  const emulator = new T.Emulator([ACCOUNT_0]);
-  let t = await T.Translucent.new(emulator);
-  emulator.awaitBlock(10_000); // For validity ranges to be valid
-  t.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
+  const {
+    t,
+    minswapToken,
+    defaultTreasuryDatum,
+    defaultSellerDatum,
+    defaultOrderDatum,
+  } = await genWarehouse();
+  const baseAsset = minswapToken;
   const warehouseOptions = await genWarehouseOptions(t);
 
   const builder = new WarehouseBuilder(warehouseOptions);
-  const owner = await t.wallet.address();
-  const treasuryDatum = {
-    factoryPolicyId: builder.factoryHash,
-    sellerHash: builder.sellerHash,
-    orderHash: builder.orderHash,
-    managerHash: builder.managerHash,
-    collectedFund: 0n,
-    baseAsset: baseAsset,
-    raiseAsset: {
-      policyId: "",
-      assetName: "",
-    },
-    startTime: BigInt(builder.t.utils.slotToUnixTime(1000)),
-    endTime: BigInt(builder.t.utils.slotToUnixTime(2000)),
-    owner: address2PlutusAddress(owner),
-    minimumRaise: null,
-    maximumRaise: null,
-    reserveBase: 69000000000000n,
-    reserveRaise: 0n,
-    totalLiquidity: 0n,
-    penaltyConfig: null,
-    totalPenalty: 0n,
-    isCancelable: false,
-    isCancelled: false,
-    minimumOrderRaise: null,
-    isManagerCollected: false,
-  };
   const treasuryUTxO = {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
     outputIndex: ++utxoIndex,
@@ -81,18 +53,16 @@ beforeEach(async () => {
       lovelace: TREASURY_MIN_ADA,
       [builder.treasuryToken]: 1n,
       [T.toUnit(baseAsset.policyId, baseAsset.assetName)]:
-        treasuryDatum.reserveBase,
+        defaultTreasuryDatum.reserveBase,
     },
     address: builder.treasuryAddress,
     datum: T.Data.to(
-      treasuryDatum,
+      defaultTreasuryDatum,
       TreasuryValidateTreasurySpending.treasuryInDatum
     ),
   };
   const sellerDatum = {
-    factoryPolicyId: builder.factoryHash,
-    baseAsset: baseAsset,
-    raiseAsset: { policyId: "", assetName: "" },
+    ...defaultSellerDatum,
     amount: -1000n,
     penaltyAmount: 10n,
   };
@@ -105,70 +75,55 @@ beforeEach(async () => {
     address: builder.sellerAddress,
     datum: T.Data.to(sellerDatum, SellerValidateSellerSpending.sellerInDatum),
   };
+  orderInDatums: UTxO[];
+  orderOutDatums: FeedTypeOrder["_datum"][];
   warehouse = {
     baseAsset,
     warehouseOptions,
     t,
-    treasuryDatum,
+    treasuryDatum: defaultTreasuryDatum,
     treasuryUTxO,
     sellerDatum,
-    sellerUTxO,
-    owner,
+    sellerUTxO,orderInDatums,
+    orderOutDatums
   };
 });
 
-function genOrderOutDatum(
-  builder: WarehouseBuilder
+function getOrderOutDatum(
+  defaultOrderDatum: FeedTypeOrder["_datum"]
 ): FeedTypeOrder["_datum"][] {
   return [
     {
-      factoryPolicyId: builder.factoryHash,
-      baseAsset: warehouse.baseAsset,
-      raiseAsset: { policyId: "", assetName: "" },
-      owner: address2PlutusAddress(warehouse.owner),
+      ...defaultOrderDatum,
       amount: 100n,
-      isCollected: false,
       penaltyAmount: 0n,
     },
     {
-      factoryPolicyId: builder.factoryHash,
-      baseAsset: warehouse.baseAsset,
-      raiseAsset: { policyId: "", assetName: "" },
-      owner: address2PlutusAddress(warehouse.owner),
+      ...defaultOrderDatum,
       amount: 200n,
-      isCollected: false,
       penaltyAmount: 0n,
     },
   ];
 }
 
-function genOrderUTxO(builder: WarehouseBuilder): T.UTxO[] {
+function getOrderUTxO(
+  defaultOrderDatum: FeedTypeOrder["_datum"],
+  builder: WarehouseBuilder
+): UTxO[] {
   const orederDatums: FeedTypeOrder["_datum"][] = [
     {
-      factoryPolicyId: builder.factoryHash,
-      baseAsset: warehouse.baseAsset,
-      raiseAsset: { policyId: "", assetName: "" },
-      owner: address2PlutusAddress(warehouse.owner),
+      ...defaultOrderDatum,
       amount: 12n,
-      isCollected: false,
       penaltyAmount: 0n,
     },
     {
-      factoryPolicyId: builder.factoryHash,
-      baseAsset: warehouse.baseAsset,
-      raiseAsset: { policyId: "", assetName: "" },
-      owner: address2PlutusAddress(warehouse.owner),
+      ...defaultOrderDatum,
       amount: 33n,
-      isCollected: false,
       penaltyAmount: 0n,
     },
     {
-      factoryPolicyId: builder.factoryHash,
-      baseAsset: warehouse.baseAsset,
-      raiseAsset: { policyId: "", assetName: "" },
-      owner: address2PlutusAddress(warehouse.owner),
+      ...defaultOrderDatum,
       amount: 1000n,
-      isCollected: false,
       penaltyAmount: 0n,
     },
   ];
