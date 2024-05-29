@@ -6,7 +6,6 @@ use aiken/transaction/value.{
 }
 use lb_v2/types.{Asset, PenaltyConfig}
 
-// TODO: change to shorter token name
 pub const factory_auth_an = #"666163746f7279"
 
 pub const treasury_auth_an = #"7472656173757279"
@@ -153,4 +152,12 @@ pub fn sort_two_consecutive_factory_datum(
 
 pub fn make_wrapper_redeemer(redeemer: Data) -> Data {
   builtin.constr_data(1, [redeemer])
+}
+
+pub fn assert(bool: Bool, str: String) {
+  if bool {
+    bool
+  } else {
+    fail str
+  }
 }

@@ -8,7 +8,8 @@
     "collect-amm-validators": "bun run src/setup.ts collect-amm-validators",
     "collect-validators": "bun run src/setup.ts collect-validators",
     "check": "aiken build && bun gen-plutus && bun init-params && bun collect-validators && bun test",
-    "format": "bun prettier --w src/* --print-width 80"
+    "format": "bun prettier --w src/* --print-width 80",
+    "test:init-factory": "aiken build -t verbose && bun gen-plutus && bun test init-factory"
   },
   "main": "./build/index.js",
   "module": "./build/index.es.js",

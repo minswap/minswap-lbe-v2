@@ -7,7 +7,7 @@ use aiken/transaction.{
   ScriptPurpose, Spend, Transaction,
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
-use aiken/transaction/value.{Value, ada_policy_id}
+use aiken/transaction/value.{PolicyId, Value, ada_policy_id}
 use lb_v2/types.{
   Asset, CloseTreasury, CollectManager, CreateTreasury, FactoryDatum,
   FactoryRedeemer, Initialization, ManageSeller, ManagerDatum, MintManager,
@@ -15,20 +15,21 @@ use lb_v2/types.{
   TreasuryDatum, UsingSeller, ValidatorHash,
 }
 use lb_v2/utils.{
-  compute_lp_asset_name, default_number_seller, factory_auth_an,
+  assert, compute_lp_asset_name, default_number_seller, factory_auth_an,
   make_wrapper_redeemer, seller_auth_an, treasury_auth_an,
 }
 use lb_v2/validation
 
 validator(
+  // seed output to initialize Factory Linked List 
   out_ref: OutputReference,
-  // ValidatorHash of Treasury Contract
+  // ValidatorHash of Treasury Validator
   treasury_hash: ValidatorHash,
-  // ValidatorHash of Seller Contract
+  // ValidatorHash of Seller Validator
   manager_hash: ValidatorHash,
-  // ValidatorHash of Seller Contract
+  // ValidatorHash of Seller Validator
   seller_hash: ValidatorHash,
-  // ValidatorHash of Order Contract
+  // ValidatorHash of Order Validator
   order_hash: ValidatorHash,
 ) {
   fn validate_factory(
@@ -350,26 +351,26 @@ validator(
   fn validate_factory_minting(redeemer: FactoryRedeemer, context: ScriptContext) {
     expect ScriptContext {
       transaction: Transaction { inputs, outputs, redeemers, mint, .. },
-      purpose: Mint(factory_hash),
+      purpose: Mint(factory_policy_id),
     } = context
     let mint_value = value.from_minted_value(mint)
     when redeemer is {
       Initialization ->
         validate_initialization(
-          inputs,
-          outputs,
-          factory_hash,
-          out_ref,
-          mint_value,
+          inputs: inputs,
+          outputs: outputs,
+          factory_policy_id: factory_policy_id,
+          out_ref: out_ref,
+          mint_value: mint_value,
         )
       CreateTreasury { .. } ->
-        has_spend_factory(inputs, factory_hash, redeemers, redeemer)
+        has_spend_factory(inputs, factory_policy_id, redeemers, redeemer)
       CloseTreasury { .. } ->
-        has_spend_factory(inputs, factory_hash, redeemers, redeemer)
+        has_spend_factory(inputs, factory_policy_id, redeemers, redeemer)
       MintManager ->
         validation.has_spend_treasury(
           inputs: inputs,
-          factory_policy_id: factory_hash,
+          factory_policy_id: factory_policy_id,
           treasury_hash: treasury_hash,
           redeemers: redeemers,
           expected_redeemer: CollectManager,
@@ -377,7 +378,7 @@ validator(
       MintSeller ->
         validation.has_spend_manager(
           inputs: inputs,
-          factory_policy_id: factory_hash,
+          factory_policy_id: factory_policy_id,
           manager_hash: manager_hash,
           redeemers: redeemers,
           expected_redeemer: ManageSeller,
@@ -385,7 +386,7 @@ validator(
       MintOrder ->
         validation.has_spend_seller(
           inputs: inputs,
-          factory_policy_id: factory_hash,
+          factory_policy_id: factory_policy_id,
           seller_hash: seller_hash,
           redeemers: redeemers,
           expected_redeemer: UsingSeller,
@@ -393,7 +394,7 @@ validator(
       MintRedeemOrders ->
         validation.has_spend_treasury(
           inputs: inputs,
-          factory_policy_id: factory_hash,
+          factory_policy_id: factory_policy_id,
           treasury_hash: treasury_hash,
           redeemers: redeemers,
           expected_redeemer: RedeemOrders,
@@ -402,36 +403,56 @@ validator(
   }
 }
 
+// Validate Transaction Init Factory Linked List
+// Assertions:
+// - Spending @out_ref
+// - Mint 1 Factory Token
+// - Paying 1 Legitimate Factory Token
 fn validate_initialization(
   inputs: List<Input>,
   outputs: List<Output>,
-  factory_hash: ValidatorHash,
+  factory_policy_id: PolicyId,
   out_ref: OutputReference,
   mint_value: Value,
 ) -> Bool {
-  expect
-    list.any(
-      inputs,
-      fn(input) {
-        let Input { output_reference, .. } = input
-        output_reference == out_ref
-      },
-    )
-  expect value.flatten(mint_value) == [(factory_hash, factory_auth_an, 1)]
-  expect [Output { datum, .. }] =
+  // Ensure transaction's outptus contain exactly 1 Factory Output 
+  expect [Output { value: out_value, datum, .. }] =
     list.filter(
       outputs,
       fn(output) {
-        let Output { value: out_value, .. } = output
-        value.quantity_of(out_value, factory_hash, factory_auth_an) == 1
+        let Output { address: Address { payment_credential, .. }, .. } = output
+        payment_credential == ScriptCredential(factory_policy_id)
       },
     )
-  datum == InlineDatum(
-    FactoryDatum {
-      head: #"00",
-      tail: #"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
-    },
-  )
+  and {
+    assert(
+      list.any(
+        inputs,
+        fn(input) {
+          let Input { output_reference, .. } = input
+          output_reference == out_ref
+        },
+      ),
+      @"Must spend @out_ref",
+    ),
+    assert(
+      value.flatten(mint_value) == [(factory_policy_id, factory_auth_an, 1)],
+      @"Must mint 1 Factory Token",
+    ),
+    assert(
+      value.quantity_of(out_value, factory_policy_id, factory_auth_an) == 1,
+      @"Factory Output must contain 1 Factory Token",
+    ),
+    assert(
+      datum == InlineDatum(
+        FactoryDatum {
+          head: #"00",
+          tail: #"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
+        },
+      ),
+      @"Factory Datum must be correct!",
+    ),
+  }
 }
 
 fn has_spend_factory(

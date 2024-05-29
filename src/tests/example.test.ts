@@ -306,7 +306,7 @@ test("example flow", async () => {
     }
     console.info(`deposit ${depositCount} orders done.`);
   };
-  await depositing(1);
+  await depositing();
 
   // update + orders
   const updatingOrders = async (maxCount?: number) => {
@@ -544,9 +544,9 @@ test("example flow", async () => {
     console.info(`Redeem order ${maxCount} done.`);
   };
   await redeemingOrders(1);
-  // await redeemingOrders(15);
-  // await redeemingOrders(15);
-  // await redeemingOrders(15);
+  await redeemingOrders(15);
+  await redeemingOrders(15);
+  await redeemingOrders(15);
 
   // let treasuryUtxo = (
   //   await emulator.getUtxos(

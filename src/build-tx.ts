@@ -287,6 +287,8 @@ export class WarehouseBuilder {
     this.tasks.push(
       () => {
         this.mintRedeemer = "Initialization";
+      },
+      () => {
         this.tx.collectFrom([seedUtxo]);
       },
       () => {
@@ -792,7 +794,7 @@ export class WarehouseBuilder {
   }
 
   /************************* PARSER  *************************/
-  private fromDatumTreasury(
+  fromDatumTreasury(
     rawDatum: string,
   ): TreasuryValidateTreasurySpending["treasuryInDatum"] {
     return T.Data.from(
@@ -801,59 +803,57 @@ export class WarehouseBuilder {
     );
   }
 
-  private toDatumTreasury(
+  toDatumTreasury(
     datum: TreasuryValidateTreasurySpending["treasuryInDatum"],
   ): string {
     return T.Data.to(datum, TreasuryValidateTreasurySpending.treasuryInDatum);
   }
 
-  private fromDatumFactory(rawDatum: string): FactoryValidateFactory["datum"] {
+  fromDatumFactory(rawDatum: string): FactoryValidateFactory["datum"] {
     return T.Data.from(rawDatum, FactoryValidateFactory.datum);
   }
 
-  private toDatumFactory(datum: FactoryValidateFactory["datum"]) {
+  toDatumFactory(datum: FactoryValidateFactory["datum"]) {
     return T.Data.to(datum, FactoryValidateFactory.datum);
   }
 
-  private fromDatumSeller(
+  fromDatumSeller(
     rawDatum: string,
   ): SellerValidateSellerSpending["sellerInDatum"] {
     return T.Data.from(rawDatum, SellerValidateSellerSpending.sellerInDatum);
   }
 
-  private toDatumSeller(
-    datum: SellerValidateSellerSpending["sellerInDatum"],
-  ): string {
+  toDatumSeller(datum: SellerValidateSellerSpending["sellerInDatum"]): string {
     return T.Data.to(datum, SellerValidateSellerSpending.sellerInDatum);
   }
 
-  private fromDatumOrder(rawDatum: string): FeedTypeOrder["_datum"] {
+  fromDatumOrder(rawDatum: string): FeedTypeOrder["_datum"] {
     return T.Data.from(rawDatum, FeedTypeOrder._datum);
   }
 
-  private toDatumOrder(datum: FeedTypeOrder["_datum"]): string {
+  toDatumOrder(datum: FeedTypeOrder["_datum"]): string {
     return T.Data.to(datum, FeedTypeOrder._datum);
   }
 
-  private fromDatumManager(
+  fromDatumManager(
     rawDatum: string,
   ): ManagerValidateManagerSpending["managerInDatum"] {
     return T.Data.from(rawDatum, ManagerValidateManagerSpending.managerInDatum);
   }
 
-  private toDatumManager(
+  toDatumManager(
     datum: ManagerValidateManagerSpending["managerInDatum"],
   ): string {
     return T.Data.to(datum, ManagerValidateManagerSpending.managerInDatum);
   }
 
-  private toRedeemerSellerSpend(
+  toRedeemerSellerSpend(
     redeemer: SellerValidateSellerSpending["redeemer"],
   ): string {
     return T.Data.to(redeemer, SellerValidateSellerSpending.redeemer);
   }
 
-  private calFinalReserveRaise(
+  calFinalReserveRaise(
     datum: TreasuryValidateTreasurySpending["treasuryInDatum"],
   ) {
     if (
@@ -866,7 +866,7 @@ export class WarehouseBuilder {
     }
   }
 
-  private setAmmLpToken(baseAsset: BluePrintAsset, raiseAsset: BluePrintAsset) {
+  setAmmLpToken(baseAsset: BluePrintAsset, raiseAsset: BluePrintAsset) {
     const lpAssetName = computeLPAssetName(
       baseAsset.policyId + baseAsset.assetName,
       raiseAsset.policyId + raiseAsset.assetName,
@@ -876,7 +876,7 @@ export class WarehouseBuilder {
   }
 
   /************************* SPENDING  *************************/
-  private spendingManagerInput() {
+  spendingManagerInput() {
     if (this.managerInputs.length == 0) {
       return;
     }
@@ -892,7 +892,7 @@ export class WarehouseBuilder {
       );
   }
 
-  private spendingSellerInput() {
+  spendingSellerInput() {
     if (this.sellerInputs.length === 0) {
       return;
     }
@@ -907,7 +907,7 @@ export class WarehouseBuilder {
       );
   }
 
-  private spendingFactoryInput() {
+  spendingFactoryInput() {
     if (this.factoryInputs.length === 0) {
       return;
     }
@@ -920,7 +920,7 @@ export class WarehouseBuilder {
       );
   }
 
-  private spendingOrderInput() {
+  spendingOrderInput() {
     if (this.orderInputs.length === 0) {
       return;
     }
@@ -943,7 +943,7 @@ export class WarehouseBuilder {
       );
   }
 
-  private spendingTreasuryInput() {
+  spendingTreasuryInput() {
     if (this.treasuryInputs.length === 0) {
       return;
     }
@@ -960,7 +960,7 @@ export class WarehouseBuilder {
   }
 
   /************************* PAYING  *************************/
-  private payingTreasuryOutput(options: {
+  payingTreasuryOutput(options: {
     treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"];
     deltaCollectedFund?: bigint;
     deltaLp?: bigint;
@@ -1047,9 +1047,7 @@ export class WarehouseBuilder {
     innerPay(assets);
   }
 
-  private payingManagerOutput(
-    datum: ManagerValidateManagerSpending["managerInDatum"],
-  ) {
+  payingManagerOutput(datum: ManagerValidateManagerSpending["managerInDatum"]) {
     this.tx.payToAddressWithData(
       this.managerAddress,
       {
@@ -1061,7 +1059,7 @@ export class WarehouseBuilder {
     );
   }
 
-  private payingOrderOutput(...orderDatums: FeedTypeOrder["_datum"][]) {
+  payingOrderOutput(...orderDatums: FeedTypeOrder["_datum"][]) {
     const innerPay = (datum: FeedTypeOrder["_datum"]) => {
       const assets = {
         [this.orderToken]: 1n,
@@ -1091,7 +1089,7 @@ export class WarehouseBuilder {
     }
   }
 
-  private payingSellerOutput(
+  payingSellerOutput(
     option: {
       addSellerCount?: bigint;
       outDatum?: SellerValidateSellerSpending["sellerInDatum"];
@@ -1148,7 +1146,7 @@ export class WarehouseBuilder {
     }
   }
 
-  private payingFactoryOutput() {
+  payingFactoryOutput() {
     const innerPay = (datum: FactoryValidateFactory["datum"]) => {
       this.tx.payToAddressWithData(
         this.factoryAddress,
@@ -1225,7 +1223,7 @@ export class WarehouseBuilder {
   /**
    * @deprecated
    */
-  private withdrawFromSeller() {
+  withdrawFromSeller() {
     this.tx
       .readFrom([this.deployedValidators["sellerValidator"]])
       .withdraw(this.sellerRewardAddress, 0n, DUMMY_REDEEMER);
@@ -1234,14 +1232,14 @@ export class WarehouseBuilder {
   /**
    * @deprecated
    */
-  private withdrawFromTreasury() {
+  withdrawFromTreasury() {
     this.tx
       .readFrom([this.deployedValidators["treasuryValidator"]])
       .withdraw(this.treasuryRewardAddress, 0n, DUMMY_REDEEMER);
   }
 
   /************************* MINTING *************************/
-  private mintingTreasuryToken() {
+  mintingTreasuryToken() {
     invariant(this.mintRedeemer);
     const cases: Record<number, bigint> = {
       1: 1n,
@@ -1256,7 +1254,7 @@ export class WarehouseBuilder {
     );
   }
 
-  private mintingManagerToken() {
+  mintingManagerToken() {
     invariant(this.mintRedeemer);
     let amount = this.treasuryInputs.length > 0 ? -1n : 1n;
     this.tx.readFrom([this.deployedValidators["factoryValidator"]]).mintAssets(
@@ -1267,7 +1265,7 @@ export class WarehouseBuilder {
     );
   }
 
-  private mintingSellerToken(mintAmount: bigint) {
+  mintingSellerToken(mintAmount: bigint) {
     if (!mintAmount) {
       return;
     }
@@ -1280,7 +1278,7 @@ export class WarehouseBuilder {
     );
   }
 
-  private mintingOrderToken(mintAmount: bigint) {
+  mintingOrderToken(mintAmount: bigint) {
     if (mintAmount == 0n) {
       return;
     }
@@ -1296,7 +1294,7 @@ export class WarehouseBuilder {
     // }
   }
 
-  private mintingFactoryToken(options?: {
+  mintingFactoryToken(options?: {
     baseAsset: BluePrintAsset;
     raiseAsset: BluePrintAsset;
   }) {
@@ -1329,7 +1327,7 @@ export class WarehouseBuilder {
   }
 
   /************************* AMM *************************/
-  private _buildCreateAmmPool(options: {
+  _buildCreateAmmPool(options: {
     poolDatum: FeedTypeAmmPool["_datum"];
     factoryInput: UTxO;
   }) {

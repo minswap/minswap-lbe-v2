@@ -1,5 +1,22 @@
 import * as T from "@minswap/translucent";
-import type { Assets, PrivateKey, Emulator, Tx } from "../types";
+import type {
+  Assets,
+  PrivateKey,
+  Emulator,
+  Tx,
+  Translucent,
+  UTxO,
+} from "../types";
+import type { WarehouseBuilderOptions } from "../build-tx";
+import {
+  collectMinswapValidators,
+  collectValidators,
+  deployMinswapValidators,
+  deployValidators,
+  type DeployedValidators,
+  type MinswapValidators,
+  type Validators,
+} from "../deploy-validators";
 
 export type GeneratedAccount = {
   privateKey: string;
@@ -65,3 +82,81 @@ export function quickSubmitBuilder(emulator: Emulator) {
     return txHash;
   };
 }
+
+export const loadModule = async () => {
+  await T.loadModule();
+  await T.CModuleLoader.load();
+};
+
+export const DUMMY_SEED_UTXO: UTxO = {
+  txHash: "5428517bd92102ce1af705f8b66560d445e620aead488b47fb824426484912f8",
+  outputIndex: 0,
+  assets: { lovelace: 5_000_000n },
+  address: "addr_test1vqtx6ahdpzm0nm9qa4wh4avhze8gv3j6jv6v3gmrukdxfrqm6m8d3",
+};
+
+export const DUMMY_SEED_AMM_UTXO: UTxO = {
+  txHash: "5428517bd92102ce1af705f8b66560d445e620aead488b47fb824426484912f8",
+  outputIndex: 1,
+  assets: { lovelace: 5_000_000n },
+  address: "addr_test1vqtx6ahdpzm0nm9qa4wh4avhze8gv3j6jv6v3gmrukdxfrqm6m8d3",
+};
+
+const genAmmValidators = async (t: Translucent) => {
+  (t.provider as Emulator).addUTxO(DUMMY_SEED_AMM_UTXO);
+  const ammValidators = collectMinswapValidators({
+    t,
+    seedOutRef: {
+      txHash: DUMMY_SEED_AMM_UTXO.txHash,
+      outputIndex: DUMMY_SEED_AMM_UTXO.outputIndex,
+    },
+  });
+  return ammValidators;
+};
+
+const genValidators = async (t: Translucent) => {
+  (t.provider as Emulator).addUTxO(DUMMY_SEED_UTXO);
+  let validators = collectValidators({
+    t,
+    seedOutRef: {
+      txHash: DUMMY_SEED_UTXO.txHash,
+      outputIndex: DUMMY_SEED_UTXO.outputIndex,
+    },
+    dry: true,
+  });
+  return validators;
+};
+
+const genDeployMinswapValidators = async (
+  t: Translucent,
+  ammValidators: MinswapValidators,
+) => {
+  const ammDeployedValidators = await deployMinswapValidators(t, ammValidators);
+  return ammDeployedValidators;
+};
+
+const genDeployValidators = async (t: Translucent, validators: Validators) => {
+  const deployedValidators = await deployValidators(t, validators);
+  return deployedValidators;
+};
+
+export type GenWarehouseOptions = ReturnType<typeof genWarehouseOptions>;
+
+export const genWarehouseOptions = async (t: Translucent) => {
+  let validators = await genValidators(t);
+  let ammValidators: MinswapValidators = await genAmmValidators(t);
+  let deployedValidators: DeployedValidators = await genDeployValidators(
+    t,
+    validators,
+  );
+  let ammDeployedValidators: DeployedValidators =
+    await genDeployMinswapValidators(t, ammValidators);
+  const options: WarehouseBuilderOptions = {
+    t,
+    validators,
+    deployedValidators,
+    ammValidators,
+    ammDeployedValidators,
+  };
+  return options;
+};
