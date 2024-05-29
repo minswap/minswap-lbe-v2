@@ -119,13 +119,12 @@ pub fn validate_creating_treasury_out(
     reserve_raise == 0,
     total_liquidity == 0,
     when penalty_config is {
-      Some(PenaltyConfig { penalty_start_time, penalty_end_time, percent }) ->
-        and {
+      Some(PenaltyConfig { penalty_start_time, percent }) -> and {
           penalty_start_time >= start_time,
-          penalty_end_time > penalty_start_time,
-          penalty_end_time <= end_time,
+          // 2D
+          end_time - penalty_start_time <= 2,
           percent > 0,
-          percent < 100,
+          percent <= 25,
         }
       _ -> True
     },
@@ -776,7 +775,6 @@ pub fn validate_using_seller(
       order_inputs: order_inputs,
       order_outputs: order_outputs,
       penalty_config: penalty_config,
-      start_valid_time_range: start_valid_time_range,
       end_valid_time_range: end_valid_time_range,
       factory_policy_id: factory_policy_id,
       base_asset: base_asset,
@@ -828,7 +826,6 @@ pub fn apply_order(
   order_inputs: List<Input>,
   order_outputs: List<Output>,
   penalty_config: Option<PenaltyConfig>,
-  start_valid_time_range: Int,
   end_valid_time_range: Int,
   factory_policy_id: PolicyId,
   base_asset: Asset,
@@ -928,7 +925,6 @@ pub fn apply_order(
   let penalty =
     calculate_penalty(
       penalty_config: penalty_config,
-      start_valid_time_range: start_valid_time_range,
       end_valid_time_range: end_valid_time_range,
       total_input_amount: total_input_amount,
       total_output_amount: total_output_amount,

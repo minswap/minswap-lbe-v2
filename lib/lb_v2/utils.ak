@@ -94,17 +94,14 @@ pub fn get_order_value(
 
 pub fn calculate_penalty(
   penalty_config: Option<PenaltyConfig>,
-  start_valid_time_range: Int,
   end_valid_time_range: Int,
   total_input_amount: Int,
   total_output_amount: Int,
 ) -> Int {
   when penalty_config is {
     None -> 0
-    Some(PenaltyConfig { penalty_start_time, penalty_end_time, percent }) ->
-      if
-      end_valid_time_range < penalty_start_time || start_valid_time_range > penalty_end_time{
-      
+    Some(PenaltyConfig { penalty_start_time, percent }) ->
+      if end_valid_time_range < penalty_start_time {
         // not in penalty time
         0
       } else {

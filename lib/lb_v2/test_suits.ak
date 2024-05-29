@@ -39,14 +39,7 @@ test test_calculate_penalty(total_amount via calculate_penalty_params()) {
   let (total_input_amount, total_output_amount, percent) = total_amount
   let penalty_amount =
     calculate_penalty(
-      penalty_config: Some(
-        PenaltyConfig {
-          penalty_start_time: 200,
-          penalty_end_time: 300,
-          percent,
-        },
-      ),
-      start_valid_time_range: 100,
+      penalty_config: Some(PenaltyConfig { penalty_start_time: 200, percent }),
       end_valid_time_range: 200,
       total_input_amount: total_input_amount,
       total_output_amount: total_output_amount,

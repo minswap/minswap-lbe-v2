@@ -36,7 +36,6 @@ pub type FactoryRedeemer {
 
 pub type PenaltyConfig {
   penalty_start_time: Int,
-  penalty_end_time: Int,
   percent: Int,
 }
 
