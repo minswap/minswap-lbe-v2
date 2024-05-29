@@ -975,6 +975,15 @@ export class WarehouseBuilder {
         assets,
       );
     };
+    const isCancelLBE = (
+      redeemer: TreasuryValidateTreasurySpending["redeemer"],
+    ): redeemer is { CancelLBE: any } => {
+      return (
+        typeof redeemer === "object" &&
+        redeemer !== null &&
+        "CancelLBE" in redeemer
+      );
+    };
     const defaultAssets = () => {
       invariant(this.treasuryInputs.length > 0);
       const assets = { ...this.treasuryInputs[0].assets };
@@ -1043,15 +1052,11 @@ export class WarehouseBuilder {
       CreateAmmPool: createPoolAssets,
       CollectOrders: collectOrders,
     };
-    let treasuryCase: string;
-    if (
-      typeof this.treasuryRedeemer === "object" &&
-      this.treasuryRedeemer !== null &&
-      "CancelLBE" in this.treasuryRedeemer
-    ) {
-      treasuryCase = "CancelLBE";
-    } else {
-      treasuryCase = this.treasuryRedeemer ?? "";
+    let treasuryCase: string = "";
+    if (this.treasuryRedeemer) {
+      treasuryCase = isCancelLBE(this.treasuryRedeemer)
+        ? "CancelLBE"
+        : this.treasuryRedeemer;
     }
     const assets = cases[treasuryCase]();
     innerPay(assets);
