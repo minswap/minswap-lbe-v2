@@ -245,7 +245,7 @@ validator {
         }
       }
 
-      CancelLBE -> {
+      CancelLBE(reason) -> {
         let treasury_output =
           validation.get_treasury_output(
             outputs,
@@ -261,6 +261,7 @@ validator {
             inputs: inputs,
             extra_signatories: extra_signatories,
             end_valid_time_range: end_valid_time_range,
+            cancel_reason: reason,
           ),
           mint_value == value.zero(),
         }

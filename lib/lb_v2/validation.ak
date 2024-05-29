@@ -12,9 +12,9 @@ use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
 use lb_v2/types.{
-  Asset, ManagerDatum, ManagerRedeemer, OrderDatum, PenaltyConfig, PoolDatum,
-  PubKeyHash, SellerDatum, SellerRedeemer, TreasuryDatum, TreasuryRedeemer,
-  ValidatorHash,
+  Asset, ByOwner, CancelReason, CreatedPool, ManagerDatum, ManagerRedeemer,
+  NotReachMinimum, OrderDatum, PenaltyConfig, PoolDatum, PubKeyHash, SellerDatum,
+  SellerRedeemer, TreasuryDatum, TreasuryRedeemer, ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
@@ -1275,6 +1275,7 @@ pub fn validate_cancel_lbe(
   inputs: List<Input>,
   extra_signatories: List<PubKeyHash>,
   end_valid_time_range: Int,
+  cancel_reason: CancelReason,
 ) -> Bool {
   let TreasuryDatum {
     base_asset,
@@ -1282,10 +1283,12 @@ pub fn validate_cancel_lbe(
     minimum_raise,
     is_cancelled,
     start_time,
+    end_time,
     owner,
     is_manager_collected,
     reserve_raise,
     total_penalty,
+    is_cancelable,
     ..
   } = treasury_in_datum
   let Address { payment_credential: owner_payment_credential, .. } = owner
@@ -1301,30 +1304,35 @@ pub fn validate_cancel_lbe(
       None -> 1
       Some(min_raise) -> min_raise
     }
+  // add reason
   and {
     // 1. Cancel reason
-    if and {
-      is_manager_collected,
-      reserve_raise + total_penalty < min_raise,
-    } {
-      True
-    } else if and {
-      end_valid_time_range < start_time,
-      validate_authorize_by_owner(
-        owner_payment_credential,
-        extra_signatories: extra_signatories,
-        inputs: inputs,
-      ),
-    } {
-      True
-    } else {
-      expect [pool_ref_input] = get_amm_pool_ref_inputs(ref_inputs)
-      expect Input {
-        output: Output { datum: InlineDatum(raw_pool_datum), .. },
-        ..
-      } = pool_ref_input
-      expect PoolDatum { asset_a, asset_b, .. }: PoolDatum = raw_pool_datum
-      utils.sort_two_assets(base_asset, raise_asset) == (asset_a, asset_b)
+    when cancel_reason is {
+      CreatedPool -> {
+        expect [pool_ref_input] = get_amm_pool_ref_inputs(ref_inputs)
+        expect Input {
+          output: Output { datum: InlineDatum(raw_pool_datum), .. },
+          ..
+        } = pool_ref_input
+        expect PoolDatum { asset_a, asset_b, .. }: PoolDatum = raw_pool_datum
+        utils.sort_two_assets(base_asset, raise_asset) == (asset_a, asset_b)
+      }
+      ByOwner -> and {
+          end_valid_time_range < if is_cancelable {
+            end_time
+          } else {
+            start_time
+          },
+          validate_authorize_by_owner(
+            owner_payment_credential,
+            extra_signatories: extra_signatories,
+            inputs: inputs,
+          ),
+        }
+      NotReachMinimum -> and {
+          is_manager_collected,
+          reserve_raise + total_penalty < min_raise,
+        }
     },
     // 2. Treasury
     //    - Datum: 

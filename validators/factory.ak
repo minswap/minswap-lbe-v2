@@ -79,10 +79,7 @@ validator(
         bound_type: Finite(end_valid_time_range),
         ..
       },
-      lower_bound: IntervalBound {
-        bound_type: Finite(_start_valid_time_range),
-        ..
-      },
+      ..
     } = validity_range
     let FactoryDatum { head: current_head, tail: current_tail } = datum
     let (base_asset, raise_asset) =

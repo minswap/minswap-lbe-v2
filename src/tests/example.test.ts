@@ -213,6 +213,7 @@ test("example flow", async () => {
     totalLiquidity: 0n,
     penaltyConfig: null,
     totalPenalty: 0n,
+    isCancelable:false,
     isCancelled: false,
     minimumOrderRaise: null,
     isManagerCollected: false,

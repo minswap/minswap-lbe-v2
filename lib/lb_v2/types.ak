@@ -64,8 +64,16 @@ pub type TreasuryDatum {
   penalty_config: Option<PenaltyConfig>,
   // added when collect manager once, descrease when refund
   total_penalty: Int,
+  // is this LBE cancelled in discovery phase
+  is_cancelable: Bool,
   is_cancelled: Bool,
   is_manager_collected: Bool,
+}
+
+pub type CancelReason {
+  CreatedPool
+  ByOwner
+  NotReachMinimum
 }
 
 pub type TreasuryRedeemer {
@@ -84,7 +92,7 @@ pub type TreasuryRedeemer {
   // If Not enough fund 
   //    or pool created 
   // =>next step: CollectManager -> RedeemOrders(refund)
-  CancelLBE
+  CancelLBE { reason: CancelReason }
   // update LBE before discovery phase
   UpdateLBE
 }
