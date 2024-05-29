@@ -214,33 +214,33 @@ export class WarehouseBuilder {
     this.tx = t.newTx();
 
     this.factoryHash = t.utils.validatorToScriptHash(
-      validators.factoryValidator,
+      validators.factoryValidator
     );
     this.treasuryHash = t.utils.validatorToScriptHash(
-      validators.treasuryValidator,
+      validators.treasuryValidator
     );
     this.managerHash = t.utils.validatorToScriptHash(
-      validators.managerValidator,
+      validators.managerValidator
     );
     this.sellerHash = t.utils.validatorToScriptHash(validators.sellerValidator);
     this.orderHash = t.utils.validatorToScriptHash(validators.orderValidator);
 
     this.factoryAddress = t.utils.validatorToAddress(
-      validators.factoryValidator,
+      validators.factoryValidator
     );
     this.treasuryAddress = t.utils.validatorToAddress(
-      validators.treasuryValidator,
+      validators.treasuryValidator
     );
     this.managerAddress = t.utils.validatorToAddress(
-      validators.managerValidator,
+      validators.managerValidator
     );
     this.sellerAddress = t.utils.validatorToAddress(validators.sellerValidator);
     this.orderAddress = t.utils.validatorToAddress(validators.orderValidator);
     this.sellerRewardAddress = t.utils.validatorToRewardAddress(
-      validators.sellerValidator,
+      validators.sellerValidator
     );
     this.treasuryRewardAddress = t.utils.validatorToRewardAddress(
-      validators.treasuryValidator,
+      validators.treasuryValidator
     );
 
     this.factoryToken = T.toUnit(this.factoryHash, FACTORY_AUTH_AN);
@@ -252,25 +252,25 @@ export class WarehouseBuilder {
     // AMM
     this.ammValidators = ammValidators;
     this.ammFactoryAddress = t.utils.validatorToAddress(
-      ammValidators.factoryValidator,
+      ammValidators.factoryValidator
     );
     this.ammPoolAddress = t.utils.validatorToAddress(
-      ammValidators.poolValidator,
+      ammValidators.poolValidator
     );
     this.ammDeployedValidators = ammDeployedValidators;
     this.ammAuthenHash = t.utils.validatorToScriptHash(
-      ammValidators.authenValidator,
+      ammValidators.authenValidator
     );
     this.ammPoolHash = t.utils.validatorToScriptHash(
-      ammValidators.poolValidator,
+      ammValidators.poolValidator
     );
     this.ammFactoryHash = t.utils.validatorToScriptHash(
-      ammValidators.factoryValidator,
+      ammValidators.factoryValidator
     );
     this.ammPoolToken = T.toUnit(this.ammAuthenHash, MINSWAP_V2_POOL_AUTH_AN);
     this.ammFactoryToken = T.toUnit(
       this.ammAuthenHash,
-      MINSWAP_V2_FACTORY_AUTH_AN,
+      MINSWAP_V2_FACTORY_AUTH_AN
     );
   }
 
@@ -296,7 +296,7 @@ export class WarehouseBuilder {
       },
       () => {
         this.payingFactoryOutput();
-      },
+      }
     );
   }
 
@@ -355,7 +355,7 @@ export class WarehouseBuilder {
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
-      },
+      }
     );
   }
 
@@ -392,7 +392,7 @@ export class WarehouseBuilder {
           .readFrom([treasuryRefUtxo])
           .validFrom(validFrom)
           .validTo(validTo);
-      },
+      }
     );
   }
 
@@ -430,7 +430,7 @@ export class WarehouseBuilder {
       penaltyAmount: sellerInDatum.penaltyAmount + deltaPenaltyAmount,
     };
     const mintingSellerCount = BigInt(
-      orderOutputDatums.length - orderInputs.length,
+      orderOutputDatums.length - orderInputs.length
     );
 
     this.tasks.push(
@@ -464,7 +464,7 @@ export class WarehouseBuilder {
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
-      },
+      }
     );
   }
 
@@ -481,12 +481,12 @@ export class WarehouseBuilder {
     this.tasks.push(
       () => {
         this.treasuryInputs = [treasuryInput];
-        this.treasuryRedeemer = "CancelLBE";
+        this.treasuryRedeemer = { CancelLBE: { reason: "ByOwner" } };
         if (validTo) {
           this.tx
             .validTo(validTo)
             .addSigner(
-              plutusAddress2Address(this.t.network, treasuryInDatum.owner),
+              plutusAddress2Address(this.t.network, treasuryInDatum.owner)
             );
         } else if (ammFactoryRefInput) {
           this.tx.readFrom([ammFactoryRefInput]);
@@ -497,7 +497,7 @@ export class WarehouseBuilder {
       },
       () => {
         this.payingTreasuryOutput({ treasuryOutDatum });
-      },
+      }
     );
   }
 
@@ -524,7 +524,7 @@ export class WarehouseBuilder {
         this.treasuryRedeemer = "CreateAmmPool";
         this.setAmmLpToken(
           treasuryInDatum.baseAsset,
-          treasuryInDatum.raiseAsset,
+          treasuryInDatum.raiseAsset
         );
       },
       () => {
@@ -543,7 +543,7 @@ export class WarehouseBuilder {
         invariant(this.ammLpToken);
         const projectOwner = plutusAddress2Address(
           this.t.network,
-          treasuryInDatum.owner,
+          treasuryInDatum.owner
         );
         this.tx.payToAddress(projectOwner, {
           [this.ammLpToken]: projectOwnerLp,
@@ -551,7 +551,7 @@ export class WarehouseBuilder {
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
-      },
+      }
     );
   }
 
@@ -572,7 +572,7 @@ export class WarehouseBuilder {
           wrapper: { CloseTreasury: innerFactoryRedeemer },
         };
         this.tx.addSigner(
-          plutusAddress2Address(this.t.network, treasuryDatum.owner),
+          plutusAddress2Address(this.t.network, treasuryDatum.owner)
         );
       },
       () => {
@@ -589,7 +589,7 @@ export class WarehouseBuilder {
       },
       () => {
         this.payingFactoryOutput();
-      },
+      }
     );
   }
 
@@ -655,7 +655,7 @@ export class WarehouseBuilder {
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
-      },
+      }
     );
   }
 
@@ -702,7 +702,7 @@ export class WarehouseBuilder {
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
-      },
+      }
     );
   }
 
@@ -741,7 +741,7 @@ export class WarehouseBuilder {
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
-      },
+      }
     );
   }
 
@@ -789,22 +789,22 @@ export class WarehouseBuilder {
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
-      },
+      }
     );
   }
 
   /************************* PARSER  *************************/
   fromDatumTreasury(
-    rawDatum: string,
+    rawDatum: string
   ): TreasuryValidateTreasurySpending["treasuryInDatum"] {
     return T.Data.from(
       rawDatum,
-      TreasuryValidateTreasurySpending.treasuryInDatum,
+      TreasuryValidateTreasurySpending.treasuryInDatum
     );
   }
 
   toDatumTreasury(
-    datum: TreasuryValidateTreasurySpending["treasuryInDatum"],
+    datum: TreasuryValidateTreasurySpending["treasuryInDatum"]
   ): string {
     return T.Data.to(datum, TreasuryValidateTreasurySpending.treasuryInDatum);
   }
@@ -818,7 +818,7 @@ export class WarehouseBuilder {
   }
 
   fromDatumSeller(
-    rawDatum: string,
+    rawDatum: string
   ): SellerValidateSellerSpending["sellerInDatum"] {
     return T.Data.from(rawDatum, SellerValidateSellerSpending.sellerInDatum);
   }
@@ -836,25 +836,25 @@ export class WarehouseBuilder {
   }
 
   fromDatumManager(
-    rawDatum: string,
+    rawDatum: string
   ): ManagerValidateManagerSpending["managerInDatum"] {
     return T.Data.from(rawDatum, ManagerValidateManagerSpending.managerInDatum);
   }
 
   toDatumManager(
-    datum: ManagerValidateManagerSpending["managerInDatum"],
+    datum: ManagerValidateManagerSpending["managerInDatum"]
   ): string {
     return T.Data.to(datum, ManagerValidateManagerSpending.managerInDatum);
   }
 
   toRedeemerSellerSpend(
-    redeemer: SellerValidateSellerSpending["redeemer"],
+    redeemer: SellerValidateSellerSpending["redeemer"]
   ): string {
     return T.Data.to(redeemer, SellerValidateSellerSpending.redeemer);
   }
 
   calFinalReserveRaise(
-    datum: TreasuryValidateTreasurySpending["treasuryInDatum"],
+    datum: TreasuryValidateTreasurySpending["treasuryInDatum"]
   ) {
     if (
       datum.maximumRaise &&
@@ -869,7 +869,7 @@ export class WarehouseBuilder {
   setAmmLpToken(baseAsset: BluePrintAsset, raiseAsset: BluePrintAsset) {
     const lpAssetName = computeLPAssetName(
       baseAsset.policyId + baseAsset.assetName,
-      raiseAsset.policyId + raiseAsset.assetName,
+      raiseAsset.policyId + raiseAsset.assetName
     );
     const lpToken = T.toUnit(this.ammAuthenHash, lpAssetName);
     this.ammLpToken = lpToken;
@@ -885,10 +885,7 @@ export class WarehouseBuilder {
       .readFrom([this.deployedValidators["managerValidator"]])
       .collectFrom(
         this.managerInputs,
-        T.Data.to(
-          this.managerRedeemer,
-          ManagerValidateManagerSpending.redeemer,
-        ),
+        T.Data.to(this.managerRedeemer, ManagerValidateManagerSpending.redeemer)
       );
   }
 
@@ -903,7 +900,7 @@ export class WarehouseBuilder {
       .readFrom([this.deployedValidators["sellerValidator"]])
       .collectFrom(
         this.sellerInputs,
-        this.toRedeemerSellerSpend(this.sellerRedeemer),
+        this.toRedeemerSellerSpend(this.sellerRedeemer)
       );
   }
 
@@ -916,7 +913,7 @@ export class WarehouseBuilder {
       .readFrom([this.deployedValidators["factoryValidator"]])
       .collectFrom(
         this.factoryInputs,
-        T.Data.to(this.factoryRedeemer, FactoryValidateFactory.redeemer),
+        T.Data.to(this.factoryRedeemer, FactoryValidateFactory.redeemer)
       );
   }
 
@@ -939,7 +936,7 @@ export class WarehouseBuilder {
       .readFrom([this.deployedValidators["orderValidator"]])
       .collectFrom(
         this.orderInputs,
-        T.Data.to(this.orderRedeemer, FeedTypeOrder._redeemer),
+        T.Data.to(this.orderRedeemer, FeedTypeOrder._redeemer)
       );
   }
 
@@ -954,8 +951,8 @@ export class WarehouseBuilder {
         this.treasuryInputs,
         T.Data.to(
           this.treasuryRedeemer,
-          TreasuryValidateTreasurySpending.redeemer,
-        ),
+          TreasuryValidateTreasurySpending.redeemer
+        )
       );
   }
 
@@ -972,7 +969,7 @@ export class WarehouseBuilder {
         {
           inline: this.toDatumTreasury(treasuryOutDatum),
         },
-        assets,
+        assets
       );
     };
     const defaultAssets = () => {
@@ -989,7 +986,7 @@ export class WarehouseBuilder {
       };
       const raiseAsset = T.toUnit(
         treasuryOutDatum.raiseAsset.policyId,
-        treasuryOutDatum.raiseAsset.assetName,
+        treasuryOutDatum.raiseAsset.assetName
       );
       assets[raiseAsset] =
         (assets[raiseAsset] ?? 0n) +
@@ -1014,7 +1011,7 @@ export class WarehouseBuilder {
       invariant(deltaCollectedFund);
       const raiseAsset = T.toUnit(
         treasuryOutDatum.raiseAsset.policyId,
-        treasuryOutDatum.raiseAsset.assetName,
+        treasuryOutDatum.raiseAsset.assetName
       );
       assets[raiseAsset] = (assets[raiseAsset] ?? 0n) + deltaCollectedFund;
       return assets;
@@ -1022,7 +1019,7 @@ export class WarehouseBuilder {
     const createTreasury = () => {
       const baseAsset = T.toUnit(
         treasuryOutDatum.baseAsset.policyId,
-        treasuryOutDatum.baseAsset.assetName,
+        treasuryOutDatum.baseAsset.assetName
       );
       const assets = {
         [this.treasuryToken]: 1n,
@@ -1043,7 +1040,17 @@ export class WarehouseBuilder {
       CreateAmmPool: createPoolAssets,
       CollectOrders: collectOrders,
     };
-    const assets = cases[this.treasuryRedeemer ?? ""]();
+    let treasuryCase: string;
+    if (
+      typeof this.treasuryRedeemer === "object" &&
+      this.treasuryRedeemer !== null &&
+      "CancelLBE" in this.treasuryRedeemer
+    ) {
+      treasuryCase = "CancelLBE";
+    } else {
+      treasuryCase = this.treasuryRedeemer ?? "";
+    }
+    const assets = cases[treasuryCase]();
     innerPay(assets);
   }
 
@@ -1055,7 +1062,7 @@ export class WarehouseBuilder {
       },
       {
         [this.managerToken]: 1n,
-      },
+      }
     );
   }
 
@@ -1068,7 +1075,7 @@ export class WarehouseBuilder {
       };
       const raiseAsset = T.toUnit(
         datum.raiseAsset.policyId,
-        datum.raiseAsset.assetName,
+        datum.raiseAsset.assetName
       );
       if (this.treasuryInputs.length > 0) {
         // collecting orders
@@ -1081,7 +1088,7 @@ export class WarehouseBuilder {
         {
           inline: this.toDatumOrder(datum),
         },
-        assets,
+        assets
       );
     };
     for (const datum of orderDatums) {
@@ -1093,7 +1100,7 @@ export class WarehouseBuilder {
     option: {
       addSellerCount?: bigint;
       outDatum?: SellerValidateSellerSpending["sellerInDatum"];
-    } = { addSellerCount: undefined, outDatum: undefined },
+    } = { addSellerCount: undefined, outDatum: undefined }
   ) {
     const { addSellerCount, outDatum } = option;
     const innerPay = (datum: SellerValidateSellerSpending["sellerInDatum"]) => {
@@ -1104,7 +1111,7 @@ export class WarehouseBuilder {
         },
         {
           [this.sellerToken]: 1n,
-        },
+        }
       );
     };
     if (this.sellerInputs.length) {
@@ -1155,7 +1162,7 @@ export class WarehouseBuilder {
         },
         {
           [this.factoryToken]: 1n,
-        },
+        }
       );
     };
 
@@ -1182,7 +1189,7 @@ export class WarehouseBuilder {
         ].raiseAsset;
         const lpAssetName = computeLPAssetName(
           baseAsset.policyId + baseAsset.assetName,
-          raiseAsset.policyId + raiseAsset.assetName,
+          raiseAsset.policyId + raiseAsset.assetName
         );
         const factoryDatum = this.fromDatumFactory(this.factoryInputs[0].datum);
         const newFactoryHeadDatum: FactoryValidateFactory["datum"] = {
@@ -1250,7 +1257,7 @@ export class WarehouseBuilder {
       {
         [this.treasuryToken]: amount,
       },
-      T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
+      T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer)
     );
   }
 
@@ -1261,7 +1268,7 @@ export class WarehouseBuilder {
       {
         [this.managerToken]: amount,
       },
-      T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
+      T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer)
     );
   }
 
@@ -1274,7 +1281,7 @@ export class WarehouseBuilder {
       {
         [this.sellerToken]: mintAmount,
       },
-      T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
+      T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer)
     );
   }
 
@@ -1287,7 +1294,7 @@ export class WarehouseBuilder {
       {
         [this.orderToken]: mintAmount,
       },
-      T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
+      T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer)
     );
     // if (count > 0) {
     //   this.withdrawFromSeller();
@@ -1322,7 +1329,7 @@ export class WarehouseBuilder {
       {
         [this.factoryToken]: amount,
       },
-      T.Data.to(redeemer, FactoryValidateFactoryMinting.redeemer),
+      T.Data.to(redeemer, FactoryValidateFactoryMinting.redeemer)
     );
   }
 
@@ -1335,7 +1342,7 @@ export class WarehouseBuilder {
     invariant(factoryInput.datum);
     const factoryDatum = T.Data.from(
       factoryInput.datum,
-      AmmValidateFactory.datum,
+      AmmValidateFactory.datum
     );
     const factoryRedeemer: AmmValidateFactory["redeemer"] = {
       assetA: poolDatum.assetA,
@@ -1343,7 +1350,7 @@ export class WarehouseBuilder {
     };
     const lpAssetName = computeLPAssetName(
       poolDatum.assetA.policyId + poolDatum.assetA.assetName,
-      poolDatum.assetB.policyId + poolDatum.assetB.assetName,
+      poolDatum.assetB.policyId + poolDatum.assetB.assetName
     );
     const lpToken = T.toUnit(this.ammAuthenHash, lpAssetName);
     invariant(this.ammLpToken);
@@ -1362,7 +1369,7 @@ export class WarehouseBuilder {
     };
     const initialLiquidity = calculateInitialLiquidity(
       poolDatum.reserveA,
-      poolDatum.reserveB,
+      poolDatum.reserveB
     );
     const remainingLiquidity =
       MINSWAP_V2_MAX_LIQUIDITY - (initialLiquidity - LP_COLATERAL);
@@ -1373,11 +1380,11 @@ export class WarehouseBuilder {
     };
     const unitA = T.toUnit(
       poolDatum.assetA.policyId,
-      poolDatum.assetA.assetName,
+      poolDatum.assetA.assetName
     );
     const unitB = T.toUnit(
       poolDatum.assetB.policyId,
-      poolDatum.assetB.assetName,
+      poolDatum.assetB.assetName
     );
     poolAssets[unitA] = (poolAssets[unitA] ?? 0n) + poolDatum.reserveA;
     poolAssets[unitB] = (poolAssets[unitB] ?? 0n) + poolDatum.reserveB;
@@ -1388,11 +1395,11 @@ export class WarehouseBuilder {
       ])
       .collectFrom(
         [factoryInput],
-        T.Data.to(factoryRedeemer, AmmValidateFactory.redeemer),
+        T.Data.to(factoryRedeemer, AmmValidateFactory.redeemer)
       )
       .mintAssets(
         mintAssets,
-        T.Data.to("CreatePool", AmmValidateAuthen.redeemer),
+        T.Data.to("CreatePool", AmmValidateAuthen.redeemer)
       )
       .payToAddressWithData(
         this.ammFactoryAddress,
@@ -1401,7 +1408,7 @@ export class WarehouseBuilder {
         },
         {
           [this.ammFactoryToken]: 1n,
-        },
+        }
       )
       .payToAddressWithData(
         this.ammFactoryAddress,
@@ -1410,14 +1417,14 @@ export class WarehouseBuilder {
         },
         {
           [this.ammFactoryToken]: 1n,
-        },
+        }
       )
       .payToAddressWithData(
         this.ammPoolAddress,
         {
           inline: T.Data.to(poolDatum, FeedTypeAmmPool._datum),
         },
-        poolAssets,
+        poolAssets
       );
   }
 }
