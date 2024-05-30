@@ -155,6 +155,20 @@ test("using-seller | SUCCESS | update orders: success", async () => {
   await tx.complete();
 });
 
+test("using-seller | SUCCESS | create orders: success", async () => {
+  const { builder, options } = warehouse;
+  builder.buildUsingSeller({ ...options, orderInputs: [] });
+  const tx = builder.complete();
+  await tx.complete();
+});
+
+test("using-seller | SUCCESS | update orders: success", async () => {
+  const { builder, options } = warehouse;
+  builder.buildUsingSeller({ ...options, orderOutputDatums: [] });
+  const tx = builder.complete();
+  await tx.complete();
+});
+
 test("using-seller | FAIL | update orders: after discovery phase", async () => {
   const { builder, treasuryDatum } = warehouse;
   const options: BuildUsingSellerOptions = {
