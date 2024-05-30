@@ -96,6 +96,8 @@ export type BuildCollectManagerOptions = {
   managerInput: UTxO;
   validFrom: UnixTime;
   validTo: UnixTime;
+  // allow pass datum as testing purpose
+  treasuryOutDatum?: TreasuryValidateTreasurySpending["treasuryInDatum"];
 };
 
 export type BuildCollectSellersOptions = {
@@ -712,13 +714,12 @@ export class WarehouseBuilder {
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
     invariant(managerInput.datum);
     const managerInDatum = this.fromDatumManager(managerInput.datum);
-    const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] =
-      {
-        ...treasuryInDatum,
-        reserveRaise: managerInDatum.reserveRaise,
-        totalPenalty: managerInDatum.totalPenalty,
-        isManagerCollected: true,
-      };
+    const treasuryOutDatum = options.treasuryOutDatum ?? {
+      ...treasuryInDatum,
+      reserveRaise: managerInDatum.reserveRaise,
+      totalPenalty: managerInDatum.totalPenalty,
+      isManagerCollected: true,
+    };
     this.tasks.push(
       () => {
         this.treasuryInputs = [treasuryInput];

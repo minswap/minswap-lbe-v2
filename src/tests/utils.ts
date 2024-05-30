@@ -1,13 +1,6 @@
 import * as T from "@minswap/translucent";
-import type {
-  Assets,
-  PrivateKey,
-  Emulator,
-  Tx,
-  Translucent,
-  UTxO,
-} from "../types";
-import type { WarehouseBuilderOptions } from "../build-tx";
+import { expect } from "bun:test";
+import type { WarehouseBuilder, WarehouseBuilderOptions } from "../build-tx";
 import {
   collectMinswapValidators,
   collectValidators,
@@ -17,6 +10,14 @@ import {
   type MinswapValidators,
   type Validators,
 } from "../deploy-validators";
+import type {
+  Assets,
+  Emulator,
+  PrivateKey,
+  Translucent,
+  Tx,
+  UTxO,
+} from "../types";
 
 export type GeneratedAccount = {
   privateKey: string;
@@ -159,4 +160,18 @@ export const genWarehouseOptions = async (t: Translucent) => {
     ammDeployedValidators,
   };
   return options;
+};
+
+export const assertValidator = async (
+  builder: WarehouseBuilder,
+  msg: string,
+) => {
+  const tx = builder.complete();
+  let errMessage = "";
+  try {
+    await tx.complete();
+  } catch (err) {
+    if (typeof err == "string") errMessage = err;
+  }
+  expect(errMessage).toContain(msg);
 };
