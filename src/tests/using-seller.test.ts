@@ -104,7 +104,7 @@ beforeEach(async () => {
     },
   ];
   const orderInputUTxOs = orderInDatums.map((datum) =>
-    genOrderUTxO(datum, builder)
+    genOrderUTxO(datum, builder),
   );
   const owner = plutusAddress2Address(t.network, defaultTreasuryDatum.owner);
   const options: BuildUsingSellerOptions = {
@@ -134,7 +134,7 @@ beforeEach(async () => {
 
 function genOrderUTxO(
   datum: FeedTypeOrder["_datum"],
-  builder: WarehouseBuilder
+  builder: WarehouseBuilder,
 ): UTxO {
   return {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
@@ -278,9 +278,13 @@ test("using-seller | FAIL | update orders: Seller output don't have any seller t
     builder.tx.payToAddressWithData(
       builder.sellerAddress,
       {
-        inline: builder.toDatumSeller(sellerDatum),
+        inline: builder.toDatumSeller({
+          ...sellerDatum,
+          // new seller output datum
+          amount: -1745n,
+        }),
       },
-      {}
+      {},
     );
   };
   await assertValidator(builder, "Seller output don't have any seller token");
@@ -307,7 +311,7 @@ test("using-seller | FAIL | update orders: Invalid order output value", async ()
         {
           inline: builder.toDatumOrder(datum),
         },
-        assets
+        assets,
       );
     }
   };
@@ -320,6 +324,6 @@ test("using-seller | FAIL | update orders: penalty_amount must higher than or eq
   builder.buildUsingSeller(options);
   await assertValidator(
     builder,
-    "penalty_amount must higher than or equal to 0"
+    "penalty_amount must higher than or equal to 0",
   );
 });
