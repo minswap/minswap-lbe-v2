@@ -19,10 +19,9 @@ use lb_v2/types.{
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
   amm_pool_validation_hash, assert, calculate_penalty,
-  compute_asset_name_from_base_and_raise, default_burn_liquidity,
-  default_number_seller, factory_auth_an, fee_ada, get_order_value,
-  manager_auth_an, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
-  treasury_minimum_ada, two_days,
+  compute_asset_name_from_base_and_raise, default_burn_liquidity, fee_ada,
+  get_order_value, manager_auth_an, minimum_ada, order_auth_an, seller_auth_an,
+  treasury_auth_an, treasury_minimum_ada, two_days,
 }
 
 pub fn validate_creating_treasury_out(
