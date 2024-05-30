@@ -30,7 +30,7 @@ export const genWarehouse = async () => {
   };
   const minswapTokenRaw = T.toUnit(
     minswapToken.policyId,
-    minswapToken.assetName
+    minswapToken.assetName,
   );
   const adaToken: BluePrintAsset = {
     policyId: "",
@@ -55,7 +55,7 @@ export const genWarehouse = async () => {
   const defaultTreasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] =
     {
       factoryPolicyId: t.utils.validatorToScriptHash(
-        validators.factoryValidator
+        validators.factoryValidator,
       ),
       sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
       orderHash: t.utils.validatorToScriptHash(validators.orderValidator),
@@ -81,7 +81,7 @@ export const genWarehouse = async () => {
   const defaultManagerDatum: ManagerValidateManagerSpending["managerInDatum"] =
     {
       factoryPolicyId: t.utils.validatorToScriptHash(
-        validators.factoryValidator
+        validators.factoryValidator,
       ),
       orderHash: t.utils.validatorToScriptHash(validators.orderValidator),
       sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),

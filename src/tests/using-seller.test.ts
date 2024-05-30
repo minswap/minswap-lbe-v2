@@ -9,18 +9,17 @@ import {
   type WarehouseBuilderOptions,
 } from "../build-tx";
 import { TREASURY_MIN_ADA } from "../constants";
-import { genWarehouseOptions, loadModule } from "./utils";
+import { assertValidator, genWarehouseOptions, loadModule } from "./utils";
 import * as T from "@minswap/translucent";
 import { genWarehouse } from "./warehouse";
-import type { UTxO } from "../types";
+import type { BluePrintAsset, UTxO } from "../types";
 import { plutusAddress2Address } from "../utils";
 
 let warehouse: {
   t: T.Translucent;
-  baseAsset: {
-    policyId: string;
-    assetName: string;
-  };
+  builder: WarehouseBuilder;
+  options: BuildUsingSellerOptions;
+  baseAsset: BluePrintAsset;
   warehouseOptions: WarehouseBuilderOptions;
   treasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"];
   treasuryUTxO: UTxO;
@@ -61,7 +60,7 @@ beforeEach(async () => {
     address: builder.treasuryAddress,
     datum: T.Data.to(
       defaultTreasuryDatum,
-      TreasuryValidateTreasurySpending.treasuryInDatum
+      TreasuryValidateTreasurySpending.treasuryInDatum,
     ),
   };
   const sellerDatum = {
@@ -107,7 +106,21 @@ beforeEach(async () => {
       penaltyAmount: 0n,
     },
   ];
+  const orderInputUTxOs = orderInDatums.map((datum) =>
+    genOrderUTxO(datum, builder),
+  );
+  const options: BuildUsingSellerOptions = {
+    treasuryRefInput: treasuryUTxO,
+    sellerUtxo: sellerUTxO,
+    validFrom: Number(defaultTreasuryDatum.startTime) + 1000,
+    validTo: Number(defaultTreasuryDatum.startTime) + 2000,
+    owners: [warehouse.owner],
+    orderInputs: orderInputUTxOs,
+    orderOutputDatums: orderOutDatums,
+  };
   warehouse = {
+    builder,
+    options,
     baseAsset,
     warehouseOptions,
     t,
@@ -123,7 +136,7 @@ beforeEach(async () => {
 
 function genOrderUTxO(
   datum: FeedTypeOrder["_datum"],
-  builder: WarehouseBuilder
+  builder: WarehouseBuilder,
 ): UTxO {
   return {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
@@ -138,66 +151,20 @@ function genOrderUTxO(
 }
 
 test("Create order happy case", async () => {
-  const {
-    warehouseOptions,
-    treasuryUTxO,
-    sellerUTxO,
-    treasuryDatum,
-    orderInDatums,
-  } = warehouse;
-  const builder = new WarehouseBuilder(warehouseOptions);
-  const orderOutDatums: FeedTypeOrder["_datum"][] = warehouse.orderOutDatums;
-  const orderInputUTxOs = orderInDatums.map((datum) =>
-    genOrderUTxO(datum, builder)
-  );
-  const options: BuildUsingSellerOptions = {
-    treasuryRefInput: treasuryUTxO,
-    sellerUtxo: sellerUTxO,
-    validFrom: Number(treasuryDatum.startTime) + 1000,
-    validTo: Number(treasuryDatum.startTime) + 2000,
-    owners: [warehouse.owner],
-    orderInputs: orderInputUTxOs,
-    orderOutputDatums: orderOutDatums,
-  };
-
+  const { builder, options } = warehouse;
   builder.buildUsingSeller(options);
   const tx = builder.complete();
   await tx.complete();
 });
 
-test("Create order: after discovery phase", async () => {
-  const {
-    warehouseOptions,
-    treasuryUTxO,
-    sellerUTxO,
-    treasuryDatum,
-    orderInDatums,
-  } = warehouse;
-  const builder = new WarehouseBuilder(warehouseOptions);
-  const orderOutDatums: FeedTypeOrder["_datum"][] = warehouse.orderOutDatums;
-  const orderInputUTxOs = orderInDatums.map((datum) =>
-    genOrderUTxO(datum, builder)
-  );
+test("using-seller | FAIL | create order after discovery phase", async () => {
+  const { builder, treasuryDatum } = warehouse;
   const options: BuildUsingSellerOptions = {
-    treasuryRefInput: treasuryUTxO,
-    sellerUtxo: sellerUTxO,
-    validFrom: Number(treasuryDatum.startTime) + 1000,
+    ...warehouse.options,
     validTo: Number(treasuryDatum.endTime) + 1000,
-    owners: [warehouse.owner],
-    orderInputs: orderInputUTxOs,
-    orderOutputDatums: orderOutDatums,
   };
-
   builder.buildUsingSeller(options);
-  const tx = builder.complete();
-  let errMessage = "";
-
-  try {
-    await tx.complete();
-  } catch (err) {
-    if (typeof err == "string") errMessage = err;
-  }
-  expect(errMessage).toContain("After discovery phase");
+  await assertValidator(builder, "After discovery phase");
 });
 
 test("Create order: before discovery phase", async () => {
@@ -211,7 +178,7 @@ test("Create order: before discovery phase", async () => {
   const builder = new WarehouseBuilder(warehouseOptions);
   const orderOutDatums: FeedTypeOrder["_datum"][] = warehouse.orderOutDatums;
   const orderInputUTxOs = orderInDatums.map((datum) =>
-    genOrderUTxO(datum, builder)
+    genOrderUTxO(datum, builder),
   );
   const options: BuildUsingSellerOptions = {
     treasuryRefInput: treasuryUTxO,
@@ -246,7 +213,7 @@ test("Create order: LBE is cancelled", async () => {
   const builder = new WarehouseBuilder(warehouseOptions);
   const orderOutDatums: FeedTypeOrder["_datum"][] = warehouse.orderOutDatums;
   const orderInputUTxOs = orderInDatums.map((datum) =>
-    genOrderUTxO(datum, builder)
+    genOrderUTxO(datum, builder),
   );
   const customTreasuryDatum = { ...treasuryDatum, isCancelled: true };
   const options: BuildUsingSellerOptions = {
@@ -254,7 +221,7 @@ test("Create order: LBE is cancelled", async () => {
       ...treasuryUTxO,
       datum: T.Data.to(
         customTreasuryDatum,
-        TreasuryValidateTreasurySpending.treasuryInDatum
+        TreasuryValidateTreasurySpending.treasuryInDatum,
       ),
     },
     sellerUtxo: sellerUTxO,
