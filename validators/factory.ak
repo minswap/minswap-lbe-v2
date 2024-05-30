@@ -7,7 +7,7 @@ use aiken/transaction.{
   ScriptPurpose, Spend, Transaction,
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
-use aiken/transaction/value.{PolicyId, Value}
+use aiken/transaction/value.{AssetName, PolicyId, Value}
 use lb_v2/types.{
   Asset, CloseTreasury, CollectManager, CreateTreasury, FactoryDatum,
   FactoryRedeemer, Initialization, ManageSeller, ManagerDatum, MintManager,
@@ -254,8 +254,34 @@ validator(
         }
       }
       CloseTreasury { .. } -> {
+        // finding exactly 2 Factory Inputs
         expect [factory_input_1, factory_input_2] = factory_inputs
-        // 1. Validate 2 Factory inputs and 1 Factory Output
+        // finding exactly 1 Factory Output
+        expect [factory_output] =
+          list.filter(
+            outputs,
+            fn(output) {
+              let Output { address: Address { payment_credential, .. }, .. } =
+                output
+              payment_credential == ScriptCredential(factory_hash)
+            },
+          )
+        // finding exactly 1 Treasury Input
+        expect [treasury_input] =
+          list.filter(
+            inputs,
+            fn(input) {
+              let Input {
+                output: Output {
+                  address: Address { payment_credential, .. },
+                  ..
+                },
+                ..
+              } = input
+              payment_credential == ScriptCredential(treasury_hash)
+            },
+          )
+        // extract some necessary data
         expect Input {
           output: Output {
             datum: InlineDatum(factory_input_1_raw_datum),
@@ -272,68 +298,19 @@ validator(
           },
           ..
         } = factory_input_2
-        let (f_in_head_raw_datum, f_in_tail_raw_datum) =
-          utils.sort_two_consecutive_factory_datum(
-            factory_input_1_raw_datum,
-            factory_input_2_raw_datum,
-          )
-        expect f_in_head_datum: FactoryDatum = f_in_head_raw_datum
-        expect f_in_tail_datum: FactoryDatum = f_in_tail_raw_datum
-        let FactoryDatum { head: new_f_datum_head, tail: f_datum_tail_lp } =
-          f_in_head_datum
-        let FactoryDatum { head: f_datum_head_lp, tail: new_f_datum_tail } =
-          f_in_tail_datum
-        expect and {
-            value.quantity_of(
-              factory_input_1_value,
-              factory_hash,
-              treasury_auth_an,
-            ) == 1,
-            value.quantity_of(
-              factory_input_2_value,
-              factory_hash,
-              treasury_auth_an,
-            ) == 1,
-            f_datum_tail_lp == lp_asset_name,
-            f_datum_head_lp == lp_asset_name,
-          }
-        expect Some(factory_output) = list.head(outputs)
-        let Output {
-          value: f_out_value,
-          address: Address { payment_credential: f_out_pc, .. },
-          datum: f_out_datum,
+        expect Output {
+          value: factory_out_value,
+          datum: InlineDatum(factory_out_datum),
           ..
         } = factory_output
-        expect and {
-            value.quantity_of(f_out_value, factory_hash, factory_auth_an) == 1,
-            f_out_pc == ScriptCredential(factory_hash),
-            f_out_datum == InlineDatum(
-              FactoryDatum { head: new_f_datum_head, tail: new_f_datum_tail },
-            ),
-          }
-        // 2. Validate treasury in 
-        expect [treasury_in] =
-          list.filter(
-            inputs,
-            fn(input) {
-              let Input {
-                output: Output {
-                  address: Address { payment_credential, .. },
-                  value: out_value,
-                  ..
-                },
-                ..
-              } = input
-              and {
-                payment_credential == ScriptCredential(treasury_hash),
-                value.quantity_of(out_value, factory_hash, factory_auth_an) == 1,
-              }
-            },
-          )
         expect Input {
-          output: Output { datum: InlineDatum(treasury_datum_raw), .. },
+          output: Output {
+            datum: InlineDatum(treasury_datum_raw),
+            value: treasury_in_value,
+            ..
+          },
           ..
-        } = treasury_in
+        } = treasury_input
         expect treasury_datum: TreasuryDatum = treasury_datum_raw
         let TreasuryDatum {
           base_asset: t_base_asset,
@@ -346,13 +323,34 @@ validator(
           ..
         } = treasury_datum
         let Address { payment_credential: owner_payment_credential, .. } = owner
-
         and {
+          // Auth Token Assertions:
+          value.quantity_of(
+            factory_input_1_value,
+            factory_hash,
+            factory_auth_an,
+          ) == 1,
+          value.quantity_of(
+            factory_input_2_value,
+            factory_hash,
+            factory_auth_an,
+          ) == 1,
+          value.quantity_of(factory_out_value, factory_hash, factory_auth_an) == 1,
+          value.quantity_of(treasury_in_value, factory_hash, treasury_auth_an) == 1,
+          assert(
+            validate_factory_remove_node(
+              out_datum: factory_out_datum,
+              in_datum_1: factory_input_1_raw_datum,
+              in_datum_2: factory_input_2_raw_datum,
+              lp_asset_name: lp_asset_name,
+            ),
+            @"Remove Factory Linked List must be correct!",
+          ),
+          // LBE ID Assertions
           t_base_asset == base_asset,
           t_raise_asset == raise_asset,
-          value.from_minted_value(mint) == validation.get_value_of_minting_treasury(
+          value.from_minted_value(mint) == get_burning_treasury(
             factory_policy_id: factory_hash,
-            is_create_treasury: False,
           ),
           // authorize by owner
           validation.validate_authorize_by_owner(
@@ -360,13 +358,13 @@ validator(
             extra_signatories: extra_signatories,
             inputs: inputs,
           ),
-          // cancel beacause fail + Collected All sellers and manager + refunded all
-          and {
-            is_cancelled == True,
-            is_manager_collected == True,
-            reserve_raise == 0,
-            total_penalty == 0,
-          },
+          assert(is_cancelled, @"LBE should already cancelled"),
+          assert(
+            is_manager_collected,
+            @"All Manager, Sellers must be collected!",
+          ),
+          assert(reserve_raise == 0, @"All Orders have been executed."),
+          assert(total_penalty == 0, @"All Penalty have been handled."),
         }
       }
       _ -> False
@@ -380,6 +378,7 @@ validator(
     } = context
     let mint_value = value.from_minted_value(mint)
     when redeemer is {
+      // Init Factory Linked List
       Initialization ->
         validate_initialization(
           inputs: inputs,
@@ -388,8 +387,10 @@ validator(
           out_ref: out_ref,
           mint_value: mint_value,
         )
+      // Delegate validation logic to the Treasury Validator.
       CreateTreasury { .. } ->
         has_spend_factory(inputs, factory_policy_id, redeemers, redeemer)
+      // Delegate validation logic to the Treasury Validator.
       CloseTreasury { .. } ->
         has_spend_factory(inputs, factory_policy_id, redeemers, redeemer)
       // Collect Manager Transaction note:
@@ -397,8 +398,8 @@ validator(
       //   1 Manager Input needs to be spent
       //   1 Treasury Input needs to be spent
       //   1 Treasury Output needs to be paid
+      // Delegate validation logic to the Treasury Validator.
       MintManager ->
-        // Delegate validation logic to the Treasury Validator.
         validation.has_spend_treasury(
           inputs: inputs,
           factory_policy_id: factory_policy_id,
@@ -572,10 +573,44 @@ fn build_default_seller_output(
   }
 }
 
+// Close LBE require remove 1 node from Factory Linked List
+// Logic remove node from Linked List is classic!
+fn validate_factory_remove_node(
+  // Factory Out Datum Raw
+  out_datum: Data,
+  // First Factory In Datum Raw
+  in_datum_1: Data,
+  // Second Factory In Datum Raw
+  in_datum_2: Data,
+  // LP Asset Name of LBE
+  lp_asset_name: AssetName,
+) -> Bool {
+  // sorting to find Head, Tail Node in term Factory Linked List
+  let (head_datum_raw, tail_datum_raw) =
+    utils.sort_two_consecutive_factory_datum(in_datum_1, in_datum_2)
+  expect head_datum: FactoryDatum = head_datum_raw
+  expect tail_datum: FactoryDatum = tail_datum_raw
+  expect factory_out_datum: FactoryDatum = out_datum
+  and {
+    factory_out_datum == FactoryDatum {
+      head: head_datum.head,
+      tail: tail_datum.tail,
+    },
+    head_datum.tail == lp_asset_name,
+    tail_datum.head == lp_asset_name,
+  }
+}
+
 // return Mint Value when creating new Treasury
 fn get_minting_treasury(factory_policy_id: PolicyId) -> Value {
   value.from_asset(factory_policy_id, factory_auth_an, 1)
     |> value.add(factory_policy_id, treasury_auth_an, 1)
     |> value.add(factory_policy_id, manager_auth_an, 1)
     |> value.add(factory_policy_id, seller_auth_an, default_number_seller)
+}
+
+// return Mint Value when close a Treasury
+fn get_burning_treasury(factory_policy_id: PolicyId) -> Value {
+  value.from_asset(factory_policy_id, factory_auth_an, -1)
+    |> value.add(factory_policy_id, treasury_auth_an, -1)
 }

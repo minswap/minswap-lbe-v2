@@ -246,8 +246,8 @@ validator {
           )
         }
       }
-
       CancelLBE(reason) -> {
+        // finding exactly 1 Legit Treasury Output
         let treasury_output =
           validation.get_treasury_output(
             outputs,
@@ -265,7 +265,7 @@ validator {
             end_valid_time_range: end_valid_time_range,
             cancel_reason: reason,
           ),
-          mint_value == value.zero(),
+          assert(mint_value == value.zero(), @"Avoid minting unnecessary"),
         }
       }
     }
