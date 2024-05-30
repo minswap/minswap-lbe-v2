@@ -90,6 +90,8 @@ pub fn validate_creating_treasury_out(
       |> value.add(ada_policy_id, ada_asset_name, treasury_minimum_ada)
   and {
     // treasury datum
+    base_asset != raise_asset,
+    base_asset.policy_id != ada_policy_id,
     factory_policy_id == t_factory_policy_id,
     manager_hash == t_manager_hash,
     seller_hash == t_seller_hash,
@@ -135,42 +137,6 @@ pub fn validate_creating_treasury_out(
     treasury_out_value == expected_treasury_out_value,
     // reference_script
     reference_script == None,
-  }
-}
-
-pub fn validate_creating_manager_out(
-  base_asset: Asset,
-  raise_asset: Asset,
-  manager_out_value: Value,
-  manager_out_datum: ManagerDatum,
-  factory_hash: ValidatorHash,
-  seller_hash: ValidatorHash,
-  order_hash: ValidatorHash,
-) -> Bool {
-  let ManagerDatum {
-    factory_policy_id: sm_factory_hash,
-    seller_hash: sm_seller_hash,
-    order_hash: sm_order_hash,
-    base_asset: sm_base_asset,
-    raise_asset: sm_raise_asset,
-    seller_count,
-    reserve_raise,
-    total_penalty,
-  } = manager_out_datum
-  and {
-    // manager datum
-    sm_factory_hash == factory_hash,
-    sm_seller_hash == seller_hash,
-    sm_order_hash == order_hash,
-    sm_base_asset == base_asset,
-    sm_raise_asset == raise_asset,
-    seller_count == default_number_seller,
-    reserve_raise == 0,
-    total_penalty == 0,
-    // manager treasury
-    value.flatten(value.without_lovelace(manager_out_value)) == [
-      (factory_hash, manager_auth_an, 1),
-    ],
   }
 }
 
@@ -604,6 +570,36 @@ pub fn get_treasury_output(
       },
     )
   treasury_output
+}
+
+// If a transaction needs to pay the Manager,
+// its outputs must contain exactly 1 Legit Manager Output.
+pub fn get_manager_output(
+  outputs: List<Output>,
+  factory_policy_id: PolicyId,
+  manager_hash: ValidatorHash,
+) -> Output {
+  expect [manager_output] =
+    list.filter(
+      outputs,
+      fn(output) {
+        let Output {
+          address: Address { payment_credential, .. },
+          value: out_value,
+          reference_script,
+          ..
+        } = output
+        and {
+          // output belongs Manager Address
+          payment_credential == ScriptCredential(manager_hash),
+          // No ref_script to avoid increase minimum ADA
+          reference_script == None,
+          // Has 1 Manager Token
+          value.quantity_of(out_value, factory_policy_id, manager_auth_an) == 1,
+        }
+      },
+    )
+  manager_output
 }
 
 pub fn get_seller_outputs(
