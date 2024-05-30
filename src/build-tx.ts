@@ -38,12 +38,14 @@ import {
   LBE_MIN_OUTPUT_ADA,
   LP_COLATERAL,
   MANAGER_AUTH_AN,
+  MANAGER_MIN_ADA,
   MINSWAP_V2_DEFAULT_POOL_ADA,
   MINSWAP_V2_FACTORY_AUTH_AN,
   MINSWAP_V2_MAX_LIQUIDITY,
   MINSWAP_V2_POOL_AUTH_AN,
   ORDER_AUTH_AN,
   SELLER_AUTH_AN,
+  SELLER_MIN_ADA,
   TREASURY_AUTH_AN,
   TREASURY_MIN_ADA,
 } from "./constants";
@@ -475,10 +477,10 @@ export class WarehouseBuilder {
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
     const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] =
-      {
-        ...treasuryInDatum,
-        isCancelled: true,
-      };
+    {
+      ...treasuryInDatum,
+      isCancelled: true,
+    };
 
     this.tasks.push(
       () => {
@@ -516,10 +518,10 @@ export class WarehouseBuilder {
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
     const projectOwnerLp = (totalLiquidity - LP_COLATERAL) / 2n;
     const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] =
-      {
-        ...treasuryInDatum,
-        totalLiquidity: totalLiquidity - LP_COLATERAL - projectOwnerLp,
-      };
+    {
+      ...treasuryInDatum,
+      totalLiquidity: totalLiquidity - LP_COLATERAL - projectOwnerLp,
+    };
     this.tasks.push(
       () => {
         this.treasuryInputs = [treasuryInput];
@@ -623,10 +625,10 @@ export class WarehouseBuilder {
       userOutputs.push(output);
     }
     const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] =
-      {
-        ...treasuryInDatum,
-        collectedFund: treasuryInDatum.collectedFund - totalFund,
-      };
+    {
+      ...treasuryInDatum,
+      collectedFund: treasuryInDatum.collectedFund - totalFund,
+    };
     this.tasks.push(
       () => {
         this.treasuryInputs = [treasuryInput];
@@ -666,9 +668,9 @@ export class WarehouseBuilder {
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
     const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] =
-      {
-        ...treasuryInDatum,
-      };
+    {
+      ...treasuryInDatum,
+    };
     const orderOutDatums: FeedTypeOrder["_datum"][] = [];
     let deltaCollectedFund = 0n;
 
@@ -1071,6 +1073,7 @@ export class WarehouseBuilder {
       },
       {
         [this.managerToken]: 1n,
+        "lovelace": MANAGER_MIN_ADA,
       },
     );
   }
@@ -1120,6 +1123,7 @@ export class WarehouseBuilder {
         },
         {
           [this.sellerToken]: 1n,
+          "lovelace": SELLER_MIN_ADA,
         },
       );
     };

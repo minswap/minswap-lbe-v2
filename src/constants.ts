@@ -17,3 +17,5 @@ export const LBE_MIN_OUTPUT_ADA = 3_000_000n;
 export const LBE_FEE = 1_000_000n;
 export const DUMMY_REDEEMER = "d87980"; // 121([])
 export const TREASURY_MIN_ADA = 3_000_000n;
+export const MANAGER_MIN_ADA = 2_000_000n;
+export const SELLER_MIN_ADA = 2_000_000n;
