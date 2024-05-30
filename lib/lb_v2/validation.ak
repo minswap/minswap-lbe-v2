@@ -22,7 +22,7 @@ use lb_v2/utils.{
   compute_asset_name_from_base_and_raise, default_burn_liquidity,
   default_number_seller, factory_auth_an, fee_ada, get_order_value,
   manager_auth_an, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
-  treasury_minimum_ada,two_days
+  treasury_minimum_ada, two_days,
 }
 
 pub fn get_value_of_minting_treasury(
@@ -625,8 +625,14 @@ pub fn get_seller_outputs(
       fn(output) {
         let Output { value: out_value, datum: out_datum, .. } = output
         and {
-          value.quantity_of(out_value, factory_policy_id, seller_auth_an) == 1,
-          InlineDatum(seller_datum) == out_datum,
+          assert(
+            value.quantity_of(out_value, factory_policy_id, seller_auth_an) == 1,
+            @"Seller output don't have any seller token",
+          ),
+          assert(
+            InlineDatum(seller_datum) == out_datum,
+            @"Invalid seller output datum",
+          ),
         }
       },
     )
@@ -871,19 +877,16 @@ pub fn validate_using_seller(
     // validate time frame
     assert(
       start_time <= start_valid_time_range,
-      @"Before discovery phase",
+      @"Using-seller: Before discovery phase",
     ),
     assert(
       end_valid_time_range <= end_time,
-      @"After discovery phase",
+      @"Using-seller: After discovery phase",
     ),
     // validate minting
-    is_valid_minting,
+    assert(is_valid_minting, @"Using-seller: Invalid minting"),
     // not cancelled yet
-    assert(
-      is_cancelled == False,
-      @"LBE is cancelled",
-    ),
+    assert(is_cancelled == False, @"Using-seller: LBE is cancelled"),
   }
 }
 

@@ -26,7 +26,7 @@ export type GeneratedAccount = {
 };
 
 export async function generateAccount(
-  assets: Assets,
+  assets: Assets
 ): Promise<GeneratedAccount> {
   const privateKey = T.generatePrivateKey();
   return {
@@ -63,7 +63,7 @@ export function quickSubmitBuilder(emulator: Emulator) {
       for (let i = 0; i < body.outputs().len(); i++) {
         const output = body.outputs().get(i);
         const addressDetails = T.getAddressDetails(
-          output.address().to_bech32(),
+          output.address().to_bech32()
         );
         if (addressDetails.paymentCredential?.type == "Script") {
           const coin = BigInt(output.amount().coin().to_str());
@@ -130,7 +130,7 @@ const genValidators = async (t: Translucent) => {
 
 const genDeployMinswapValidators = async (
   t: Translucent,
-  ammValidators: MinswapValidators,
+  ammValidators: MinswapValidators
 ) => {
   const ammDeployedValidators = await deployMinswapValidators(t, ammValidators);
   return ammDeployedValidators;
@@ -148,7 +148,7 @@ export const genWarehouseOptions = async (t: Translucent) => {
   let ammValidators: MinswapValidators = await genAmmValidators(t);
   let deployedValidators: DeployedValidators = await genDeployValidators(
     t,
-    validators,
+    validators
   );
   let ammDeployedValidators: DeployedValidators =
     await genDeployMinswapValidators(t, ammValidators);
@@ -164,7 +164,7 @@ export const genWarehouseOptions = async (t: Translucent) => {
 
 export const assertValidator = async (
   builder: WarehouseBuilder,
-  msg: string,
+  msg: string
 ) => {
   const tx = builder.complete();
   let errMessage = "";
