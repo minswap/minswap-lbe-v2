@@ -1,5 +1,4 @@
 use aiken/dict.{Dict}
-use aiken/cbor
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
@@ -870,12 +869,21 @@ pub fn validate_using_seller(
     base_asset == seller_in_datum.base_asset,
     raise_asset == seller_in_datum.raise_asset,
     // validate time frame
-    start_time <= start_valid_time_range,
-    end_time >= end_valid_time_range,
+    assert(
+      start_time <= start_valid_time_range,
+      @"Before discovery phase",
+    ),
+    assert(
+      end_valid_time_range <= end_time,
+      @"After discovery phase",
+    ),
     // validate minting
     is_valid_minting,
     // not cancelled yet
-    is_cancelled == False,
+    assert(
+      is_cancelled == False,
+      @"LBE is cancelled",
+    ),
   }
 }
 
