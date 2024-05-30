@@ -8,7 +8,7 @@ import {
   type BuildUsingSellerOptions,
   type WarehouseBuilderOptions,
 } from "../build-tx";
-import { TREASURY_MIN_ADA } from "../constants";
+import { LBE_FEE, LBE_MIN_OUTPUT_ADA, TREASURY_MIN_ADA } from "../constants";
 import { assertValidator, genWarehouseOptions, loadModule } from "./utils";
 import * as T from "@minswap/translucent";
 import { genWarehouse } from "./warehouse";
@@ -284,4 +284,42 @@ test("using-seller | FAIL | update orders: Seller output don't have any seller t
     );
   };
   await assertValidator(builder, "Seller output don't have any seller token");
+});
+
+test("using-seller | FAIL | update orders: Invalid order output value", async () => {
+  const { builder, options } = warehouse;
+  builder.buildUsingSeller(options);
+  // pay to orders
+  builder.tasks[5] = () => {
+    for (const datum of options.orderOutputDatums) {
+      // raise asset is ADA
+      const assets = {
+        [builder.orderToken]: 1n,
+        lovelace:
+          LBE_MIN_OUTPUT_ADA +
+          (datum.isCollected ? LBE_FEE : LBE_FEE * 2n) +
+          datum.amount -
+          1n,
+      };
+
+      builder.tx.payToAddressWithData(
+        builder.orderAddress,
+        {
+          inline: builder.toDatumOrder(datum),
+        },
+        assets
+      );
+    }
+  };
+  await assertValidator(builder, "Invalid order output value");
+});
+
+test("using-seller | FAIL | update orders: penalty_amount must higher than or equal to 0", async () => {
+  const { builder, options } = warehouse;
+  options.orderOutputDatums[0].penaltyAmount = -1n;
+  builder.buildUsingSeller(options);
+  await assertValidator(
+    builder,
+    "penalty_amount must higher than or equal to 0"
+  );
 });

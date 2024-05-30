@@ -980,11 +980,11 @@ pub fn apply_order(
               Some(min_order_raise) -> amount >= min_order_raise
               None -> amount > 0
             },
-            penalty_amount >= 0,
+            assert(penalty_amount >= 0, @"penalty_amount must higher than or equal to 0"),
             is_collected == False,
             o_base_asset == base_asset,
             o_raise_asset == raise_asset,
-            expected_order == order_value,
+            assert(expected_order == order_value, @"Invalid order output value"),
           }
         (acc_amount + amount, acc_penalty + penalty_amount)
       },
