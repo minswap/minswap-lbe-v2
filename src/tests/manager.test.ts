@@ -1,30 +1,25 @@
-import { loadModule } from "@minswap/translucent";
-import { genWarehouse, skipToCountingPhase } from "./warehouse";
-import { WarehouseBuilder, type BuildCollectManagerOptions } from "../build-tx";
-import type { UTxO } from "../types";
-import type {
-  ManagerValidateManagerSpending,
+import * as T from "@minswap/translucent";
+import {
   TreasuryValidateTreasurySpending,
+  type ManagerValidateManagerSpending,
 } from "../../plutus";
+import { WarehouseBuilder, type BuildCollectManagerOptions } from "../build-tx";
 import { TREASURY_MIN_ADA } from "../constants";
+import type { UTxO } from "../types";
+import { assertValidator, loadModule } from "./utils";
+import { genWarehouse } from "./warehouse";
 
-let warehouse: any;
+let W: any; // warehouse
 
 beforeAll(async () => {
   await loadModule();
 });
 
 beforeEach(async () => {
-  warehouse = await genWarehouse();
-  const {
-    warehouseOptions,
-    defaultManagerDatum,
-    defaultTreasuryDatum,
-    minswapTokenRaw,
-  } = warehouse;
-  let builder = new WarehouseBuilder(warehouseOptions);
+  W = await genWarehouse();
+  let builder = new WarehouseBuilder(W.warehouseOptions);
   const managerDatum: ManagerValidateManagerSpending["managerInDatum"] = {
-    ...defaultManagerDatum,
+    ...W.defaultManagerDatum,
     sellerCount: 0n,
     reserveRaise: 100_000_000_000n,
     totalPenalty: 0n,
@@ -40,145 +35,98 @@ beforeEach(async () => {
     datum: builder.toDatumManager(managerDatum),
   };
   const treasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] = {
-    ...defaultTreasuryDatum,
+    ...W.defaultTreasuryDatum,
   };
   const treasuryInput: UTxO = {
     txHash: "00".repeat(32),
     outputIndex: 1,
     assets: {
       [builder.treasuryToken]: 1n,
-      [minswapTokenRaw]: treasuryDatum.reserveBase,
+      [W.minswapTokenRaw]: treasuryDatum.reserveBase,
       lovelace: TREASURY_MIN_ADA,
     },
     address: builder.treasuryAddress,
     datum: builder.toDatumTreasury(treasuryDatum),
   };
-
-  warehouse = {
-    ...warehouse,
+  const options: BuildCollectManagerOptions = {
+    treasuryInput: treasuryInput,
+    managerInput: managerInput,
+    validFrom: W.t.utils.slotToUnixTime(W.emulator.slot),
+    validTo: W.t.utils.slotToUnixTime(W.emulator.slot + 100),
+  };
+  W = {
+    ...W,
     managerInput,
     treasuryInput,
     treasuryDatum,
+    builder,
+    options,
   };
 });
 
 test("collect-manager | PASS | happy case", async () => {
-  const {
-    emulator,
-    managerInput,
-    treasuryInput,
-    t,
-    treasuryDatum,
-    warehouseOptions,
-  } = warehouse;
-  let builder = new WarehouseBuilder(warehouseOptions);
-  skipToCountingPhase({ e: emulator, t, datum: treasuryDatum });
-  const options: BuildCollectManagerOptions = {
-    treasuryInput,
-    managerInput,
-    validFrom: t.utils.slotToUnixTime(emulator.slot),
-    validTo: t.utils.slotToUnixTime(emulator.slot + 100),
-  };
-  builder.buildCollectManager(options);
-  builder.complete();
+  W.builder.buildCollectManager(W.options);
+  W.builder.complete();
 });
 
 test("collect-manager | FAIL | no auth treasury", async () => {
-  let {
-    emulator,
-    managerInput,
-    treasuryInput,
-    t,
-    treasuryDatum,
-    warehouseOptions,
-  } = warehouse;
-  let builder = new WarehouseBuilder(warehouseOptions);
-  managerInput = {
-    ...managerInput,
+  let managerInput = {
+    ...W.managerInput,
     assets: {
-      ...managerInput.assets,
-      [builder.treasuryToken]: 1n,
+      ...W.managerInput.assets,
+      [W.builder.treasuryToken]: 1n,
     },
   };
-  treasuryInput = {
-    ...treasuryInput,
+  let treasuryInput = {
+    ...W.treasuryInput,
     assets: {
-      ...treasuryInput.assets,
-      [builder.treasuryToken]: 0n,
+      ...W.treasuryInput.assets,
+      [W.builder.treasuryToken]: 0n,
     },
   };
-  skipToCountingPhase({ e: emulator, t, datum: treasuryDatum });
-  const options: BuildCollectManagerOptions = {
-    treasuryInput,
-    managerInput,
-    validFrom: t.utils.slotToUnixTime(emulator.slot),
-    validTo: t.utils.slotToUnixTime(emulator.slot + 100),
-  };
-  builder.buildCollectManager(options);
-  const tx = builder.complete();
-  let errMessage = "";
-  try {
-    await tx.complete();
-  } catch (err) {
-    if (typeof err == "string") errMessage = err;
-  }
-  expect(errMessage).toContain("Treasury UTxO must contain 1 Treasury Token");
+  let options = { ...W.options, treasuryInput, managerInput };
+  W.builder.buildCollectManager(options);
+  await assertValidator(
+    W.builder,
+    "Treasury UTxO must contain 1 Treasury Token",
+  );
 });
 
 test("collect-manager | FAIL | no minting", async () => {
-  let {
-    emulator,
-    managerInput,
-    treasuryInput,
-    t,
-    treasuryDatum,
-    warehouseOptions,
-  } = warehouse;
-  let builder = new WarehouseBuilder(warehouseOptions);
-  skipToCountingPhase({ e: emulator, t, datum: treasuryDatum });
-  const options: BuildCollectManagerOptions = {
-    treasuryInput,
-    managerInput,
-    validFrom: t.utils.slotToUnixTime(emulator.slot),
-    validTo: t.utils.slotToUnixTime(emulator.slot + 100),
-  };
+  let { builder, options } = W;
   builder.buildCollectManager(options);
   builder.tasks = [...builder.tasks.slice(0, 3), ...builder.tasks.slice(4)];
-  const tx = builder.complete();
-  let errMessage = "";
-  try {
-    await tx.complete();
-  } catch (err) {
-    if (typeof err == "string") errMessage = err;
-  }
-  expect(errMessage).toContain("Must burn 1 Manager Token");
+  await assertValidator(builder, "Must burn 1 Manager Token");
 });
 
-test("collect-manager | FAIL | different LBE", async () => {
-  let {
-    emulator,
-    managerInput,
-    treasuryInput,
-    t,
-    treasuryDatum,
-    warehouseOptions,
-  } = warehouse;
-  let builder = new WarehouseBuilder(warehouseOptions);
-  skipToCountingPhase({ e: emulator, t, datum: treasuryDatum });
-  const options: BuildCollectManagerOptions = {
-    treasuryInput,
-    managerInput,
-    validFrom: t.utils.slotToUnixTime(emulator.slot),
-    validTo: t.utils.slotToUnixTime(emulator.slot + 100),
+test("collect-manager | FAIL | wrong treasury out datum", async () => {
+  const { builder } = W;
+  const options = {
+    ...W.options,
+    treasuryOutDatum: W.treasuryDatum,
   };
   builder.buildCollectManager(options);
-  builder.tasks = [...builder.tasks.slice(0, 3), ...builder.tasks.slice(4)];
-  const tx = builder.complete();
-  let errMessage = "";
-  try {
-    await tx.complete();
-  } catch (err) {
-    if (typeof err == "string") errMessage = err;
-  }
-  expect(errMessage).toContain("Must burn 1 Manager Token");
+  await assertValidator(builder, "Treasury Out Datum must be correct!");
+});
+
+test("collect-manager | FAIL | LBE ID missmatch", async () => {
+  const { builder } = W;
+  const treasuryInDatum = {
+    ...W.treasuryDatum,
+    baseAsset: W.adaToken,
+  };
+  const treasuryInput: UTxO = {
+    ...W.treasuryInput,
+    datum: T.Data.to(
+      treasuryInDatum,
+      TreasuryValidateTreasurySpending.treasuryInDatum,
+    ),
+  };
+  const options = {
+    ...W.options,
+    treasuryInput: treasuryInput,
+    managerInput: W.managerInput,
+  };
+  builder.buildCollectManager(options);
+  await assertValidator(builder, "Treasury In Datum must be correct!");
 });
