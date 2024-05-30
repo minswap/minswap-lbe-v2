@@ -22,7 +22,7 @@ use lb_v2/utils.{
   compute_asset_name_from_base_and_raise, default_burn_liquidity,
   default_number_seller, factory_auth_an, fee_ada, get_order_value,
   manager_auth_an, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
-  treasury_minimum_ada,
+  treasury_minimum_ada, two_days,
 }
 
 pub fn get_value_of_minting_treasury(
@@ -123,8 +123,7 @@ pub fn validate_creating_treasury_out(
     when penalty_config is {
       Some(PenaltyConfig { penalty_start_time, percent }) -> and {
           penalty_start_time >= start_time,
-          // 2D
-          end_time - penalty_start_time <= 2,
+          end_time - penalty_start_time <= two_days,
           percent > 0,
           percent <= 25,
         }
@@ -622,8 +621,14 @@ pub fn get_seller_outputs(
       fn(output) {
         let Output { value: out_value, datum: out_datum, .. } = output
         and {
-          value.quantity_of(out_value, factory_policy_id, seller_auth_an) == 1,
-          InlineDatum(seller_datum) == out_datum,
+          assert(
+            value.quantity_of(out_value, factory_policy_id, seller_auth_an) == 1,
+            @"Seller output don't have any seller token",
+          ),
+          assert(
+            InlineDatum(seller_datum) == out_datum,
+            @"Invalid seller output datum",
+          ),
         }
       },
     )
@@ -806,6 +811,7 @@ pub fn validate_using_seller(
     start_time,
     end_time,
     minimum_order_raise,
+    is_cancelled,
     ..
   }: TreasuryDatum = raw_treasury_datum
   let order_inputs =
@@ -865,10 +871,18 @@ pub fn validate_using_seller(
     base_asset == seller_in_datum.base_asset,
     raise_asset == seller_in_datum.raise_asset,
     // validate time frame
-    start_time < start_valid_time_range,
-    end_time > end_valid_time_range,
+    assert(
+      start_time <= start_valid_time_range,
+      @"Using-seller: Before discovery phase",
+    ),
+    assert(
+      end_valid_time_range <= end_time,
+      @"Using-seller: After discovery phase",
+    ),
     // validate minting
-    is_valid_minting,
+    assert(is_valid_minting, @"Using-seller: Invalid minting"),
+    // not cancelled yet
+    assert(is_cancelled == False, @"Using-seller: LBE is cancelled"),
   }
 }
 
@@ -962,11 +976,11 @@ pub fn apply_order(
               Some(min_order_raise) -> amount >= min_order_raise
               None -> amount > 0
             },
-            penalty_amount >= 0,
+            assert(penalty_amount >= 0, @"penalty_amount must higher than or equal to 0"),
             is_collected == False,
             o_base_asset == base_asset,
             o_raise_asset == raise_asset,
-            expected_order == order_value,
+            assert(expected_order == order_value, @"Invalid order output value"),
           }
         (acc_amount + amount, acc_penalty + penalty_amount)
       },

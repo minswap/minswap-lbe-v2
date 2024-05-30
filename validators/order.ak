@@ -3,6 +3,7 @@ use lb_v2/types.{
   CollectOrder, CollectOrders, OrderDatum, OrderRedeemer, RedeemOrder,
   RedeemOrders, UpdateOrder, UsingSeller, ValidatorHash,
 }
+use lb_v2/utils.{assert}
 use lb_v2/validation
 
 validator(
@@ -23,12 +24,15 @@ validator(
     let OrderDatum { factory_policy_id, .. } = datum
     when redeemer is {
       UpdateOrder ->
-        validation.has_spend_seller(
-          inputs: inputs,
-          factory_policy_id: factory_policy_id,
-          seller_hash: seller_hash,
-          redeemers: redeemers,
-          expected_redeemer: UsingSeller,
+        assert(
+          validation.has_spend_seller(
+            inputs: inputs,
+            factory_policy_id: factory_policy_id,
+            seller_hash: seller_hash,
+            redeemers: redeemers,
+            expected_redeemer: UsingSeller,
+          ),
+          @"Using-seller: Tx don't have any seller",
         )
       CollectOrder ->
         validation.has_spend_treasury(

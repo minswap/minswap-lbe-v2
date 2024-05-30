@@ -1,6 +1,8 @@
 import type {
   FactoryValidateFactory,
+  FeedTypeOrder,
   ManagerValidateManagerSpending,
+  SellerValidateSellerSpending,
   TreasuryValidateTreasurySpending,
 } from "../../plutus";
 import { LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
@@ -89,6 +91,22 @@ export const genWarehouse = async () => {
       reserveRaise: 0n,
       totalPenalty: 0n,
     };
+  const defaultSellerDatum: SellerValidateSellerSpending["sellerInDatum"] = {
+    factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
+    baseAsset: minswapToken,
+    raiseAsset: adaToken,
+    amount: 0n,
+    penaltyAmount: 0n,
+  };
+  const defaultOrderDatum: FeedTypeOrder["_datum"] = {
+    factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
+    baseAsset: minswapToken,
+    raiseAsset: adaToken,
+    owner: address2PlutusAddress(ACCOUNT_0.address),
+    amount: 10_000_000n,
+    isCollected: false,
+    penaltyAmount: 0n,
+  };
 
   return {
     adaToken,
@@ -100,5 +118,7 @@ export const genWarehouse = async () => {
     defaultFactoryDatum,
     defaultTreasuryDatum,
     defaultManagerDatum,
+    defaultSellerDatum,
+    defaultOrderDatum,
   };
 };

@@ -415,12 +415,15 @@ validator(
           expected_redeemer: ManageSeller,
         )
       MintOrder ->
-        validation.has_spend_seller(
-          inputs: inputs,
-          factory_policy_id: factory_policy_id,
-          seller_hash: seller_hash,
-          redeemers: redeemers,
-          expected_redeemer: UsingSeller,
+        assert(
+          validation.has_spend_seller(
+            inputs: inputs,
+            factory_policy_id: factory_policy_id,
+            seller_hash: seller_hash,
+            redeemers: redeemers,
+            expected_redeemer: UsingSeller,
+          ),
+          @"Using-seller: Tx don't have any seller",
         )
       MintRedeemOrders ->
         validation.has_spend_treasury(
