@@ -180,3 +180,10 @@ export const assertValidator = async (
   }
   expect(errMessage).toContain(msg);
 };
+
+export const assertValidatorFail = async (builder: WarehouseBuilder) => {
+  const tx = builder.complete();
+  expect(async () => {
+    await tx.complete();
+  }).toThrowError();
+};

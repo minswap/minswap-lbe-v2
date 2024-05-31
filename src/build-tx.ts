@@ -330,17 +330,15 @@ export class WarehouseBuilder {
       baseAsset: treasuryDatum.baseAsset,
       raiseAsset: treasuryDatum.raiseAsset,
     };
-    this.tasks.push(
-      () => {
-        this.factoryInputs = [factoryUtxo];
-        this.factoryRedeemer = {
-          wrapper: {
-            CreateTreasury: { ...innerFactoryRedeemer },
-          },
-        };
-        this.mintRedeemer = { CreateTreasury: { ...innerFactoryRedeemer } };
-        this.setInnerAssets(treasuryDatum.baseAsset, treasuryDatum.raiseAsset);
+    this.factoryInputs = [factoryUtxo];
+    this.mintRedeemer = { CreateTreasury: { ...innerFactoryRedeemer } };
+    this.factoryRedeemer = {
+      wrapper: {
+        CreateTreasury: { ...innerFactoryRedeemer },
       },
+    };
+    this.setInnerAssets(treasuryDatum.baseAsset, treasuryDatum.raiseAsset);
+    this.tasks.push(
       () => {
         this.spendingFactoryInput();
       },
@@ -491,10 +489,10 @@ export class WarehouseBuilder {
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
     const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] =
-      {
-        ...treasuryInDatum,
-        isCancelled: true,
-      };
+    {
+      ...treasuryInDatum,
+      isCancelled: true,
+    };
 
     this.tasks.push(
       () => {
@@ -535,10 +533,10 @@ export class WarehouseBuilder {
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
     const projectOwnerLp = (totalLiquidity - LP_COLATERAL) / 2n;
     const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] =
-      {
-        ...treasuryInDatum,
-        totalLiquidity: totalLiquidity - LP_COLATERAL - projectOwnerLp,
-      };
+    {
+      ...treasuryInDatum,
+      totalLiquidity: totalLiquidity - LP_COLATERAL - projectOwnerLp,
+    };
     this.tasks.push(
       () => {
         this.treasuryInputs = [treasuryInput];
@@ -653,10 +651,10 @@ export class WarehouseBuilder {
       userOutputs.push(output);
     }
     const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] =
-      {
-        ...treasuryInDatum,
-        collectedFund: treasuryInDatum.collectedFund - totalFund,
-      };
+    {
+      ...treasuryInDatum,
+      collectedFund: treasuryInDatum.collectedFund - totalFund,
+    };
     this.tasks.push(
       () => {
         this.treasuryInputs = [treasuryInput];
@@ -699,9 +697,9 @@ export class WarehouseBuilder {
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
     const treasuryOutDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] =
-      {
-        ...treasuryInDatum,
-      };
+    {
+      ...treasuryInDatum,
+    };
     const orderOutDatums: FeedTypeOrder["_datum"][] = [];
     let deltaCollectedFund = 0n;
 
@@ -894,6 +892,10 @@ export class WarehouseBuilder {
     return T.Data.to(redeemer, SellerValidateSellerSpending.redeemer);
   }
 
+  toRedeemerFactory(redeemer: FactoryValidateFactory["redeemer"]): string {
+    return T.Data.to(redeemer, FactoryValidateFactory.redeemer);
+  }
+
   calFinalReserveRaise(
     datum: TreasuryValidateTreasurySpending["treasuryInDatum"],
   ) {
@@ -978,7 +980,7 @@ export class WarehouseBuilder {
       .readFrom([this.deployedValidators["factoryValidator"]])
       .collectFrom(
         this.factoryInputs,
-        T.Data.to(this.factoryRedeemer, FactoryValidateFactory.redeemer),
+        this.toRedeemerFactory(this.factoryRedeemer),
       );
   }
 
