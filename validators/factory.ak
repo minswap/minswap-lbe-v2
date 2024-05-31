@@ -490,30 +490,62 @@ fn validate_initialization(
   }
 }
 
+// Transaction's spending Legit Factory Input base on `expected_redeemer`
 fn has_spend_factory(
   inputs: List<Input>,
   factory_hash: ValidatorHash,
   redeemers: Dict<ScriptPurpose, Redeemer>,
   expected_redeemer: FactoryRedeemer,
 ) -> Bool {
-  expect [factory_input] =
+  // finding Legit Factory Inputs
+  let factory_inputs =
     list.filter(
       inputs,
       fn(input) {
         let Input {
-          output: Output { address: Address { payment_credential, .. }, .. },
+          output: Output {
+            address: Address { payment_credential, .. },
+            value: in_value,
+            ..
+          },
           ..
         } = input
-        payment_credential == ScriptCredential(factory_hash)
+        and {
+          // input belongs Treasury Address
+          payment_credential == ScriptCredential(factory_hash),
+          // Factory Input must contains exactly 1 Factory Token
+          value.quantity_of(in_value, factory_hash, factory_auth_an) == 1,
+        }
       },
     )
-  let Input {
-    output_reference: factory_out_ref,
-    output: Output { value: out_value, .. },
-  } = factory_input
-  expect value.quantity_of(out_value, factory_hash, factory_auth_an) == 1
-  expect Some(raw_redeemer) = dict.get(redeemers, Spend(factory_out_ref))
-  make_wrapper_redeemer(expected_redeemer) == raw_redeemer
+  // wrapping Factory Mint Redeemer -> Factory Spend Redeemer
+  let wrapper_redeemer = make_wrapper_redeemer(expected_redeemer)
+  when expected_redeemer is {
+    CreateTreasury { .. } -> {
+      // CreateTreasury require only 1 Factory Input
+      expect [Input { output_reference, .. }] = factory_inputs
+      // finding Factory Input self-redeemer
+      expect Some(raw_redeemer) = dict.get(redeemers, Spend(output_reference))
+      // ensure Factory Input spending with expected redeemer 
+      raw_redeemer == wrapper_redeemer
+    }
+    CloseTreasury { .. } -> {
+      // CloseTreasury require 2 Factory Inputs as Head, Tail node
+      expect [
+        Input { output_reference: head_out_ref, .. },
+        Input { output_reference: tail_out_ref, .. },
+      ] = factory_inputs
+      // finding Factory Input self-redeemer
+      expect Some(head_raw_redeemer) = dict.get(redeemers, Spend(head_out_ref))
+      expect Some(tail_raw_redeemer) = dict.get(redeemers, Spend(tail_out_ref))
+      // ensure 2 Factory Inputs spending with expected redeemer
+      and {
+        head_raw_redeemer == wrapper_redeemer,
+        tail_raw_redeemer == wrapper_redeemer,
+      }
+    }
+    _ -> False
+  }
 }
 
 // return Manager Output when creating Treasury
@@ -525,6 +557,7 @@ fn build_default_manager_output(
   base_asset: Asset,
   raise_asset: Asset,
 ) -> Output {
+  // build default manager datum
   let manager_datum =
     ManagerDatum {
       factory_policy_id,
@@ -536,6 +569,7 @@ fn build_default_manager_output(
       reserve_raise: 0,
       total_penalty: 0,
     }
+  // build default manager value
   let manager_value =
     value.from_lovelace(manager_minimum_ada)
       |> value.add(factory_policy_id, manager_auth_an, 1)
@@ -554,6 +588,7 @@ fn build_default_seller_output(
   raise_asset: Asset,
   seller_address: Address,
 ) -> Output {
+  // build default seller datum
   let seller_datum =
     SellerDatum {
       factory_policy_id,
@@ -562,6 +597,7 @@ fn build_default_seller_output(
       amount: 0,
       penalty_amount: 0,
     }
+  // build default seller value
   let seller_value =
     value.from_lovelace(seller_minimum_ada)
       |> value.add(factory_policy_id, seller_auth_an, 1)
