@@ -90,5 +90,5 @@ beforeEach(async () => {
 });
 
 test("close-event | PASS | happy case", async () => {
-  assertValidator(W.builder.buildCloseEvent(W.options).complete(), "");
+  assertValidator(W.builder.buildCloseEvent(W.options), "");
 });

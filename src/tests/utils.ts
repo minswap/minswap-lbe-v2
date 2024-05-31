@@ -169,6 +169,7 @@ export const assertValidator = async (
   const tx = builder.complete();
   // If msg is empty, then it mean validator should be PASS
   if (msg === "") {
+    await tx.complete();
     return;
   }
   let errMessage = "";
