@@ -38,12 +38,14 @@ import {
   LBE_MIN_OUTPUT_ADA,
   LP_COLATERAL,
   MANAGER_AUTH_AN,
+  MANAGER_MIN_ADA,
   MINSWAP_V2_DEFAULT_POOL_ADA,
   MINSWAP_V2_FACTORY_AUTH_AN,
   MINSWAP_V2_MAX_LIQUIDITY,
   MINSWAP_V2_POOL_AUTH_AN,
   ORDER_AUTH_AN,
   SELLER_AUTH_AN,
+  SELLER_MIN_ADA,
   TREASURY_AUTH_AN,
   TREASURY_MIN_ADA,
 } from "./constants";
@@ -139,7 +141,9 @@ export type BuildRedeemOrdersOptions = {
 
 export type BuildCloseEventOptions = {
   treasuryInput: UTxO;
-  factoryInputs: UTxO[];
+  factoryInputs: UTxO[]; // [Head Factory Input, Tail Factory Input]
+  validFrom: UnixTime;
+  validTo: UnixTime;
 };
 
 export class WarehouseBuilder {
@@ -200,6 +204,11 @@ export class WarehouseBuilder {
   ammFactoryHash: string;
   ammPoolToken: string;
   ammFactoryToken: string;
+
+  // Internal Asset
+  baseAsset: BluePrintAsset | undefined;
+  raiseAsset: BluePrintAsset | undefined;
+  lpAssetName: string | undefined;
   ammLpToken: string | undefined;
 
   constructor(options: WarehouseBuilderOptions) {
@@ -284,7 +293,7 @@ export class WarehouseBuilder {
     return this.tx;
   }
 
-  public buildInitFactory(options: BuildInitFactoryOptions) {
+  public buildInitFactory(options: BuildInitFactoryOptions): WarehouseBuilder {
     const { seedUtxo } = options;
     this.tasks.push(
       () => {
@@ -300,9 +309,12 @@ export class WarehouseBuilder {
         this.payingFactoryOutput();
       },
     );
+    return this;
   }
 
-  public buildCreateTreasury(options: BuildCreateTreasuryOptions) {
+  public buildCreateTreasury(
+    options: BuildCreateTreasuryOptions,
+  ): WarehouseBuilder {
     const { factoryUtxo, treasuryDatum, validFrom, validTo } = options;
     const managerDatum: ManagerValidateManagerSpending["managerInDatum"] = {
       factoryPolicyId: this.factoryHash,
@@ -327,6 +339,7 @@ export class WarehouseBuilder {
           },
         };
         this.mintRedeemer = { CreateTreasury: { ...innerFactoryRedeemer } };
+        this.setInnerAssets(treasuryDatum.baseAsset, treasuryDatum.raiseAsset);
       },
       () => {
         this.spendingFactoryInput();
@@ -359,9 +372,10 @@ export class WarehouseBuilder {
         this.tx.validFrom(validFrom).validTo(validTo);
       },
     );
+    return this;
   }
 
-  public buildAddSeller(options: BuildAddSellersOptions) {
+  public buildAddSeller(options: BuildAddSellersOptions): WarehouseBuilder {
     const { addSellerCount, validFrom, validTo, treasuryRefUtxo, managerUtxo } =
       options;
     invariant(managerUtxo.datum);
@@ -396,9 +410,10 @@ export class WarehouseBuilder {
           .validTo(validTo);
       },
     );
+    return this;
   }
 
-  public buildUsingSeller(options: BuildUsingSellerOptions) {
+  public buildUsingSeller(options: BuildUsingSellerOptions): WarehouseBuilder {
     const {
       treasuryRefInput,
       sellerUtxo,
@@ -468,9 +483,10 @@ export class WarehouseBuilder {
         this.tx.validFrom(validFrom).validTo(validTo);
       },
     );
+    return this;
   }
 
-  public buildCancelLBE(options: BuildCancelLBEOptions) {
+  public buildCancelLBE(options: BuildCancelLBEOptions): WarehouseBuilder {
     const { treasuryInput, validTo, ammFactoryRefInput } = options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
@@ -501,9 +517,12 @@ export class WarehouseBuilder {
         this.payingTreasuryOutput({ treasuryOutDatum });
       },
     );
+    return this;
   }
 
-  public buildCreateAmmPool(options: BuildCreateAmmPoolOptions) {
+  public buildCreateAmmPool(
+    options: BuildCreateAmmPoolOptions,
+  ): WarehouseBuilder {
     const {
       treasuryInput,
       ammFactoryInput,
@@ -524,7 +543,7 @@ export class WarehouseBuilder {
       () => {
         this.treasuryInputs = [treasuryInput];
         this.treasuryRedeemer = "CreateAmmPool";
-        this.setAmmLpToken(
+        this.setInnerAssets(
           treasuryInDatum.baseAsset,
           treasuryInDatum.raiseAsset,
         );
@@ -555,10 +574,11 @@ export class WarehouseBuilder {
         this.tx.validFrom(validFrom).validTo(validTo);
       },
     );
+    return this;
   }
 
-  public buildCloseEvent(options: BuildCloseEventOptions) {
-    const { treasuryInput, factoryInputs } = options;
+  public buildCloseEvent(options: BuildCloseEventOptions): WarehouseBuilder {
+    const { treasuryInput, factoryInputs, validFrom, validTo } = options;
     invariant(treasuryInput.datum);
     const treasuryDatum = this.fromDatumTreasury(treasuryInput.datum);
     const innerFactoryRedeemer = {
@@ -573,6 +593,13 @@ export class WarehouseBuilder {
         this.factoryRedeemer = {
           wrapper: { CloseTreasury: innerFactoryRedeemer },
         };
+        this.mintRedeemer = { CloseTreasury: innerFactoryRedeemer };
+        this.setInnerAssets(treasuryDatum.baseAsset, treasuryDatum.raiseAsset);
+      },
+      () => {
+        this.tx.validFrom(validFrom).validTo(validTo);
+      },
+      () => {
         this.tx.addSigner(
           plutusAddress2Address(this.t.network, treasuryDatum.owner),
         );
@@ -587,19 +614,22 @@ export class WarehouseBuilder {
         this.mintingTreasuryToken();
       },
       () => {
-        this.mintingFactoryToken();
+        this.mintingFactoryToken(innerFactoryRedeemer);
       },
       () => {
         this.payingFactoryOutput();
       },
     );
+    return this;
   }
 
-  public buildRedeemOrders(options: BuildRedeemOrdersOptions) {
+  public buildRedeemOrders(
+    options: BuildRedeemOrdersOptions,
+  ): WarehouseBuilder {
     const { treasuryInput, orderInputs, validFrom, validTo } = options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
-    this.setAmmLpToken(treasuryInDatum.baseAsset, treasuryInDatum.raiseAsset);
+    this.setInnerAssets(treasuryInDatum.baseAsset, treasuryInDatum.raiseAsset);
     invariant(this.ammLpToken);
     const sortedOrders = sortUTxOs(orderInputs);
     let totalFund = 0n;
@@ -659,9 +689,12 @@ export class WarehouseBuilder {
         this.tx.validFrom(validFrom).validTo(validTo);
       },
     );
+    return this;
   }
 
-  public buildCollectOrders(options: BuildCollectOrdersOptions) {
+  public buildCollectOrders(
+    options: BuildCollectOrdersOptions,
+  ): WarehouseBuilder {
     const { treasuryInput, orderInputs, validFrom, validTo } = options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
@@ -706,9 +739,12 @@ export class WarehouseBuilder {
         this.tx.validFrom(validFrom).validTo(validTo);
       },
     );
+    return this;
   }
 
-  public buildCollectManager(options: BuildCollectManagerOptions) {
+  public buildCollectManager(
+    options: BuildCollectManagerOptions,
+  ): WarehouseBuilder {
     const { treasuryInput, managerInput, validFrom, validTo } = options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
@@ -744,9 +780,12 @@ export class WarehouseBuilder {
         this.tx.validFrom(validFrom).validTo(validTo);
       },
     );
+    return this;
   }
 
-  public buildCollectSeller(options: BuildCollectSellersOptions) {
+  public buildCollectSeller(
+    options: BuildCollectSellersOptions,
+  ): WarehouseBuilder {
     const { treasuryRefInput, managerInput, sellerInputs, validFrom, validTo } =
       options;
     invariant(managerInput.datum);
@@ -792,6 +831,7 @@ export class WarehouseBuilder {
         this.tx.validFrom(validFrom).validTo(validTo);
       },
     );
+    return this;
   }
 
   /************************* PARSER  *************************/
@@ -867,13 +907,34 @@ export class WarehouseBuilder {
     }
   }
 
-  setAmmLpToken(baseAsset: BluePrintAsset, raiseAsset: BluePrintAsset) {
-    const lpAssetName = computeLPAssetName(
-      baseAsset.policyId + baseAsset.assetName,
-      raiseAsset.policyId + raiseAsset.assetName,
+  setBaseAsset(baseAsset: BluePrintAsset) {
+    this.baseAsset = baseAsset;
+  }
+
+  setRaiseAsset(raiseAsset: BluePrintAsset) {
+    this.raiseAsset = raiseAsset;
+  }
+
+  setLpAssetName() {
+    invariant(this.baseAsset);
+    invariant(this.raiseAsset);
+    this.lpAssetName = computeLPAssetName(
+      this.baseAsset.policyId + this.baseAsset.assetName,
+      this.raiseAsset.policyId + this.raiseAsset.assetName,
     );
-    const lpToken = T.toUnit(this.ammAuthenHash, lpAssetName);
+  }
+
+  setAmmLpToken() {
+    invariant(this.baseAsset);
+    const lpToken = T.toUnit(this.ammAuthenHash, this.lpAssetName);
     this.ammLpToken = lpToken;
+  }
+
+  setInnerAssets(baseAsset: BluePrintAsset, raiseAsset: BluePrintAsset) {
+    this.setBaseAsset(baseAsset);
+    this.setRaiseAsset(raiseAsset);
+    this.setLpAssetName();
+    this.setAmmLpToken();
   }
 
   /************************* SPENDING  *************************/
@@ -1071,6 +1132,7 @@ export class WarehouseBuilder {
       },
       {
         [this.managerToken]: 1n,
+        lovelace: MANAGER_MIN_ADA,
       },
     );
   }
@@ -1120,6 +1182,7 @@ export class WarehouseBuilder {
         },
         {
           [this.sellerToken]: 1n,
+          lovelace: SELLER_MIN_ADA,
         },
       );
     };
@@ -1190,23 +1253,14 @@ export class WarehouseBuilder {
         invariant(this.factoryInputs.length == 1);
         invariant(this.factoryInputs[0].datum);
         invariant(typeof this.factoryRedeemer.wrapper !== "string");
-        const baseAsset = (this.factoryRedeemer.wrapper as any)[
-          "CreateTreasury"
-        ].baseAsset;
-        const raiseAsset = (this.factoryRedeemer.wrapper as any)[
-          "CreateTreasury"
-        ].raiseAsset;
-        const lpAssetName = computeLPAssetName(
-          baseAsset.policyId + baseAsset.assetName,
-          raiseAsset.policyId + raiseAsset.assetName,
-        );
+        invariant(this.lpAssetName);
         const factoryDatum = this.fromDatumFactory(this.factoryInputs[0].datum);
         const newFactoryHeadDatum: FactoryValidateFactory["datum"] = {
           head: factoryDatum.head,
-          tail: lpAssetName,
+          tail: this.lpAssetName,
         };
         const newFactoryTailDatum: FactoryValidateFactory["datum"] = {
-          head: lpAssetName,
+          head: this.lpAssetName,
           tail: factoryDatum.tail,
         };
         innerPay(newFactoryHeadDatum);
@@ -1215,20 +1269,16 @@ export class WarehouseBuilder {
       // Remove Treasury
       2: () => {
         invariant(this.factoryInputs.length == 2);
-        const [factory1, factory2] = this.factoryInputs;
-        invariant(factory1.datum);
-        invariant(factory2.datum);
-        const factoryDatum1 = this.fromDatumFactory(factory1.datum);
-        const factoryDatum2 = this.fromDatumFactory(factory2.datum);
-        const newFactoryDatum = { ...factoryDatum1 };
-        if (factoryDatum1.head == factoryDatum2.tail) {
-          newFactoryDatum.head = factoryDatum1.head;
-          newFactoryDatum.tail = factoryDatum2.tail;
-        } else {
-          newFactoryDatum.head = factoryDatum2.head;
-          newFactoryDatum.tail = factoryDatum1.tail;
-        }
-        innerPay(newFactoryDatum);
+        const [headInput, tailInput] = this.factoryInputs;
+        invariant(headInput.datum);
+        invariant(tailInput.datum);
+        const headDatum = this.fromDatumFactory(headInput.datum);
+        const tailDatum = this.fromDatumFactory(tailInput.datum);
+        const newDatum = {
+          head: headDatum.head,
+          tail: tailDatum.tail,
+        };
+        innerPay(newDatum);
       },
     };
 

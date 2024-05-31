@@ -19,25 +19,9 @@ use lb_v2/types.{
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
   amm_pool_validation_hash, assert, calculate_penalty,
-  compute_asset_name_from_base_and_raise, default_burn_liquidity,
-  default_number_seller, factory_auth_an, fee_ada, get_order_value,
-  manager_auth_an, minimum_ada, order_auth_an, seller_auth_an, treasury_auth_an,
-  treasury_minimum_ada, two_days,
-}
-
-pub fn get_value_of_minting_treasury(
-  factory_policy_id: PolicyId,
-  is_create_treasury: Bool,
-) -> Value {
-  if is_create_treasury {
-    value.from_asset(factory_policy_id, factory_auth_an, 1)
-      |> value.add(factory_policy_id, treasury_auth_an, 1)
-      |> value.add(factory_policy_id, manager_auth_an, 1)
-      |> value.add(factory_policy_id, seller_auth_an, default_number_seller)
-  } else {
-    value.from_asset(factory_policy_id, factory_auth_an, -1)
-      |> value.add(factory_policy_id, treasury_auth_an, -1)
-  }
+  compute_asset_name_from_base_and_raise, default_burn_liquidity, fee_ada,
+  get_order_value, manager_auth_an, minimum_ada, order_auth_an, seller_auth_an,
+  treasury_auth_an, treasury_minimum_ada, two_days,
 }
 
 pub fn validate_creating_treasury_out(
@@ -90,6 +74,8 @@ pub fn validate_creating_treasury_out(
       |> value.add(ada_policy_id, ada_asset_name, treasury_minimum_ada)
   and {
     // treasury datum
+    base_asset != raise_asset,
+    base_asset.policy_id != ada_policy_id,
     factory_policy_id == t_factory_policy_id,
     manager_hash == t_manager_hash,
     seller_hash == t_seller_hash,
@@ -134,42 +120,6 @@ pub fn validate_creating_treasury_out(
     treasury_out_value == expected_treasury_out_value,
     // reference_script
     reference_script == None,
-  }
-}
-
-pub fn validate_creating_manager_out(
-  base_asset: Asset,
-  raise_asset: Asset,
-  manager_out_value: Value,
-  manager_out_datum: ManagerDatum,
-  factory_hash: ValidatorHash,
-  seller_hash: ValidatorHash,
-  order_hash: ValidatorHash,
-) -> Bool {
-  let ManagerDatum {
-    factory_policy_id: sm_factory_hash,
-    seller_hash: sm_seller_hash,
-    order_hash: sm_order_hash,
-    base_asset: sm_base_asset,
-    raise_asset: sm_raise_asset,
-    seller_count,
-    reserve_raise,
-    total_penalty,
-  } = manager_out_datum
-  and {
-    // manager datum
-    sm_factory_hash == factory_hash,
-    sm_seller_hash == seller_hash,
-    sm_order_hash == order_hash,
-    sm_base_asset == base_asset,
-    sm_raise_asset == raise_asset,
-    seller_count == default_number_seller,
-    reserve_raise == 0,
-    total_penalty == 0,
-    // manager treasury
-    value.flatten(value.without_lovelace(manager_out_value)) == [
-      (factory_hash, manager_auth_an, 1),
-    ],
   }
 }
 
@@ -546,35 +496,6 @@ pub fn get_amm_pool_output(outputs: List<Output>) -> Output {
   pool_output
 }
 
-pub fn get_amm_pool_ref_inputs(ref_inputs: List<Input>) -> List<Input> {
-  let pool_ref_inputs =
-    list.filter(
-      ref_inputs,
-      fn(ref_input) {
-        let Input {
-          output: Output {
-            address: Address { payment_credential, .. },
-            value,
-            ..
-          },
-          ..
-        } = ref_input
-        when payment_credential is {
-          ScriptCredential(hash) -> and {
-              hash == amm_pool_validation_hash,
-              value.quantity_of(
-                value,
-                amm_authen_policy_id,
-                amm_pool_auth_asset_name,
-              ) == 1,
-            }
-          _ -> False
-        }
-      },
-    )
-  pool_ref_inputs
-}
-
 // If a transaction needs to pay the Treasury,
 // its outputs must contain exactly 1 Legit Treasury Output.
 pub fn get_treasury_output(
@@ -603,6 +524,36 @@ pub fn get_treasury_output(
       },
     )
   treasury_output
+}
+
+// If a transaction needs to pay the Manager,
+// its outputs must contain exactly 1 Legit Manager Output.
+pub fn get_manager_output(
+  outputs: List<Output>,
+  factory_policy_id: PolicyId,
+  manager_hash: ValidatorHash,
+) -> Output {
+  expect [manager_output] =
+    list.filter(
+      outputs,
+      fn(output) {
+        let Output {
+          address: Address { payment_credential, .. },
+          value: out_value,
+          reference_script,
+          ..
+        } = output
+        and {
+          // output belongs Manager Address
+          payment_credential == ScriptCredential(manager_hash),
+          // No ref_script to avoid increase minimum ADA
+          reference_script == None,
+          // Has 1 Manager Token
+          value.quantity_of(out_value, factory_policy_id, manager_auth_an) == 1,
+        }
+      },
+    )
+  manager_output
 }
 
 pub fn get_seller_outputs(
@@ -1344,6 +1295,102 @@ fn apply_redeeming_lp_order(
   (amount + penalty_amount, o_lp_amount, o_remaining_raise_amount)
 }
 
+// If transaction showing that AMM Pool have been created
+//  then LBE should be cancelled. 
+// Notes: The existence of the pool 
+//  is verified by passing the AMM Pool UTxO into the reference inputs.
+fn cancel_by_pool_exist(
+  treasury_datum: TreasuryDatum,
+  ref_inputs: List<Input>,
+) -> Bool {
+  // finding AMM Pool Ref Input
+  expect [pool_ref_input] =
+    list.filter(
+      ref_inputs,
+      fn(ref_input) {
+        let Input {
+          output: Output {
+            address: Address { payment_credential, .. },
+            value: in_value,
+            ..
+          },
+          ..
+        } = ref_input
+        and {
+          // Ref Input belongs Amm Pool Address
+          payment_credential == ScriptCredential(amm_pool_validation_hash),
+          // Ref Input has AMM Pool Auth Token
+          value.quantity_of(
+            in_value,
+            amm_authen_policy_id,
+            amm_pool_auth_asset_name,
+          ) == 1,
+        }
+      },
+    )
+  // Extract some necessary data.
+  expect Input { output: Output { datum: InlineDatum(raw_pool_datum), .. }, .. } =
+    pool_ref_input
+  expect PoolDatum { asset_a, asset_b, .. }: PoolDatum = raw_pool_datum
+  let TreasuryDatum { base_asset, raise_asset, .. } = treasury_datum
+  // Ensure that the AMM Pool ID and the LBE bootstrapping pool are the same.
+  utils.sort_two_assets(base_asset, raise_asset) == (asset_a, asset_b)
+}
+
+// After Discovery Phase, If final reserve raise amount not reach target
+//  then LBE should be cancelled.
+fn cancel_by_not_reach_minimum_raise(treasury_datum: TreasuryDatum) -> Bool {
+  let TreasuryDatum {
+    minimum_raise,
+    is_manager_collected,
+    reserve_raise,
+    total_penalty,
+    ..
+  } = treasury_datum
+  let min_raise =
+    when minimum_raise is {
+      None -> 1
+      Some(min_raise) -> min_raise
+    }
+  and {
+    // All Manager, Sellers must be collected
+    is_manager_collected,
+    // Final reserve base = reserve_raise + total_penalty
+    reserve_raise + total_penalty < min_raise,
+  }
+}
+
+// Before discovery phase start:
+//  - Project Owner can cancel LBE if need.
+// After discovery phase start and `is_cancelable` truthy:
+//  - Project Owner can cancel LBE before discovery phase ended.
+fn cancel_by_owner(
+  treasury_datum: TreasuryDatum,
+  end_valid_time_range: Int,
+  inputs: List<Input>,
+  extra_signatories: List<PubKeyHash>,
+) -> Bool {
+  let TreasuryDatum { is_cancelable, start_time, end_time, owner, .. } =
+    treasury_datum
+  let Address { payment_credential: owner_payment_credential, .. } = owner
+  // get last time project owner can make cancel
+  let last_time =
+    when is_cancelable is {
+      True -> start_time
+      False -> end_time
+    }
+  and {
+    // transaction validity before the last time
+    end_valid_time_range < last_time,
+    // project owner has authorize transaction
+    validate_authorize_by_owner(
+      owner_payment_credential,
+      extra_signatories: extra_signatories,
+      inputs: inputs,
+    ),
+  }
+}
+
 pub fn validate_cancel_lbe(
   treasury_in_datum: TreasuryDatum,
   treasury_in_value: Value,
@@ -1354,75 +1401,40 @@ pub fn validate_cancel_lbe(
   end_valid_time_range: Int,
   cancel_reason: CancelReason,
 ) -> Bool {
-  let TreasuryDatum {
-    base_asset,
-    raise_asset,
-    minimum_raise,
-    is_cancelled,
-    start_time,
-    end_time,
-    owner,
-    is_manager_collected,
-    reserve_raise,
-    total_penalty,
-    is_cancelable,
-    ..
-  } = treasury_in_datum
-  let Address { payment_credential: owner_payment_credential, .. } = owner
-
+  // Extract some necessary data.
+  let TreasuryDatum { is_cancelled, .. } = treasury_in_datum
   expect Output {
     value: treasury_out_value,
     datum: InlineDatum(raw_treasury_out_datum),
     ..
   } = treasury_output
   expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
-  let min_raise =
-    when minimum_raise is {
-      None -> 1
-      Some(min_raise) -> min_raise
-    }
-  // add reason
   and {
-    // 1. Cancel reason
+    // validate cancel base on reason
     when cancel_reason is {
-      CreatedPool -> {
-        expect [pool_ref_input] = get_amm_pool_ref_inputs(ref_inputs)
-        expect Input {
-          output: Output { datum: InlineDatum(raw_pool_datum), .. },
-          ..
-        } = pool_ref_input
-        expect PoolDatum { asset_a, asset_b, .. }: PoolDatum = raw_pool_datum
-        utils.sort_two_assets(base_asset, raise_asset) == (asset_a, asset_b)
-      }
-      ByOwner -> and {
-          end_valid_time_range < if is_cancelable {
-            end_time
-          } else {
-            start_time
-          },
-          validate_authorize_by_owner(
-            owner_payment_credential,
-            extra_signatories: extra_signatories,
-            inputs: inputs,
-          ),
-        }
-      NotReachMinimum -> and {
-          is_manager_collected,
-          reserve_raise + total_penalty < min_raise,
-        }
+      CreatedPool ->
+        cancel_by_pool_exist(
+          treasury_datum: treasury_in_datum,
+          ref_inputs: ref_inputs,
+        )
+      ByOwner ->
+        cancel_by_owner(
+          treasury_datum: treasury_in_datum,
+          end_valid_time_range: end_valid_time_range,
+          inputs: inputs,
+          extra_signatories: extra_signatories,
+        )
+      NotReachMinimum ->
+        cancel_by_not_reach_minimum_raise(treasury_datum: treasury_in_datum)
     },
-    // 2. Treasury
-    //    - Datum: 
-    //      - is_cancelled: 
-    //        - Input: False
-    //        - Output: True
-    //      - other field no changes
+    // LBE should not be cancelled yet.
     is_cancelled == False,
+    // Treasury Out Datum must be correct!
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
       is_cancelled: True,
     },
-    //    - Value: no change
+    // Treasury Value has no changes.
     treasury_in_value == treasury_out_value,
   }
 }
@@ -1691,6 +1703,9 @@ pub fn validate_manage_seller(
   }
 }
 
+// Check if the owner authorizes the transaction
+// If Owner is Script -> Transaction must contains at least 1 Script Input
+// Else Transaction must be signed by Owner.
 pub fn validate_authorize_by_owner(
   owner_payment_credential: PaymentCredential,
   extra_signatories: List<PubKeyHash>,

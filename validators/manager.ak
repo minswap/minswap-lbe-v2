@@ -11,7 +11,17 @@ use lb_v2/types.{
 use lb_v2/utils.{manager_auth_an}
 use lb_v2/validation
 
-validator(treasury_hash: ValidatorHash) {
+// Spending Manager for:
+// 1. Collect Manager
+//   - Purpose: Update `reserve_raise`, `total_penalty` of Treasury
+//   - 1 Manager Token needs to be burned (trigger Factory Minting)
+//   - 1 Manager Input needs to be spent
+//   - 1 Treasury Input needs to be spent
+//   - 1 Treasury Output needs to be paid
+validator(
+  // ValidatorHash of Treasury Validator
+  treasury_hash: ValidatorHash,
+) {
   fn validate_manager_spending(
     manager_in_datum: ManagerDatum,
     redeemer: ManagerRedeemer,

@@ -6,6 +6,7 @@ import { WarehouseBuilder } from "../build-tx";
 import { LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
 import {
   DUMMY_SEED_UTXO,
+  assertValidator,
   genWarehouseOptions,
   generateAccount,
   loadModule,
@@ -40,7 +41,7 @@ beforeEach(async () => {
   };
 });
 
-test("happy case", async () => {
+test("init-factory | PASS | happy case", async () => {
   const { warehouseOptions } = warehouse;
   let builder = new WarehouseBuilder(warehouseOptions);
   builder.buildInitFactory({ seedUtxo: DUMMY_SEED_UTXO });
@@ -48,22 +49,15 @@ test("happy case", async () => {
   await tx.complete();
 });
 
-test("absent @out_ref", async () => {
+test("init-factory | FAIL | absent @out_ref", async () => {
   const { warehouseOptions } = warehouse;
   let builder = new WarehouseBuilder(warehouseOptions);
   builder.buildInitFactory({ seedUtxo: DUMMY_SEED_UTXO });
   builder.tasks = [builder.tasks[0], ...builder.tasks.slice(2)];
-  const tx = builder.complete();
-  let errMessage = "";
-  try {
-    await tx.complete();
-  } catch (err) {
-    if (typeof err == "string") errMessage = err;
-  }
-  expect(errMessage).toContain("Must spend @out_ref");
+  assertValidator(builder, "Must spend @out_ref");
 });
 
-test("mint redundant Factory Token", async () => {
+test("init-factory | FAIL | mint redundant Factory Token", async () => {
   const { warehouseOptions } = warehouse;
   let builder = new WarehouseBuilder(warehouseOptions);
   builder.buildInitFactory({ seedUtxo: DUMMY_SEED_UTXO });
@@ -78,17 +72,10 @@ test("mint redundant Factory Token", async () => {
         T.Data.to("Initialization", FactoryValidateFactoryMinting.redeemer),
       );
   });
-  const tx = builder.complete();
-  let errMessage = "";
-  try {
-    await tx.complete();
-  } catch (err) {
-    if (typeof err == "string") errMessage = err;
-  }
-  expect(errMessage).toContain("Must mint 1 Factory Token");
+  assertValidator(builder, "Must mint 1 Factory Token");
 });
 
-test("missing Factory Token", async () => {
+test("init-factory | FAIL | missing Factory Token", async () => {
   const { warehouseOptions } = warehouse;
   let builder = new WarehouseBuilder(warehouseOptions);
   builder.buildInitFactory({ seedUtxo: DUMMY_SEED_UTXO });
@@ -108,47 +95,10 @@ test("missing Factory Token", async () => {
       },
     );
   });
-  const tx = builder.complete();
-  let errMessage = "";
-  try {
-    await tx.complete();
-  } catch (err) {
-    if (typeof err == "string") errMessage = err;
-  }
-  expect(errMessage).toContain("Factory Output must contain 1 Factory Token");
+  assertValidator(builder, "Factory Output must contain 1 Factory Token");
 });
 
-test("missing Factory Token", async () => {
-  const { warehouseOptions } = warehouse;
-  let builder = new WarehouseBuilder(warehouseOptions);
-  builder.buildInitFactory({ seedUtxo: DUMMY_SEED_UTXO });
-  builder.tasks.pop();
-  builder.tasks.push(() => {
-    const factoryDatum: FactoryValidateFactory["datum"] = {
-      head: LBE_INIT_FACTORY_HEAD,
-      tail: LBE_INIT_FACTORY_TAIL,
-    };
-    builder.tx.payToAddressWithData(
-      builder.factoryAddress,
-      {
-        inline: builder.toDatumFactory(factoryDatum),
-      },
-      {
-        lovelace: 2_000_000n,
-      },
-    );
-  });
-  const tx = builder.complete();
-  let errMessage = "";
-  try {
-    await tx.complete();
-  } catch (err) {
-    if (typeof err == "string") errMessage = err;
-  }
-  expect(errMessage).toContain("Factory Output must contain 1 Factory Token");
-});
-
-test("Factory Datum is not correct", async () => {
+test("init-factory | FAIL | Factory Datum is not correct", async () => {
   const { warehouseOptions } = warehouse;
   let builder = new WarehouseBuilder(warehouseOptions);
   builder.buildInitFactory({ seedUtxo: DUMMY_SEED_UTXO });
@@ -168,12 +118,5 @@ test("Factory Datum is not correct", async () => {
       },
     );
   });
-  const tx = builder.complete();
-  let errMessage = "";
-  try {
-    await tx.complete();
-  } catch (err) {
-    if (typeof err == "string") errMessage = err;
-  }
-  expect(errMessage).toContain("Factory Datum must be correct!");
+  assertValidator(builder, "Factory Datum must be correct!");
 });
