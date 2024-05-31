@@ -1,9 +1,7 @@
-import * as T from "@minswap/translucent";
 import { WarehouseBuilder, type BuildCreateTreasuryOptions } from "../build-tx";
 import type { UTxO } from "../types";
 import { assertValidator, assertValidatorFail, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
-import { FactoryValidateFactory } from "../../plutus";
 
 let W: any;
 
