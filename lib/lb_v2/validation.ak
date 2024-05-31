@@ -1006,7 +1006,11 @@ pub fn apply_order(
       total_input_amount: total_input_amount,
       total_output_amount: total_output_amount,
     )
-  expect total_output_penalty - total_input_penalty == penalty
+  expect
+    assert(
+      total_output_penalty - total_input_penalty == penalty,
+      @"Invalid penalty amount",
+    )
 
   (
     total_output_amount - total_input_amount,

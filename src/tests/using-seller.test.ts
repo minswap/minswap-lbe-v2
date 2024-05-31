@@ -417,15 +417,14 @@ test("using-seller | PASS | update orders(withdraw fund) in penalty time", async
   await tx.complete();
 });
 
-// test("using-seller | FAIL | update orders(withdraw fund): invalid penalty amount", async () => {
-//   const { builder, penaltyTimeRange } = warehouse;
-//   // withdraw 745 -> penalty will be 186
-//   warehouse.options.orderOutputDatums[0].penaltyAmount = 185n;
-//   const options = {
-//     ...warehouse.options,
-//     ...penaltyTimeRange,
-//   };
-//   builder.buildUsingSeller(options);
-//   const tx = builder.complete();
-//   await tx.complete();
-// });
+test("using-seller | FAIL | update orders(withdraw fund): invalid penalty amount", async () => {
+  const { builder, penaltyTimeRange } = warehouse;
+  // withdraw 745 -> penalty will be 186
+  warehouse.options.orderOutputDatums[0].penaltyAmount = 185n;
+  const options = {
+    ...warehouse.options,
+    ...penaltyTimeRange,
+  };
+  builder.buildUsingSeller(options);
+  await assertValidator(builder, "Invalid penalty amount");
+});
