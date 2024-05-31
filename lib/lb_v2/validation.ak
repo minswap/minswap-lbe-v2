@@ -823,8 +823,14 @@ pub fn validate_using_seller(
     )
   and {
     // validate LBE ID
-    base_asset == seller_in_datum.base_asset,
-    raise_asset == seller_in_datum.raise_asset,
+    assert(
+      base_asset == seller_in_datum.base_asset,
+      @"Invalid seller input LBE ID",
+    ),
+    assert(
+      raise_asset == seller_in_datum.raise_asset,
+      @"Invalid seller input LBE ID",
+    ),
     // validate time frame
     assert(
       start_time <= start_valid_time_range,
@@ -892,8 +898,8 @@ pub fn apply_order(
               inputs: inputs,
             ),
             is_collected == False,
-            o_base_asset == base_asset,
-            o_raise_asset == raise_asset,
+            assert(o_base_asset == base_asset, @"Invalid order input LBE ID"),
+            assert(o_raise_asset == raise_asset, @"Invalid order input LBE ID"),
             expected_order == order_value,
           }
         (acc_amount + amount, acc_penalty + penalty_amount)
@@ -936,8 +942,8 @@ pub fn apply_order(
               @"penalty_amount must higher than or equal to 0",
             ),
             is_collected == False,
-            o_base_asset == base_asset,
-            o_raise_asset == raise_asset,
+            assert(o_base_asset == base_asset, @"Invalid order output LBE ID"),
+            assert(o_raise_asset == raise_asset, @"Invalid order output LBE ID"),
             assert(expected_order == order_value, @"Invalid order output value"),
           }
         (acc_amount + amount, acc_penalty + penalty_amount)
@@ -951,7 +957,11 @@ pub fn apply_order(
       total_input_amount: total_input_amount,
       total_output_amount: total_output_amount,
     )
-  expect total_output_penalty - total_input_penalty == penalty
+  expect
+    assert(
+      total_output_penalty - total_input_penalty == penalty,
+      @"Invalid penalty amount",
+    )
 
   (
     total_output_amount - total_input_amount,

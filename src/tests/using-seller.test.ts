@@ -15,6 +15,11 @@ import { genWarehouse } from "./warehouse";
 import type { BluePrintAsset, UTxO } from "../types";
 import { plutusAddress2Address } from "../utils";
 
+const MINt = {
+  policyId: "29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6",
+  assetName: "4d494e74",
+};
+let utxoIndex: number;
 let warehouse: {
   t: T.Translucent;
   builder: WarehouseBuilder;
@@ -28,9 +33,11 @@ let warehouse: {
   orderOutDatums: FeedTypeOrder["_datum"][];
   orderInDatums: FeedTypeOrder["_datum"][];
   owner: string;
+  penaltyTimeRange: {
+    validFrom: number;
+    validTo: number;
+  };
 };
-
-let utxoIndex = 0;
 
 beforeAll(async () => {
   await loadModule();
@@ -44,10 +51,18 @@ beforeEach(async () => {
     defaultSellerDatum,
     defaultOrderDatum,
   } = await genWarehouse();
+  utxoIndex = 0;
   const baseAsset = minswapToken;
   const warehouseOptions = await genWarehouseOptions(t);
 
   const builder = new WarehouseBuilder(warehouseOptions);
+  const treasuryDatum = {
+    ...defaultTreasuryDatum,
+    penaltyConfig: {
+      penaltyStartTime: defaultTreasuryDatum.endTime - 5000n,
+      percent: 25n,
+    },
+  };
   const treasuryUTxO = {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
     outputIndex: ++utxoIndex,
@@ -55,10 +70,10 @@ beforeEach(async () => {
       lovelace: TREASURY_MIN_ADA,
       [builder.treasuryToken]: 1n,
       [T.toUnit(baseAsset.policyId, baseAsset.assetName)]:
-        defaultTreasuryDatum.reserveBase,
+        treasuryDatum.reserveBase,
     },
     address: builder.treasuryAddress,
-    datum: builder.toDatumTreasury(defaultTreasuryDatum),
+    datum: builder.toDatumTreasury(treasuryDatum),
   };
   const sellerDatum = {
     ...defaultSellerDatum,
@@ -106,12 +121,12 @@ beforeEach(async () => {
   const orderInputUTxOs = orderInDatums.map((datum) =>
     genOrderUTxO(datum, builder),
   );
-  const owner = plutusAddress2Address(t.network, defaultTreasuryDatum.owner);
+  const owner = plutusAddress2Address(t.network, treasuryDatum.owner);
   const options: BuildUsingSellerOptions = {
     treasuryRefInput: treasuryUTxO,
     sellerUtxo: sellerUTxO,
-    validFrom: Number(defaultTreasuryDatum.startTime) + 1000,
-    validTo: Number(defaultTreasuryDatum.startTime) + 2000,
+    validFrom: Number(treasuryDatum.startTime) + 1000,
+    validTo: Number(treasuryDatum.startTime) + 2000,
     owners: [owner],
     orderInputs: orderInputUTxOs,
     orderOutputDatums: orderOutDatums,
@@ -122,13 +137,17 @@ beforeEach(async () => {
     baseAsset,
     warehouseOptions,
     t,
-    treasuryDatum: defaultTreasuryDatum,
+    treasuryDatum,
     treasuryUTxO,
     sellerDatum,
     sellerUTxO,
     orderInDatums,
     orderOutDatums,
     owner,
+    penaltyTimeRange: {
+      validFrom: Number(treasuryDatum.endTime - 3000n),
+      validTo: Number(treasuryDatum.endTime - 2000n),
+    },
   };
 });
 
@@ -148,21 +167,21 @@ function genOrderUTxO(
   };
 }
 
-test("using-seller | SUCCESS | update orders: success", async () => {
+test("using-seller | PASS | update orders: success", async () => {
   const { builder, options } = warehouse;
   builder.buildUsingSeller(options);
   const tx = builder.complete();
   await tx.complete();
 });
 
-test("using-seller | SUCCESS | create orders: success", async () => {
+test("using-seller | PASS | create orders: success", async () => {
   const { builder, options } = warehouse;
   builder.buildUsingSeller({ ...options, orderInputs: [] });
   const tx = builder.complete();
   await tx.complete();
 });
 
-test("using-seller | SUCCESS | update orders: success", async () => {
+test("using-seller | PASS | update orders: success", async () => {
   const { builder, options } = warehouse;
   builder.buildUsingSeller({ ...options, orderOutputDatums: [] });
   const tx = builder.complete();
@@ -171,6 +190,8 @@ test("using-seller | SUCCESS | update orders: success", async () => {
 
 test("using-seller | FAIL | update orders: after discovery phase", async () => {
   const { builder, treasuryDatum } = warehouse;
+  // tricky to pass penalty condition()
+  warehouse.options.orderOutputDatums[0].penaltyAmount = 186n;
   const options: BuildUsingSellerOptions = {
     ...warehouse.options,
     validTo: Number(treasuryDatum.endTime) + 1000,
@@ -249,7 +270,7 @@ test("using-seller | FAIL | update orders: Invalid minting 3", async () => {
 //       builder.tx.addSigner(owner);
 //     }
 //   };
-//   await assertValidator(builder, "Using-seller: Invalid minting");
+//   await assertValidator(builder, "TODO:");
 // });
 
 test("using-seller | FAIL | update orders: Invalid seller output datum 1(invalid amount)", async () => {
@@ -340,4 +361,70 @@ test("using-seller | FAIL | update orders: penalty_amount must higher than or eq
     builder,
     "penalty_amount must higher than or equal to 0",
   );
+});
+
+test("using-seller | FAIL | update orders: Order's input LBE miss match", async () => {
+  const { builder, options, orderInDatums } = warehouse;
+  options.orderInputs[0].datum = builder.toDatumOrder({
+    ...orderInDatums[0],
+    // MINt
+    baseAsset: MINt,
+  });
+  builder.buildUsingSeller(options);
+  await assertValidator(builder, "Invalid order input LBE ID");
+});
+
+test("using-seller | FAIL | update orders: Order's output LBE miss match", async () => {
+  const { builder, options, orderOutDatums } = warehouse;
+  options.orderOutputDatums[0] = {
+    ...orderOutDatums[0],
+    // MINt
+    baseAsset: MINt,
+  };
+  builder.buildUsingSeller(options);
+  await assertValidator(builder, "Invalid order output LBE ID");
+});
+
+test("using-seller | FAIL | update orders: Seller's input LBE miss match", async () => {
+  const { builder, options, sellerDatum } = warehouse;
+  options.sellerUtxo.datum = builder.toDatumSeller({
+    ...sellerDatum,
+    // MINt
+    baseAsset: MINt,
+  });
+  builder.buildUsingSeller(options);
+  builder.tasks[4] = () => {
+    builder.payingSellerOutput({
+      outDatum: {
+        ...sellerDatum,
+        amount: -1745n,
+      },
+    });
+  };
+  await assertValidator(builder, "Invalid seller input LBE ID");
+});
+
+test("using-seller | PASS | update orders(withdraw fund) in penalty time", async () => {
+  const { builder, penaltyTimeRange } = warehouse;
+  // withdraw 745 -> penalty will be 186
+  warehouse.options.orderOutputDatums[0].penaltyAmount = 186n;
+  const options = {
+    ...warehouse.options,
+    ...penaltyTimeRange,
+  };
+  builder.buildUsingSeller(options);
+  const tx = builder.complete();
+  await tx.complete();
+});
+
+test("using-seller | FAIL | update orders(withdraw fund): invalid penalty amount", async () => {
+  const { builder, penaltyTimeRange } = warehouse;
+  // withdraw 745 -> penalty will be 186
+  warehouse.options.orderOutputDatums[0].penaltyAmount = 185n;
+  const options = {
+    ...warehouse.options,
+    ...penaltyTimeRange,
+  };
+  builder.buildUsingSeller(options);
+  await assertValidator(builder, "Invalid penalty amount");
 });

@@ -5,7 +5,11 @@ import type {
   SellerValidateSellerSpending,
   TreasuryValidateTreasurySpending,
 } from "../../plutus";
-import { LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
+import {
+  DEFAULT_NUMBER_SELLER,
+  LBE_INIT_FACTORY_HEAD,
+  LBE_INIT_FACTORY_TAIL,
+} from "../constants";
 import type { BluePrintAsset, Emulator, Translucent } from "../types";
 import { address2PlutusAddress } from "../utils";
 import { genWarehouseOptions, generateAccount } from "./utils";
@@ -87,7 +91,7 @@ export const genWarehouse = async () => {
       sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
       baseAsset: minswapToken,
       raiseAsset: adaToken,
-      sellerCount: 0n,
+      sellerCount: DEFAULT_NUMBER_SELLER,
       reserveRaise: 0n,
       totalPenalty: 0n,
     };
