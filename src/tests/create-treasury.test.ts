@@ -186,66 +186,57 @@ const remixManagerDatum = (remixDatum: any) => {
 };
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | factory_policy_id", async () => {
-  await assertValidator(
+  assertValidator(
     remixManagerDatum({ factoryPolicyId: "00" }),
     "Manager Output must pay correctly!",
   );
 });
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | orderHash", async () => {
-  await assertValidator(
+  assertValidator(
     remixManagerDatum({ orderHash: "00" }),
     "Manager Output must pay correctly!",
   );
 });
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | sellerHash", async () => {
-  await assertValidator(
+  assertValidator(
     remixManagerDatum({ sellerHash: "00" }),
     "Manager Output must pay correctly!",
   );
 });
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | baseAsset", async () => {
-  await assertValidator(
+  assertValidator(
     remixManagerDatum({ baseAsset: W.adaToken }),
     "Manager Output must pay correctly!",
   );
 });
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | raiseAsset", async () => {
-  await assertValidator(
+  assertValidator(
     remixManagerDatum({ raiseAsset: W.minswapToken }),
     "Manager Output must pay correctly!",
   );
 });
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | sellerCount", async () => {
-  await assertValidator(
+  assertValidator(
     remixManagerDatum({ sellerCount: 10n }),
     "Manager Output must pay correctly!",
   );
 });
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | reserveRaise", async () => {
-  await assertValidator(
+  assertValidator(
     remixManagerDatum({ reserveRaise: 10n }),
     "Manager Output must pay correctly!",
   );
 });
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | totalPenalty", async () => {
-  await assertValidator(
+  assertValidator(
     remixManagerDatum({ totalPenalty: 10n }),
     "Manager Output must pay correctly!",
   );
 });
-
-/**
- * no manager
- * manager out wrong
- * seller out wrong
- * seller outs not enough
- * minting value wrong
- *
- */
