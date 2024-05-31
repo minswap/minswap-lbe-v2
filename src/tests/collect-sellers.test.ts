@@ -21,6 +21,7 @@ FAIL
   - total raise
   - total penalty
 - no manager out
+- 2 manager input
 - managre value dont have any manager token
 - Invalid LBE ID:
   - Seller input
@@ -37,11 +38,18 @@ import {
   type BuildCollectSellersOptions,
   type WarehouseBuilderOptions,
 } from "../build-tx";
-import { TREASURY_MIN_ADA } from "../constants";
-import { genWarehouseOptions, loadModule } from "./utils";
+import { MANAGER_MIN_ADA, TREASURY_MIN_ADA } from "../constants";
+import {
+  assertValidator,
+  assertValidatorFail,
+  genWarehouseOptions,
+  loadModule,
+} from "./utils";
 import * as T from "@minswap/translucent";
 import { genWarehouse } from "./warehouse";
-import type { BluePrintAsset, UTxO } from "../types";
+import type { Assets, BluePrintAsset, UTxO } from "../types";
+import { plutusAddress2Address } from "../utils";
+import invariant from "@minswap/tiny-invariant";
 
 let utxoIndex: number;
 let warehouse: {
@@ -57,13 +65,18 @@ let warehouse: {
   expectedManagerDatumOut: ManagerValidateManagerSpending["managerInDatum"];
   sellerDatums: SellerValidateSellerSpending["sellerInDatum"][];
   sellerUTxOs: UTxO[];
+  defaultSellerDatum: SellerValidateSellerSpending["sellerInDatum"];
+  owner: string;
+};
+
+const MINt = {
+  policyId: "29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6",
+  assetName: "4d494e74",
 };
 
 beforeAll(async () => {
   await loadModule();
 });
-
-//1 manager + n seller + 1 treasury
 
 beforeEach(async () => {
   const {
@@ -155,6 +168,8 @@ beforeEach(async () => {
     expectedManagerDatumOut,
     sellerDatums,
     sellerUTxOs,
+    defaultSellerDatum,
+    owner: plutusAddress2Address(t.network, treasuryDatum.owner),
   };
 });
 
@@ -173,30 +188,231 @@ function genSellerUTxO(
   };
 }
 
+function attachValueToInput(value: Assets): void {
+  const { builder, owner } = warehouse;
+  builder.tasks.push(() => {
+    // 1 UTxO contain 1 seller tokens for tx value balance
+    builder.tx.collectFrom([
+      {
+        txHash:
+          "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
+        outputIndex: ++utxoIndex,
+        assets: value,
+        address: owner,
+      },
+    ]);
+  });
+}
+
 test("collect sellers | PASS | happy case 1", async () => {
-  const { builder, options, expectedManagerDatumOut } = warehouse;
+  const { builder, options } = warehouse;
   builder.buildCollectSeller(options);
-  builder.tasks[4] = () => {
-    builder.payingManagerOutput(expectedManagerDatumOut);
-  };
   const tx = builder.complete();
   await tx.complete();
 });
 
 test("collect sellers | PASS | happy case 2", async () => {
-  const { builder, options, sellerDatums } = warehouse;
-  warehouse.expectedManagerDatumOut.reserveRaise += 1000n;
-  warehouse.expectedManagerDatumOut.totalPenalty += 20_000n;
-  builder.buildCollectSeller({
-    ...options,
-    sellerInputs: [
-      ...options.sellerInputs,
-      genSellerUTxO(
-        { ...sellerDatums[0], amount: 1000n, penaltyAmount: 20_000n },
-        builder,
-      ),
-    ],
+  const { defaultSellerDatum, builder } = warehouse;
+  warehouse.options.sellerInputs.push(
+    genSellerUTxO(
+      { ...defaultSellerDatum, amount: 1000n, penaltyAmount: 20_000n },
+      builder,
+    ),
+  );
+  const builder1 = stupidManagerDatumOut({
+    reserveRaise: warehouse.expectedManagerDatumOut.reserveRaise + 1000n,
+    totalPenalty: warehouse.expectedManagerDatumOut.totalPenalty + 20_000n,
+    sellerCount: warehouse.expectedManagerDatumOut.sellerCount - 1n,
   });
-  const tx = builder.complete();
+  const tx = builder1.complete();
   await tx.complete();
 });
+
+test("collect sellers | FAIL | Before end of discovery phase", async () => {
+  const { builder, options, treasuryDatum } = warehouse;
+  builder.buildCollectSeller({
+    ...options,
+    validFrom: Number(treasuryDatum.endTime - 1000n),
+  });
+  // Manager is determining whether the action is collect sellers
+  //  or add sellers through valid time range and is_cancelled field, so...
+  assertValidator(builder, "Unable to determine action");
+});
+
+test("collect sellers | FAIL | invalid minting", async () => {
+  const { builder, options } = warehouse;
+  builder.buildCollectSeller(options);
+  // must not be -3 to be fail
+  builder.tasks[3] = () => {
+    builder.mintingSellerToken(-2n);
+  };
+  assertValidator(builder, "Collect sellers: Invalid minting");
+});
+
+test("collect sellers | FAIL | 1 seller out", async () => {
+  const { builder, options, defaultSellerDatum } = warehouse;
+  builder.buildCollectSeller(options);
+  builder.tasks.push(() => {
+    // 1 UTxO contain 1 seller tokens for tx value balance
+    attachValueToInput({
+      [builder.sellerToken]: 1n,
+    });
+    // pay to seller UTxO
+    builder.innerPaySeller(defaultSellerDatum);
+  });
+  assertValidator(builder, "Collect sellers: Tx mustn't have seller output");
+});
+
+test("collect sellers | FAIL | No treasury ref input", async () => {
+  const { builder, options } = warehouse;
+  builder.buildCollectSeller(options);
+  builder.tasks[2] = () => {
+    if (builder.sellerInputs.length === 0) {
+      return;
+    }
+    invariant(builder.sellerRedeemer);
+    builder.tx
+      .readFrom([builder.deployedValidators["sellerValidator"]])
+      .collectFrom(
+        builder.sellerInputs,
+        builder.toRedeemerSellerSpend(builder.sellerRedeemer),
+      );
+  };
+  assertValidatorFail(builder);
+});
+
+test("collect sellers | FAIL | No treasury ref input", async () => {
+  const { builder, options } = warehouse;
+  builder.buildCollectSeller(options);
+  builder.tasks[2] = () => {
+    if (builder.sellerInputs.length === 0) {
+      return;
+    }
+    invariant(builder.sellerRedeemer);
+    builder.tx
+      .readFrom([builder.deployedValidators["sellerValidator"]])
+      .collectFrom(
+        builder.sellerInputs,
+        builder.toRedeemerSellerSpend(builder.sellerRedeemer),
+      );
+  };
+  assertValidatorFail(builder);
+});
+
+function stupidManagerDatumOut(stupidInfo: any): WarehouseBuilder {
+  const { builder, options } = warehouse;
+  builder.buildCollectSeller(options);
+
+  builder.tasks[4] = () => {
+    builder.payingManagerOutput({
+      ...warehouse.expectedManagerDatumOut,
+      ...stupidInfo,
+    });
+  };
+  return builder;
+}
+
+test("collect sellers | FAIL | Stupid Manager datum output(baseAsset)", async () => {
+  const builder = stupidManagerDatumOut({
+    baseAsset: MINt,
+  });
+  assertValidator(builder, "Collect sellers: Invalid manager datum");
+});
+
+test("collect sellers | FAIL | Stupid Manager datum output(raiseAsset)", async () => {
+  const builder = stupidManagerDatumOut({
+    raiseAsset: MINt,
+  });
+  assertValidator(builder, "Collect sellers: Invalid manager datum");
+});
+
+test("collect sellers | FAIL | Stupid Manager datum output(factoryPolicyId)", async () => {
+  const builder = stupidManagerDatumOut({
+    factoryPolicyId: "1234567890",
+  });
+  assertValidator(builder, "Collect sellers: Invalid manager datum");
+});
+
+test("collect sellers | FAIL | Stupid Manager datum output(orderHash)", async () => {
+  const builder = stupidManagerDatumOut({
+    orderHash: "1234567890",
+  });
+  assertValidator(builder, "Collect sellers: Invalid manager datum");
+});
+
+test("collect sellers | FAIL | Stupid Manager datum output(sellerHash)", async () => {
+  const builder = stupidManagerDatumOut({
+    sellerHash: "1234567890",
+  });
+  assertValidator(builder, "Collect sellers: Invalid manager datum");
+});
+
+test("collect sellers | FAIL | Stupid Manager datum output(sellerCount)", async () => {
+  const { expectedManagerDatumOut } = warehouse;
+  const builder = stupidManagerDatumOut({
+    sellerCount: expectedManagerDatumOut.sellerCount + 1n,
+  });
+  assertValidator(builder, "Collect sellers: Invalid manager datum");
+});
+
+test("collect sellers | FAIL | Stupid Manager datum output(reserveRaise)", async () => {
+  const { expectedManagerDatumOut } = warehouse;
+  const builder = stupidManagerDatumOut({
+    reserveRaise: expectedManagerDatumOut.reserveRaise + 1n,
+  });
+  assertValidator(builder, "Collect sellers: Invalid manager datum");
+});
+
+test("collect sellers | FAIL | Stupid Manager datum output(totalPenalty)", async () => {
+  const { expectedManagerDatumOut } = warehouse;
+  const builder = stupidManagerDatumOut({
+    totalPenalty: expectedManagerDatumOut.totalPenalty + 1n,
+  });
+  assertValidator(builder, "Collect sellers: Invalid manager datum");
+});
+
+test("collect sellers | FAIL | No manager input", async () => {
+  const { builder, options } = warehouse;
+  builder.buildCollectSeller(options);
+  builder.tasks[4] = () => {};
+  assertValidatorFail(builder);
+});
+
+test("collect sellers | FAIL | Managre input value dont have any manager token", async () => {
+  const { builder, options } = warehouse;
+  builder.buildCollectSeller({
+    ...options,
+    managerInput: {
+      ...options.managerInput,
+      assets: {
+        lovelace: MANAGER_MIN_ADA,
+      },
+    },
+  });
+  attachValueToInput({ [builder.managerToken]: 1n });
+  assertValidator(builder, "Manager input dont have manager token");
+});
+
+test("collect sellers | FAIL | Managre input value dont have any manager token", async () => {
+  const { builder, options } = warehouse;
+  builder.buildCollectSeller({
+    ...options,
+    managerInput: {
+      ...options.managerInput,
+      assets: {
+        lovelace: MANAGER_MIN_ADA,
+      },
+    },
+  });
+  attachValueToInput({ [builder.managerToken]: 1n });
+  assertValidator(builder, "Manager input dont have manager token");
+});
+
+/*
+TODO:
+- seller input value dont have seller token
+- Invalid LBE ID:
+  - Seller input
+  - Manager input
+- 2 manager input
+*/

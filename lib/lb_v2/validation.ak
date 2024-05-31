@@ -1,3 +1,4 @@
+use aiken/cbor
 use aiken/dict.{Dict}
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
@@ -1685,21 +1686,30 @@ pub fn validate_manage_seller(
       )
     and {
       // no seller outputs
-      list.length(seller_outputs) == 0,
+      assert(
+        list.length(seller_outputs) == 0,
+        @"Collect sellers: Tx mustn't have seller output",
+      ),
       // mint value
-      value.flatten(mint_value) == [
-        (factory_policy_id, seller_auth_an, -seller_input_count),
-      ],
+      assert(
+        value.flatten(mint_value) == [
+          (factory_policy_id, seller_auth_an, -seller_input_count),
+        ],
+        @"Collect sellers: Invalid minting",
+      ),
       // update datum
-      manager_out_datum == ManagerDatum {
-        ..manager_in_datum,
-        seller_count: seller_count - seller_input_count,
-        reserve_raise: reserve_raise + total_reserve_raise,
-        total_penalty: total_penalty + total_penalty_input,
-      },
+      assert(
+        manager_out_datum == ManagerDatum {
+          ..manager_in_datum,
+          seller_count: seller_count - seller_input_count,
+          reserve_raise: reserve_raise + total_reserve_raise,
+          total_penalty: total_penalty + total_penalty_input,
+        },
+        @"Collect sellers: Invalid manager datum",
+      ),
     }
   } else {
-    False
+    fail @"Unable to determine action"
   }
 }
 

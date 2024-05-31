@@ -1169,6 +1169,19 @@ export class WarehouseBuilder {
     }
   }
 
+  innerPaySeller(datum: SellerValidateSellerSpending["sellerInDatum"]) {
+    this.tx.payToAddressWithData(
+      this.sellerAddress,
+      {
+        inline: this.toDatumSeller(datum),
+      },
+      {
+        [this.sellerToken]: 1n,
+        lovelace: SELLER_MIN_ADA,
+      },
+    );
+  }
+
   payingSellerOutput(
     option: {
       addSellerCount?: bigint;
@@ -1176,22 +1189,10 @@ export class WarehouseBuilder {
     } = { addSellerCount: undefined, outDatum: undefined },
   ) {
     const { addSellerCount, outDatum } = option;
-    const innerPay = (datum: SellerValidateSellerSpending["sellerInDatum"]) => {
-      this.tx.payToAddressWithData(
-        this.sellerAddress,
-        {
-          inline: this.toDatumSeller(datum),
-        },
-        {
-          [this.sellerToken]: 1n,
-          lovelace: SELLER_MIN_ADA,
-        },
-      );
-    };
     if (this.sellerInputs.length) {
       // Using seller
       invariant(outDatum);
-      innerPay(outDatum);
+      this.innerPaySeller(outDatum);
     } else if (this.managerInputs.length) {
       invariant(this.managerInputs.length == 1);
       invariant(this.managerInputs[0].datum);
@@ -1205,7 +1206,7 @@ export class WarehouseBuilder {
       };
       invariant(addSellerCount);
       for (let i = 0n; i < addSellerCount; i++) {
-        innerPay(sellerDatum);
+        this.innerPaySeller(sellerDatum);
       }
     } else {
       invariant(this.treasuryInputs.length === 0);
@@ -1222,7 +1223,7 @@ export class WarehouseBuilder {
         penaltyAmount: 0n,
       };
       for (let i = 0; i < DEFAULT_NUMBER_SELLER; i++) {
-        innerPay(sellerDatum);
+        this.innerPaySeller(sellerDatum);
       }
     }
   }

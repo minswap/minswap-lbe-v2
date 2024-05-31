@@ -8,7 +8,7 @@ use lb_v2/types.{
   CollectManager, ManageSeller, ManagerDatum, ManagerRedeemer, SellerDatum,
   SpendManager, TreasuryDatum, ValidatorHash,
 }
-use lb_v2/utils.{manager_auth_an}
+use lb_v2/utils.{assert, manager_auth_an}
 use lb_v2/validation
 
 // Spending Manager for:
@@ -67,11 +67,14 @@ validator(
               } = input
               and {
                 out_ref == manager_out_ref,
-                value.quantity_of(
-                  sm_in_value,
-                  factory_policy_id,
-                  manager_auth_an,
-                ) == 1,
+                assert(
+                  value.quantity_of(
+                    sm_in_value,
+                    factory_policy_id,
+                    manager_auth_an,
+                  ) == 1,
+                  @"Manager input dont have manager token",
+                ),
               }
             },
           )
