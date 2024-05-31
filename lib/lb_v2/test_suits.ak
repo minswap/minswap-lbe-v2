@@ -14,15 +14,23 @@ use lb_v2/utils.{
 }
 use lb_v2/validation.{apply_collecting_orders}
 
-test test_sort_two_consecutive_factory_datum() {
-  let datum_a = FactoryDatum { head: #"00", tail: #"646174756d5f62" }
-  let datum_b =
-    FactoryDatum { head: #"646174756d5f62", tail: #"ffffffffffffff00" }
-
+test test_sort_two_consecutive_factory_datum_1() {
+  let datum_a = FactoryDatum { head: #"0000", tail: #"00ff" }
+  let datum_b = FactoryDatum { head: #"00ff", tail: #"ffff" }
   let (d1, d2) = sort_two_consecutive_factory_datum(datum_b, datum_a)
   and {
     builtin.serialise_data(d1) == builtin.serialise_data(datum_a),
     builtin.serialise_data(d2) == builtin.serialise_data(datum_b),
+  }
+}
+
+test test_sort_two_consecutive_factory_datum_2() {
+  let datum_a = FactoryDatum { head: #"00ff", tail: #"ffff" }
+  let datum_b = FactoryDatum { head: #"0000", tail: #"00ff" }
+  let (d1, d2) = sort_two_consecutive_factory_datum(datum_b, datum_a)
+  and {
+    builtin.serialise_data(d1) == builtin.serialise_data(datum_b),
+    builtin.serialise_data(d2) == builtin.serialise_data(datum_a),
   }
 }
 

@@ -120,6 +120,7 @@ pub fn calculate_penalty(
   }
 }
 
+// Return LP Asset Name from `base_asset`, `raise_asset`
 pub fn compute_asset_name_from_base_and_raise(
   base_asset: Asset,
   raise_asset: Asset,
@@ -137,6 +138,13 @@ pub fn compute_asset_name_from_base_and_raise(
   )
 }
 
+// Input: 2 consecutive Factory Linked List Node
+// Output: return sorted [Previous, Next] Node of Linked List
+// Example:
+// datum_a (Previous Node): FactoryDatum { head: #"0000", tail: #"00ff" }
+// datum_b (Next Node)    : FactoryDatum { head: #"00ff", tail: #"ffff" }
+// => datum_a equivalent 121([h'0000', h'00FF']) or #"d8799f4200004200ffff"
+// => datum_b equivalent 121([h'00FF', h'FFFF']) or #"d8799f4200ff42ffffff"
 pub fn sort_two_consecutive_factory_datum(
   datum_a: Data,
   datum_b: Data,
@@ -150,14 +158,17 @@ pub fn sort_two_consecutive_factory_datum(
   }
 }
 
+// If Validator support 2 purposes: Spend, Mint
+//  Then redeemer of spend-validate is wrapper-type data.
+// This function return Wrapper type of redeemer
 pub fn make_wrapper_redeemer(redeemer: Data) -> Data {
   builtin.constr_data(1, [redeemer])
 }
 
+// If `bool` is False then throw error `str`
 pub fn assert(bool: Bool, str: String) {
-  if bool {
-    bool
-  } else {
-    fail str
+  when bool is {
+    True -> True
+    False -> fail str
   }
 }
