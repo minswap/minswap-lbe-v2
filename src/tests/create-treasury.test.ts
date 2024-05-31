@@ -92,3 +92,51 @@ test("create-treasury | FAIL | have 2 Factory Inputs", async () => {
   });
   assertValidatorFail(txBuilder);
 });
+
+test("create-treasury | FAIL | have 0 Factory Out", async () => {
+  let builder: WarehouseBuilder = W.builder;
+  builder = builder.buildCreateTreasury(W.options);
+  builder.tasks[1] = () => {};
+  // await (builder.complete()).complete();
+  assertValidatorFail(builder);
+});
+
+test("create-treasury | FAIL | have 3 Factory Outs", async () => {
+  let builder: WarehouseBuilder = W.builder;
+  builder = builder.buildCreateTreasury(W.options);
+  builder.tasks.push(() => {
+    builder.tx.payToAddressWithData(
+      builder.factoryAddress,
+      {
+        inline: builder.toDatumFactory({ head: "00", tail: "ff" }),
+      },
+      {
+        lovelace: 1_000_000n,
+      },
+    );
+  });
+  // await (builder.complete()).complete();
+  assertValidatorFail(builder);
+});
+
+test("create-treasury | FAIL | Factory Out Datum incorrect!", async () => {
+  let builder: WarehouseBuilder = W.builder;
+  builder = builder.buildCreateTreasury(W.options);
+  builder.tasks[1] = () => {
+    const factoryDatum = builder.fromDatumFactory(
+      builder.factoryInputs[0].datum!,
+    );
+    const newFactoryHeadDatum = {
+      head: factoryDatum.head,
+      tail: builder.lpAssetName!,
+    };
+    const newFactoryTailDatum = {
+      // INCORRECT!
+      head: builder.lpAssetName!,
+      tail: "00".repeat(10),
+    };
+    builder.innerPayFactory(newFactoryHeadDatum);
+    builder.innerPayFactory(newFactoryTailDatum);
+  };
+  assertValidator(builder, "2 Factory Outputs must pay correctly!");
+});

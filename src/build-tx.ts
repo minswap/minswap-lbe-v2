@@ -1227,19 +1227,19 @@ export class WarehouseBuilder {
     }
   }
 
-  payingFactoryOutput() {
-    const innerPay = (datum: FactoryValidateFactory["datum"]) => {
-      this.tx.payToAddressWithData(
-        this.factoryAddress,
-        {
-          inline: this.toDatumFactory(datum),
-        },
-        {
-          [this.factoryToken]: 1n,
-        },
-      );
-    };
+  innerPayFactory(datum: FactoryValidateFactory["datum"]) {
+    this.tx.payToAddressWithData(
+      this.factoryAddress,
+      {
+        inline: this.toDatumFactory(datum),
+      },
+      {
+        [this.factoryToken]: 1n,
+      },
+    );
+  }
 
+  payingFactoryOutput() {
     const cases: Record<number, () => void> = {
       // Init System
       0: () => {
@@ -1247,14 +1247,12 @@ export class WarehouseBuilder {
           head: LBE_INIT_FACTORY_HEAD,
           tail: LBE_INIT_FACTORY_TAIL,
         };
-        innerPay(factoryDatum);
+        this.innerPayFactory(factoryDatum);
       },
       // Create Treasury
       1: () => {
-        invariant(this.factoryRedeemer);
         invariant(this.factoryInputs.length == 1);
         invariant(this.factoryInputs[0].datum);
-        invariant(typeof this.factoryRedeemer.wrapper !== "string");
         invariant(this.lpAssetName);
         const factoryDatum = this.fromDatumFactory(this.factoryInputs[0].datum);
         const newFactoryHeadDatum: FactoryValidateFactory["datum"] = {
@@ -1265,8 +1263,8 @@ export class WarehouseBuilder {
           head: this.lpAssetName,
           tail: factoryDatum.tail,
         };
-        innerPay(newFactoryHeadDatum);
-        innerPay(newFactoryTailDatum);
+        this.innerPayFactory(newFactoryHeadDatum);
+        this.innerPayFactory(newFactoryTailDatum);
       },
       // Remove Treasury
       2: () => {
@@ -1280,7 +1278,7 @@ export class WarehouseBuilder {
           head: headDatum.head,
           tail: tailDatum.tail,
         };
-        innerPay(newDatum);
+        this.innerPayFactory(newDatum);
       },
     };
 

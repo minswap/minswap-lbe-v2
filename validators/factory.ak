@@ -112,7 +112,7 @@ validator(
           (d_base_asset, d_raise_asset)
         CloseTreasury { base_asset: d_base_asset, raise_asset: d_raise_asset } ->
           (d_base_asset, d_raise_asset)
-        _ -> fail
+        _ -> fail @"Only spending Factory Input when Create | Close Treasury"
       }
     // sort to compute `asset_a`, `asset_b` in term AMM Pool Assets  
     let (asset_a, asset_b) = utils.sort_two_assets(base_asset, raise_asset)
