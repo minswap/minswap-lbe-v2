@@ -1,3 +1,41 @@
+/*
+Using Seller Tx:
+  - Inputs:
+    - 1 seller(UsingSeller)
+    - n order(s)(UpdateOrder)
+  - Outputs:
+    - 1 seller
+    - m order(s)
+  - Mint (m-n) order tokens
+  - Ref:
+    - 1 treasury 
+  - Time:
+    - In discovery phase
+PASS:
+- update order
+- create order
+- withdraw all orders
+- Update orders(withdraw fund) in penalty time
+FAIL:
+- Out of discovery phase
+  - before discovery phase
+  - after discovery phase
+- LBE is cancelled
+- Invalid minting value
+- TODO: No seller input
+- Invalid seller output datum
+  - invalid amount
+  - invalid penalty amount
+  - invalid factory pid
+- Seller output don't have any seller tokens
+- Invalid order output value
+- penalty_amount is less than 0
+- Order's input LBE ID miss match
+- Order's output LBE ID miss match
+- Seller's input LBE ID miss match
+- Update orders(withdraw fund): invalid penalty amount
+- TODO: No Treasury ref inputs
+*/
 import {
   FeedTypeOrder,
   SellerValidateSellerSpending,
@@ -181,7 +219,7 @@ test("using-seller | PASS | create orders: success", async () => {
   await tx.complete();
 });
 
-test("using-seller | PASS | update orders: success", async () => {
+test("using-seller | PASS | withdraw all orders: success", async () => {
   const { builder, options } = warehouse;
   builder.buildUsingSeller({ ...options, orderOutputDatums: [] });
   const tx = builder.complete();
@@ -210,7 +248,7 @@ test("using-seller | FAIL | update orders: before discovery phase", async () => 
   await assertValidator(builder, "Using-seller: Before discovery phase");
 });
 
-test("using-seller | FAIL | update orders: when LBE is cancelled", async () => {
+test("using-seller | FAIL | update orders: LBE is cancelled", async () => {
   const { builder, treasuryDatum, treasuryUTxO } = warehouse;
   const options: BuildUsingSellerOptions = {
     ...warehouse.options,
@@ -353,7 +391,7 @@ test("using-seller | FAIL | update orders: Invalid order output value", async ()
   await assertValidator(builder, "Invalid order output value");
 });
 
-test("using-seller | FAIL | update orders: penalty_amount must higher than or equal to 0", async () => {
+test("using-seller | FAIL | update orders: penalty_amount is less than 0", async () => {
   const { builder, options } = warehouse;
   options.orderOutputDatums[0].penaltyAmount = -1n;
   builder.buildUsingSeller(options);
@@ -363,7 +401,7 @@ test("using-seller | FAIL | update orders: penalty_amount must higher than or eq
   );
 });
 
-test("using-seller | FAIL | update orders: Order's input LBE miss match", async () => {
+test("using-seller | FAIL | update orders: Order's input LBE ID miss match", async () => {
   const { builder, options, orderInDatums } = warehouse;
   options.orderInputs[0].datum = builder.toDatumOrder({
     ...orderInDatums[0],
@@ -374,7 +412,7 @@ test("using-seller | FAIL | update orders: Order's input LBE miss match", async 
   await assertValidator(builder, "Invalid order input LBE ID");
 });
 
-test("using-seller | FAIL | update orders: Order's output LBE miss match", async () => {
+test("using-seller | FAIL | update orders: Order's output LBE ID miss match", async () => {
   const { builder, options, orderOutDatums } = warehouse;
   options.orderOutputDatums[0] = {
     ...orderOutDatums[0],
@@ -385,7 +423,7 @@ test("using-seller | FAIL | update orders: Order's output LBE miss match", async
   await assertValidator(builder, "Invalid order output LBE ID");
 });
 
-test("using-seller | FAIL | update orders: Seller's input LBE miss match", async () => {
+test("using-seller | FAIL | update orders: Seller's input LBE ID miss match", async () => {
   const { builder, options, sellerDatum } = warehouse;
   options.sellerUtxo.datum = builder.toDatumSeller({
     ...sellerDatum,
@@ -419,7 +457,7 @@ test("using-seller | PASS | update orders(withdraw fund) in penalty time", async
 
 test("using-seller | FAIL | update orders(withdraw fund): invalid penalty amount", async () => {
   const { builder, penaltyTimeRange } = warehouse;
-  // withdraw 745 -> penalty will be 186
+  // withdraw 745 -> penalty will be 745/4 = 186
   warehouse.options.orderOutputDatums[0].penaltyAmount = 185n;
   const options = {
     ...warehouse.options,
