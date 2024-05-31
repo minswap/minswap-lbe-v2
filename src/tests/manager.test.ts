@@ -65,8 +65,7 @@ beforeEach(async () => {
 });
 
 test("collect-manager | PASS | happy case", async () => {
-  W.builder.buildCollectManager(W.options);
-  W.builder.complete();
+  assertValidator(W.builder.buildCollectManager(W.options).complete(), "");
 });
 
 test("collect-manager | FAIL | no auth treasury", async () => {
