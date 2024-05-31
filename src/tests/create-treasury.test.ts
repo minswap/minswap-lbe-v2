@@ -1,4 +1,5 @@
 import { WarehouseBuilder, type BuildCreateTreasuryOptions } from "../build-tx";
+import { MANAGER_MIN_ADA } from "../constants";
 import type { UTxO } from "../types";
 import { assertValidator, assertValidatorFail, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
@@ -119,7 +120,7 @@ test("create-treasury | FAIL | have 3 Factory Outs", async () => {
   assertValidatorFail(builder);
 });
 
-test("create-treasury | FAIL | Factory Out Datum incorrect!", async () => {
+test("create-treasury | FAIL | Factory Out Tail Datum incorrect!", async () => {
   let builder: WarehouseBuilder = W.builder;
   builder = builder.buildCreateTreasury(W.options);
   builder.tasks[1] = () => {
@@ -140,3 +141,111 @@ test("create-treasury | FAIL | Factory Out Datum incorrect!", async () => {
   };
   assertValidator(builder, "2 Factory Outputs must pay correctly!");
 });
+
+test("create-treasury | FAIL | Factory Out Head Datum incorrect!", async () => {
+  let builder: WarehouseBuilder = W.builder;
+  builder = builder.buildCreateTreasury(W.options);
+  builder.tasks[1] = () => {
+    const factoryDatum = builder.fromDatumFactory(
+      builder.factoryInputs[0].datum!,
+    );
+    const newFactoryHeadDatum = {
+      // INCORRECT!
+      head: "ff00ff",
+      tail: builder.lpAssetName!,
+    };
+    const newFactoryTailDatum = {
+      head: builder.lpAssetName!,
+      tail: factoryDatum.tail,
+    };
+    builder.innerPayFactory(newFactoryHeadDatum);
+    builder.innerPayFactory(newFactoryTailDatum);
+  };
+  assertValidator(builder, "2 Factory Outputs must pay correctly!");
+});
+
+const remixManagerDatum = (remixDatum: any) => {
+  let builder: WarehouseBuilder = W.builder;
+  builder = builder.buildCreateTreasury(W.options);
+  builder.tasks[5] = () => {
+    builder.tx.payToAddressWithData(
+      builder.managerAddress,
+      {
+        inline: builder.toDatumManager({
+          ...W.defaultManagerDatum,
+          ...remixDatum,
+        }),
+      },
+      {
+        [builder.managerToken]: 1n,
+        lovelace: MANAGER_MIN_ADA,
+      },
+    );
+  };
+  return builder;
+};
+
+test("create-treasury | FAIL | Manager Output Datum incorrect! | X | factory_policy_id", async () => {
+  await assertValidator(
+    remixManagerDatum({ factoryPolicyId: "00" }),
+    "Manager Output must pay correctly!",
+  );
+});
+
+test("create-treasury | FAIL | Manager Output Datum incorrect! | X | orderHash", async () => {
+  await assertValidator(
+    remixManagerDatum({ orderHash: "00" }),
+    "Manager Output must pay correctly!",
+  );
+});
+
+test("create-treasury | FAIL | Manager Output Datum incorrect! | X | sellerHash", async () => {
+  await assertValidator(
+    remixManagerDatum({ sellerHash: "00" }),
+    "Manager Output must pay correctly!",
+  );
+});
+
+test("create-treasury | FAIL | Manager Output Datum incorrect! | X | baseAsset", async () => {
+  await assertValidator(
+    remixManagerDatum({ baseAsset: W.adaToken }),
+    "Manager Output must pay correctly!",
+  );
+});
+
+test("create-treasury | FAIL | Manager Output Datum incorrect! | X | raiseAsset", async () => {
+  await assertValidator(
+    remixManagerDatum({ raiseAsset: W.minswapToken }),
+    "Manager Output must pay correctly!",
+  );
+});
+
+test("create-treasury | FAIL | Manager Output Datum incorrect! | X | sellerCount", async () => {
+  await assertValidator(
+    remixManagerDatum({ sellerCount: 10n }),
+    "Manager Output must pay correctly!",
+  );
+});
+
+test("create-treasury | FAIL | Manager Output Datum incorrect! | X | reserveRaise", async () => {
+  await assertValidator(
+    remixManagerDatum({ reserveRaise: 10n }),
+    "Manager Output must pay correctly!",
+  );
+});
+
+test("create-treasury | FAIL | Manager Output Datum incorrect! | X | totalPenalty", async () => {
+  await assertValidator(
+    remixManagerDatum({ totalPenalty: 10n }),
+    "Manager Output must pay correctly!",
+  );
+});
+
+/**
+ * no manager
+ * manager out wrong
+ * seller out wrong
+ * seller outs not enough
+ * minting value wrong
+ *
+ */
