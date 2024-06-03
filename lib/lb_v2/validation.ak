@@ -1449,10 +1449,10 @@ pub fn validate_refund(
   mint_value: Value,
 ) -> Bool {
   let TreasuryDatum {
+    factory_policy_id,
     collected_fund,
     base_asset,
     raise_asset,
-    seller_hash,
     is_cancelled,
     reserve_raise,
     total_penalty,
@@ -1506,7 +1506,7 @@ pub fn validate_refund(
     ),
     // 3. Mint: burn order NFT
     value.flatten(mint_value) == [
-      (seller_hash, order_auth_an, -list.length(order_inputs)),
+      (factory_policy_id, order_auth_an, -list.length(order_inputs)),
     ],
     is_manager_collected == True,
   }
