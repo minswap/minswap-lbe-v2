@@ -68,7 +68,7 @@ export const genWarehouse = async () => {
       baseAsset: minswapToken,
       raiseAsset: adaToken,
       startTime: BigInt(t.utils.slotToUnixTime(emulator.slot + 60 * 60)),
-      endTime: BigInt(t.utils.slotToUnixTime(emulator.slot + 60 * 60 * 24 * 2)),
+      endTime: BigInt(t.utils.slotToUnixTime(emulator.slot + 60 * 60 * 24 * 5)),
       owner: address2PlutusAddress(ACCOUNT_0.address),
       minimumRaise: null,
       maximumRaise: null,

@@ -1100,8 +1100,8 @@ export class WarehouseBuilder {
       const assets = {
         [this.treasuryToken]: 1n,
         [baseAsset]: treasuryOutDatum.reserveBase,
+        lovelace: TREASURY_MIN_ADA,
       };
-      assets["lovelace"] = (assets["lovelace"] ?? 0n) + TREASURY_MIN_ADA;
       return assets;
     };
     const cases: Record<string, () => Assets> = {
@@ -1194,6 +1194,7 @@ export class WarehouseBuilder {
       invariant(outDatum);
       this.innerPaySeller(outDatum);
     } else if (this.managerInputs.length) {
+      // collecting sellers
       invariant(this.managerInputs.length == 1);
       invariant(this.managerInputs[0].datum);
       const managerDatum = this.fromDatumManager(this.managerInputs[0].datum);
@@ -1209,6 +1210,7 @@ export class WarehouseBuilder {
         this.innerPaySeller(sellerDatum);
       }
     } else {
+      // create new treasury
       invariant(this.treasuryInputs.length === 0);
       invariant(this.factoryRedeemer);
       const baseAsset = (this.factoryRedeemer.wrapper as any)["CreateTreasury"]

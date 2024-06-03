@@ -21,7 +21,7 @@ use lb_v2/utils.{
   amm_pool_validation_hash, assert, calculate_penalty,
   compute_asset_name_from_base_and_raise, default_burn_liquidity, fee_ada,
   get_order_value, manager_auth_an, minimum_ada, order_auth_an, seller_auth_an,
-  treasury_auth_an, treasury_minimum_ada, two_days,
+  treasury_auth_an, treasury_minimum_ada, two_day_ms,
 }
 
 pub fn validate_creating_treasury_out(
@@ -41,7 +41,6 @@ pub fn validate_creating_treasury_out(
     ..
   } = treasury_out
   expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
-  // check all field except owner
   let TreasuryDatum {
     factory_policy_id: t_factory_policy_id,
     manager_hash: t_manager_hash,
@@ -66,7 +65,6 @@ pub fn validate_creating_treasury_out(
   } = treasury_out_datum
   let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
     base_asset
-  // base_asset must be not ada(already validate in factory)
   let expected_treasury_out_value =
     value.zero()
       |> value.add(factory_policy_id, treasury_auth_an, 1)
@@ -106,10 +104,12 @@ pub fn validate_creating_treasury_out(
     total_liquidity == 0,
     when penalty_config is {
       Some(PenaltyConfig { penalty_start_time, percent }) -> and {
-          penalty_start_time >= start_time,
-          penalty_start_time <= end_time,
-          end_time - penalty_start_time <= two_days,
+          penalty_start_time > start_time,
+          penalty_start_time < end_time,
+          // Business requires a maximum penalty period of 2 final days
+          penalty_start_time >= end_time - two_day_ms,
           percent > 0,
+          // Business requires maximum penalty rate is 25 percent
           percent <= 25,
         }
       _ -> True
