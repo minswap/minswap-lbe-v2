@@ -36,21 +36,13 @@ FAIL:
 - Update orders(withdraw fund): invalid penalty amount
 - TODO: No Treasury ref inputs
 */
-import {
-  FeedTypeOrder,
-  SellerValidateSellerSpending,
-  TreasuryValidateTreasurySpending,
-} from "../../plutus";
-import {
-  WarehouseBuilder,
-  type BuildUsingSellerOptions,
-  type WarehouseBuilderOptions,
-} from "../build-tx";
+import { FeedTypeOrder } from "../../plutus";
+import { WarehouseBuilder, type BuildUsingSellerOptions } from "../build-tx";
 import { LBE_FEE, LBE_MIN_OUTPUT_ADA, TREASURY_MIN_ADA } from "../constants";
 import { assertValidator, genWarehouseOptions, loadModule } from "./utils";
 import * as T from "@minswap/translucent";
 import { genWarehouse } from "./warehouse";
-import type { BluePrintAsset, UTxO } from "../types";
+import type { UTxO } from "../types";
 import { plutusAddress2Address } from "../utils";
 
 const MINt = {
@@ -58,30 +50,10 @@ const MINt = {
   assetName: "4d494e74",
 };
 let utxoIndex: number;
-let warehouse: {
-  t: T.Translucent;
-  builder: WarehouseBuilder;
-  options: BuildUsingSellerOptions;
-  baseAsset: BluePrintAsset;
-  warehouseOptions: WarehouseBuilderOptions;
-  treasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"];
-  treasuryUTxO: UTxO;
-  sellerDatum: SellerValidateSellerSpending["sellerInDatum"];
-  sellerUTxO: UTxO;
-  orderOutDatums: FeedTypeOrder["_datum"][];
-  orderInDatums: FeedTypeOrder["_datum"][];
-  owner: string;
-  penaltyTimeRange: {
-    validFrom: number;
-    validTo: number;
-  };
-};
+type AwaitedReturnType<T> = T extends Promise<infer R> ? R : T;
 
-beforeAll(async () => {
-  await loadModule();
-});
-
-beforeEach(async () => {
+let warehouse: AwaitedReturnType<ReturnType<typeof genTestWarehouse>>;
+async function genTestWarehouse() {
   const {
     t,
     minswapToken,
@@ -169,7 +141,7 @@ beforeEach(async () => {
     orderInputs: orderInputUTxOs,
     orderOutputDatums: orderOutDatums,
   };
-  warehouse = {
+  return {
     builder,
     options,
     baseAsset,
@@ -187,6 +159,13 @@ beforeEach(async () => {
       validTo: Number(treasuryDatum.endTime - 2000n),
     },
   };
+}
+beforeAll(async () => {
+  await loadModule();
+});
+
+beforeEach(async () => {
+  warehouse = await genTestWarehouse();
 });
 
 function genOrderUTxO(

@@ -31,13 +31,8 @@ FAIL
 import {
   ManagerValidateManagerSpending,
   SellerValidateSellerSpending,
-  TreasuryValidateTreasurySpending,
 } from "../../plutus";
-import {
-  WarehouseBuilder,
-  type BuildCollectSellersOptions,
-  type WarehouseBuilderOptions,
-} from "../build-tx";
+import { WarehouseBuilder, type BuildCollectSellersOptions } from "../build-tx";
 import { MANAGER_MIN_ADA, TREASURY_MIN_ADA } from "../constants";
 import {
   assertValidator,
@@ -47,27 +42,14 @@ import {
 } from "./utils";
 import * as T from "@minswap/translucent";
 import { genWarehouse } from "./warehouse";
-import type { Assets, BluePrintAsset, UTxO } from "../types";
+import type { Assets, UTxO } from "../types";
 import { plutusAddress2Address } from "../utils";
 import invariant from "@minswap/tiny-invariant";
 
 let utxoIndex: number;
-let warehouse: {
-  t: T.Translucent;
-  builder: WarehouseBuilder;
-  options: BuildCollectSellersOptions;
-  baseAsset: BluePrintAsset;
-  warehouseOptions: WarehouseBuilderOptions;
-  treasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"];
-  treasuryUTxO: UTxO;
-  managerDatum: ManagerValidateManagerSpending["managerInDatum"];
-  managerUTxO: UTxO;
-  expectedManagerDatumOut: ManagerValidateManagerSpending["managerInDatum"];
-  sellerDatums: SellerValidateSellerSpending["sellerInDatum"][];
-  sellerUTxOs: UTxO[];
-  defaultSellerDatum: SellerValidateSellerSpending["sellerInDatum"];
-  owner: string;
-};
+type AwaitedReturnType<T> = T extends Promise<infer R> ? R : T;
+
+let warehouse: AwaitedReturnType<ReturnType<typeof genTestWarehouse>>;
 
 const MINt = {
   policyId: "29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6",
@@ -78,7 +60,7 @@ beforeAll(async () => {
   await loadModule();
 });
 
-beforeEach(async () => {
+async function genTestWarehouse() {
   const {
     t,
     minswapToken,
@@ -155,7 +137,7 @@ beforeEach(async () => {
     reserveRaise: managerDatum.reserveRaise + 9_000n,
     totalPenalty: managerDatum.totalPenalty + 2010n,
   };
-  warehouse = {
+  return {
     t,
     builder,
     options,
@@ -171,6 +153,10 @@ beforeEach(async () => {
     defaultSellerDatum,
     owner: plutusAddress2Address(t.network, treasuryDatum.owner),
   };
+}
+
+beforeEach(async () => {
+  warehouse = await genTestWarehouse();
 });
 
 function genSellerUTxO(
