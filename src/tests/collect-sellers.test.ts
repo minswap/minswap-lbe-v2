@@ -408,11 +408,68 @@ test("collect sellers | FAIL | Managre input value dont have any manager token",
   assertValidator(builder, "Manager input dont have manager token");
 });
 
-/*
-TODO:
-- seller input value dont have seller token
-- Invalid LBE ID:
-  - Seller input
-  - Manager input
-- 2 manager input
-*/
+test("collect sellers | FAIL | Seller input value dont have seller token", async () => {
+  const { builder, options } = warehouse;
+  const { sellerInputs } = options;
+  const assets = sellerInputs[0].assets;
+  delete assets[builder.sellerToken];
+  sellerInputs[0] = {
+    ...sellerInputs[0],
+    assets: assets,
+  };
+  builder.buildCollectSeller({
+    ...options,
+    sellerInputs,
+  });
+  attachValueToInput({ [builder.sellerToken]: 1n });
+  assertValidator(builder, "Collect sellers: Invalid minting");
+});
+
+test("collect sellers | FAIL | Seller Input: Invalid LBE ID", async () => {
+  const { builder, options, sellerDatums } = warehouse;
+  const { sellerInputs } = options;
+  sellerInputs[0] = {
+    ...sellerInputs[0],
+    datum: builder.toDatumSeller({
+      ...sellerDatums[0],
+      baseAsset: MINt,
+    }),
+  };
+  builder.buildCollectSeller({
+    ...options,
+    sellerInputs,
+  });
+  assertValidator(builder, "Collect Sellers: invalid seller inputs' LBE ID");
+});
+
+test("collect sellers | FAIL | Manager Input: Invalid LBE ID", async () => {
+  const { builder, options, managerDatum } = warehouse;
+  const { managerInput } = options;
+  builder.buildCollectSeller({
+    ...options,
+    managerInput: {
+      ...managerInput,
+      datum: builder.toDatumManager({ ...managerDatum, baseAsset: MINt }),
+    },
+  });
+  assertValidator(builder, "Collect Sellers: invalid manager input's LBE ID");
+});
+
+test("collect sellers | FAIL | More than 1 manager input", async () => {
+  const { builder, options } = warehouse;
+  const { managerInput } = options;
+  builder.tasks.push(() => {
+    builder.tx
+      .readFrom([builder.deployedValidators["managerValidator"]])
+      .collectFrom(
+        [
+          {
+            ...managerInput,
+            outputIndex: ++utxoIndex,
+          },
+        ],
+        T.Data.to("ManageSeller", ManagerValidateManagerSpending.redeemer),
+      );
+  });
+  assertValidatorFail(builder);
+});

@@ -1,4 +1,3 @@
-use aiken/cbor
 use aiken/dict.{Dict}
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
@@ -108,6 +107,7 @@ pub fn validate_creating_treasury_out(
     when penalty_config is {
       Some(PenaltyConfig { penalty_start_time, percent }) -> and {
           penalty_start_time >= start_time,
+          penalty_start_time <= end_time,
           end_time - penalty_start_time <= two_days,
           percent > 0,
           percent <= 25,
@@ -1622,10 +1622,10 @@ pub fn validate_manage_seller(
     ..
   } = manager_in_datum
   // validate LBE ID
-  expect and {
-      sm_base_asset == base_asset,
-      sm_raise_asset == raise_asset,
-    }
+  expect assert(and {
+        sm_base_asset == base_asset,
+        sm_raise_asset == raise_asset,
+      }, @"Collect Sellers: invalid manager input's LBE ID")
   expect Output { datum: InlineDatum(raw_manager_out_datum), .. } = manager_out
   expect manager_out_datum: ManagerDatum = raw_manager_out_datum
   if and {
@@ -1673,10 +1673,10 @@ pub fn validate_manage_seller(
             penalty_amount,
             ..
           } = seller_datum
-          expect and {
-              s_base_asset == base_asset,
-              s_raise_asset == raise_asset,
-            }
+          expect assert(and {
+                s_base_asset == base_asset,
+                s_raise_asset == raise_asset,
+              }, @"Collect Sellers: invalid seller inputs' LBE ID")
           [
             acc_reserve_raise + amount,
             acc_total_penalty + penalty_amount,
