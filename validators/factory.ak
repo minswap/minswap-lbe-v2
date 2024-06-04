@@ -150,6 +150,7 @@ validator(
             treasury_hash: treasury_hash,
           )
         // finding exactly 1 Manager Output
+        // redundant logic
         let manager_out =
           validation.get_manager_output(
             outputs: outputs,
@@ -159,6 +160,7 @@ validator(
         // Extract some necessary data.
         let Input { output: Output { value: factory_input_value, .. }, .. } =
           factory_input
+        // ref script of factory out
         let Output { datum: f_out_head_datum, value: f_out_head_value, .. } =
           f_out_head
         let Output { datum: f_out_tail_datum, value: f_out_tail_value, .. } =
@@ -256,6 +258,7 @@ validator(
       CloseTreasury { .. } -> {
         // finding exactly 2 Factory Inputs
         expect [factory_input_1, factory_input_2] = factory_inputs
+        // duplicate logic find factory out
         // finding exactly 1 Factory Output
         expect [factory_output] =
           list.filter(

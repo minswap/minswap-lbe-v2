@@ -73,7 +73,7 @@ pub fn validate_creating_treasury_out(
   and {
     // treasury datum
     base_asset != raise_asset,
-    base_asset.policy_id != ada_policy_id,
+    base_asset_pid != ada_policy_id,
     factory_policy_id == t_factory_policy_id,
     manager_hash == t_manager_hash,
     seller_hash == t_seller_hash,
@@ -109,7 +109,8 @@ pub fn validate_creating_treasury_out(
           // Business requires a maximum penalty period of 2 final days
           penalty_start_time >= end_time - two_day_ms,
           percent > 0,
-          // Business requires maximum penalty rate is 25 percent
+          // Business requires maximum penalty rate is 25.00 percent
+          // shold be more exact.
           percent <= 25,
         }
       _ -> True
