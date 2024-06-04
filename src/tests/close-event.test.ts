@@ -1,14 +1,10 @@
-import type {
-  FactoryValidateFactory,
-  TreasuryValidateTreasurySpending,
-} from "../../plutus";
 import { WarehouseBuilder, type BuildCloseEventOptions } from "../build-tx";
 import {
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
   TREASURY_MIN_ADA,
 } from "../constants";
-import type { UTxO } from "../types";
+import type { FactoryDatum, TreasuryDatum, UTxO } from "../types";
 import { computeLPAssetName } from "../utils";
 import { assertValidator, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
@@ -22,7 +18,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   W = await genWarehouse();
   let builder = new WarehouseBuilder(W.warehouseOptions);
-  let treasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] = {
+  let treasuryDatum: TreasuryDatum = {
     ...W.defaultTreasuryDatum,
     isCancelled: true,
     isManagerCollected: true,
@@ -42,11 +38,11 @@ beforeEach(async () => {
     treasuryDatum.baseAsset.policyId + treasuryDatum.baseAsset.assetName,
     treasuryDatum.raiseAsset.policyId + treasuryDatum.raiseAsset.assetName,
   );
-  let factoryHeadDatum: FactoryValidateFactory["datum"] = {
+  let factoryHeadDatum: FactoryDatum = {
     head: LBE_INIT_FACTORY_HEAD,
     tail: lpAssetName,
   };
-  let factoryTailDatum: FactoryValidateFactory["datum"] = {
+  let factoryTailDatum: FactoryDatum = {
     head: lpAssetName,
     tail: LBE_INIT_FACTORY_TAIL,
   };

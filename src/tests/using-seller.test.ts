@@ -36,14 +36,13 @@ FAIL:
 - Update orders(withdraw fund): invalid penalty amount
 - TODO: No Treasury ref inputs
 */
-import { FeedTypeOrder } from "../../plutus";
+import * as T from "@minswap/translucent";
 import { WarehouseBuilder, type BuildUsingSellerOptions } from "../build-tx";
 import { LBE_FEE, LBE_MIN_OUTPUT_ADA, TREASURY_MIN_ADA } from "../constants";
-import { assertValidator, genWarehouseOptions, loadModule } from "./utils";
-import * as T from "@minswap/translucent";
-import { genWarehouse } from "./warehouse";
-import type { UTxO } from "../types";
+import type { OrderDatum, UTxO } from "../types";
 import { plutusAddress2Address } from "../utils";
+import { assertValidator, genWarehouseOptions, loadModule } from "./utils";
+import { genWarehouse } from "./warehouse";
 
 const MINt = {
   policyId: "29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6",
@@ -99,7 +98,7 @@ async function genTestWarehouse() {
     address: builder.sellerAddress,
     datum: builder.toDatumSeller(sellerDatum),
   };
-  const orderInDatums: FeedTypeOrder["_datum"][] = [
+  const orderInDatums: OrderDatum[] = [
     {
       ...defaultOrderDatum,
       amount: 12n,
@@ -116,7 +115,7 @@ async function genTestWarehouse() {
       penaltyAmount: 0n,
     },
   ];
-  const orderOutDatums: FeedTypeOrder["_datum"][] = [
+  const orderOutDatums: OrderDatum[] = [
     {
       ...defaultOrderDatum,
       amount: 100n,
@@ -168,10 +167,7 @@ beforeEach(async () => {
   warehouse = await genTestWarehouse();
 });
 
-function genOrderUTxO(
-  datum: FeedTypeOrder["_datum"],
-  builder: WarehouseBuilder,
-): UTxO {
+function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): UTxO {
   return {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
     outputIndex: ++utxoIndex,

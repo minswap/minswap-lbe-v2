@@ -1,11 +1,6 @@
-import * as T from "@minswap/translucent";
-import {
-  TreasuryValidateTreasurySpending,
-  type ManagerValidateManagerSpending,
-} from "../../plutus";
 import { WarehouseBuilder, type BuildCollectManagerOptions } from "../build-tx";
 import { TREASURY_MIN_ADA } from "../constants";
-import type { UTxO } from "../types";
+import type { ManagerDatum, TreasuryDatum, UTxO } from "../types";
 import { assertValidator, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
 
@@ -18,7 +13,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   W = await genWarehouse();
   let builder = new WarehouseBuilder(W.warehouseOptions);
-  const managerDatum: ManagerValidateManagerSpending["managerInDatum"] = {
+  const managerDatum: ManagerDatum = {
     ...W.defaultManagerDatum,
     sellerCount: 0n,
     reserveRaise: 100_000_000_000n,
@@ -34,7 +29,7 @@ beforeEach(async () => {
     address: builder.managerAddress,
     datum: builder.toDatumManager(managerDatum),
   };
-  const treasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] = {
+  const treasuryDatum: TreasuryDatum = {
     ...W.defaultTreasuryDatum,
   };
   const treasuryInput: UTxO = {
@@ -109,17 +104,14 @@ test("collect-manager | FAIL | wrong treasury out datum", async () => {
 });
 
 test("collect-manager | FAIL | LBE ID missmatch", async () => {
-  const { builder } = W;
+  let builder: WarehouseBuilder = W.builder;
   const treasuryInDatum = {
     ...W.treasuryDatum,
     baseAsset: W.adaToken,
   };
   const treasuryInput: UTxO = {
     ...W.treasuryInput,
-    datum: T.Data.to(
-      treasuryInDatum,
-      TreasuryValidateTreasurySpending.treasuryInDatum,
-    ),
+    datum: builder.toDatumTreasury(treasuryInDatum),
   };
   const options = {
     ...W.options,
