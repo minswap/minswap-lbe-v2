@@ -44,9 +44,8 @@ import {
 import { genWarehouse } from "./warehouse";
 
 let utxoIndex: number;
-type AwaitedReturnType<T> = T extends Promise<infer R> ? R : T;
 
-let warehouse: AwaitedReturnType<ReturnType<typeof genTestWarehouse>>;
+let warehouse: Awaited<ReturnType<typeof genTestWarehouse>>;
 
 const MINt = {
   policyId: "29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6",
