@@ -1,4 +1,5 @@
 use aiken/builtin
+use aiken/bytearray
 use aiken/fuzz
 use aiken/list
 use aiken/transaction.{
@@ -35,19 +36,7 @@ test test_sort_two_consecutive_factory_datum_1(
   factory_node via factory_params(),
 ) {
   let (a, b, c) = factory_node
-  expect [x, y, z] =
-    list.sort(
-      [a, b, c],
-      fn(a, b) {
-        if a == b {
-          Equal
-        } else if builtin.less_than_bytearray(a, b) {
-          Less
-        } else {
-          Greater
-        }
-      },
-    )
+  expect [x, y, z] = list.sort([a, b, c], bytearray.compare)
   if and {
     x != y,
     y != z,
@@ -68,19 +57,7 @@ test test_sort_two_consecutive_factory_datum_2(
   factory_node via factory_params(),
 ) {
   let (a, b, _) = factory_node
-  expect [x, y] =
-    list.sort(
-      [a, b],
-      fn(a, b) {
-        if a == b {
-          Equal
-        } else if builtin.less_than_bytearray(a, b) {
-          Less
-        } else {
-          Greater
-        }
-      },
-    )
+  expect [x, y] = list.sort([a, b], bytearray.compare)
   if x != y {
     // datum_a.head == initial head
     let datum_a = FactoryDatum { head: #"00", tail: x }
