@@ -1,5 +1,6 @@
 use aiken/builtin
 use aiken/fuzz
+use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Output, OutputReference, TransactionId,
 }
@@ -14,23 +15,97 @@ use lb_v2/utils.{
 }
 use lb_v2/validation.{apply_collecting_orders}
 
-test test_sort_two_consecutive_factory_datum_1() {
-  let datum_a = FactoryDatum { head: #"0000", tail: #"00ff" }
-  let datum_b = FactoryDatum { head: #"00ff", tail: #"ffff" }
-  let (d1, d2) = sort_two_consecutive_factory_datum(datum_b, datum_a)
-  and {
-    builtin.serialise_data(d1) == builtin.serialise_data(datum_a),
-    builtin.serialise_data(d2) == builtin.serialise_data(datum_b),
+// dont use  fuzz.bytearray_between(64, 64) beacause it have a bug
+fn custom_factory_node() -> Fuzzer<ByteArray> {
+  let head = fuzz.bytearray()
+  let tail = fuzz.bytearray()
+  fuzz.map2(head, tail, fn(h, t) { builtin.append_bytearray(h, t) })
+}
+
+fn factory_params() -> Fuzzer<(ByteArray, ByteArray, ByteArray)> {
+  fuzz.map3(
+    fuzz_0: custom_factory_node(),
+    fuzz_1: custom_factory_node(),
+    fuzz_2: custom_factory_node(),
+    f: fn(x0, x1, x2) { (x0, x1, x2) },
+  )
+}
+
+test test_sort_two_consecutive_factory_datum_1(
+  factory_node via factory_params(),
+) {
+  let (a, b, c) = factory_node
+  expect [x, y, z] =
+    list.sort(
+      [a, b, c],
+      fn(a, b) {
+        if a == b {
+          Equal
+        } else if builtin.less_than_bytearray(a, b) {
+          Less
+        } else {
+          Greater
+        }
+      },
+    )
+  if and {
+    x != y,
+    y != z,
+  } {
+    let datum_a = FactoryDatum { head: x, tail: y }
+    let datum_b = FactoryDatum { head: y, tail: z }
+    let (d1, d2) = sort_two_consecutive_factory_datum(datum_b, datum_a)
+    and {
+      builtin.serialise_data(d1) == builtin.serialise_data(datum_a),
+      builtin.serialise_data(d2) == builtin.serialise_data(datum_b),
+    }
+  } else {
+    True
   }
 }
 
-test test_sort_two_consecutive_factory_datum_2() {
-  let datum_a = FactoryDatum { head: #"00ff", tail: #"ffff" }
-  let datum_b = FactoryDatum { head: #"0000", tail: #"00ff" }
-  let (d1, d2) = sort_two_consecutive_factory_datum(datum_b, datum_a)
-  and {
-    builtin.serialise_data(d1) == builtin.serialise_data(datum_b),
-    builtin.serialise_data(d2) == builtin.serialise_data(datum_a),
+test test_sort_two_consecutive_factory_datum_2(
+  factory_node via factory_params(),
+) {
+  let (a, b, _) = factory_node
+  expect [x, y] =
+    list.sort(
+      [a, b],
+      fn(a, b) {
+        if a == b {
+          Equal
+        } else if builtin.less_than_bytearray(a, b) {
+          Less
+        } else {
+          Greater
+        }
+      },
+    )
+  if x != y {
+    // datum_a.head == initial head
+    let datum_a = FactoryDatum { head: #"00", tail: x }
+    let datum_b = FactoryDatum { head: x, tail: y }
+    let (d1, d2) = sort_two_consecutive_factory_datum(datum_b, datum_a)
+    expect and {
+        builtin.serialise_data(d1) == builtin.serialise_data(datum_a),
+        builtin.serialise_data(d2) == builtin.serialise_data(datum_b),
+      }
+
+    // datum_b.tail == initial tail
+    let datum_a = FactoryDatum { head: x, tail: y }
+    let datum_b =
+      FactoryDatum {
+        head: y,
+        tail: #"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
+      }
+    let (d1, d2) = sort_two_consecutive_factory_datum(datum_b, datum_a)
+    expect and {
+        builtin.serialise_data(d1) == builtin.serialise_data(datum_a),
+        builtin.serialise_data(d2) == builtin.serialise_data(datum_b),
+      }
+    True
+  } else {
+    True
   }
 }
 
