@@ -1,24 +1,26 @@
-import type {
-  FactoryValidateFactory,
-  FeedTypeOrder,
-  ManagerValidateManagerSpending,
-  SellerValidateSellerSpending,
-  TreasuryValidateTreasurySpending,
-} from "../../plutus";
+import * as T from "@minswap/translucent";
 import {
   DEFAULT_NUMBER_SELLER,
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
 } from "../constants";
-import type { BluePrintAsset, Emulator, Translucent } from "../types";
+import type {
+  BluePrintAsset,
+  Emulator,
+  FactoryDatum,
+  ManagerDatum,
+  OrderDatum,
+  SellerDatum,
+  Translucent,
+  TreasuryDatum,
+} from "../types";
 import { address2PlutusAddress } from "../utils";
 import { genWarehouseOptions, generateAccount } from "./utils";
-import * as T from "@minswap/translucent";
 
 export const skipToCountingPhase = (options: {
   t: Translucent;
   e: Emulator;
-  datum: TreasuryValidateTreasurySpending["treasuryInDatum"];
+  datum: TreasuryDatum;
 }) => {
   const { t, e, datum } = options;
   const discoveryEndSlot = t.utils.unixTimeToSlot(Number(datum.endTime));
@@ -51,58 +53,52 @@ export const genWarehouse = async () => {
   t.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
   const warehouseOptions = await genWarehouseOptions(t);
 
-  const defaultFactoryDatum: FactoryValidateFactory["datum"] = {
+  const defaultFactoryDatum: FactoryDatum = {
     head: LBE_INIT_FACTORY_HEAD,
     tail: LBE_INIT_FACTORY_TAIL,
   };
   let validators = warehouseOptions.validators;
-  const defaultTreasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] =
-    {
-      factoryPolicyId: t.utils.validatorToScriptHash(
-        validators.factoryValidator,
-      ),
-      sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
-      orderHash: t.utils.validatorToScriptHash(validators.orderValidator),
-      managerHash: t.utils.validatorToScriptHash(validators.managerValidator),
-      collectedFund: 0n,
-      baseAsset: minswapToken,
-      raiseAsset: adaToken,
-      startTime: BigInt(t.utils.slotToUnixTime(emulator.slot + 60 * 60)),
-      endTime: BigInt(t.utils.slotToUnixTime(emulator.slot + 60 * 60 * 24 * 5)),
-      owner: address2PlutusAddress(ACCOUNT_0.address),
-      minimumRaise: null,
-      maximumRaise: null,
-      reserveBase: 69000000000000n,
-      reserveRaise: 0n,
-      totalLiquidity: 0n,
-      penaltyConfig: null,
-      totalPenalty: 0n,
-      isCancelled: false,
-      minimumOrderRaise: null,
-      isManagerCollected: false,
-      isCancelable: false,
-    };
-  const defaultManagerDatum: ManagerValidateManagerSpending["managerInDatum"] =
-    {
-      factoryPolicyId: t.utils.validatorToScriptHash(
-        validators.factoryValidator,
-      ),
-      orderHash: t.utils.validatorToScriptHash(validators.orderValidator),
-      sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
-      baseAsset: minswapToken,
-      raiseAsset: adaToken,
-      sellerCount: DEFAULT_NUMBER_SELLER,
-      reserveRaise: 0n,
-      totalPenalty: 0n,
-    };
-  const defaultSellerDatum: SellerValidateSellerSpending["sellerInDatum"] = {
+  const defaultTreasuryDatum: TreasuryDatum = {
+    factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
+    sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
+    orderHash: t.utils.validatorToScriptHash(validators.orderValidator),
+    managerHash: t.utils.validatorToScriptHash(validators.managerValidator),
+    collectedFund: 0n,
+    baseAsset: minswapToken,
+    raiseAsset: adaToken,
+    startTime: BigInt(t.utils.slotToUnixTime(emulator.slot + 60 * 60)),
+    endTime: BigInt(t.utils.slotToUnixTime(emulator.slot + 60 * 60 * 24 * 5)),
+    owner: address2PlutusAddress(ACCOUNT_0.address),
+    minimumRaise: null,
+    maximumRaise: null,
+    reserveBase: 69000000000000n,
+    reserveRaise: 0n,
+    totalLiquidity: 0n,
+    penaltyConfig: null,
+    totalPenalty: 0n,
+    isCancelled: false,
+    minimumOrderRaise: null,
+    isManagerCollected: false,
+    isCancelable: false,
+  };
+  const defaultManagerDatum: ManagerDatum = {
+    factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
+    orderHash: t.utils.validatorToScriptHash(validators.orderValidator),
+    sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
+    baseAsset: minswapToken,
+    raiseAsset: adaToken,
+    sellerCount: DEFAULT_NUMBER_SELLER,
+    reserveRaise: 0n,
+    totalPenalty: 0n,
+  };
+  const defaultSellerDatum: SellerDatum = {
     factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
     baseAsset: minswapToken,
     raiseAsset: adaToken,
     amount: 0n,
     penaltyAmount: 0n,
   };
-  const defaultOrderDatum: FeedTypeOrder["_datum"] = {
+  const defaultOrderDatum: OrderDatum = {
     factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
     baseAsset: minswapToken,
     raiseAsset: adaToken,

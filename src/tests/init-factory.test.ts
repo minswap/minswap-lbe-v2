@@ -1,9 +1,8 @@
-import {
-  FactoryValidateFactory,
-  FactoryValidateFactoryMinting,
-} from "../../plutus";
+import * as T from "@minswap/translucent";
+import { FactoryValidateFactoryMinting } from "../../plutus";
 import { WarehouseBuilder } from "../build-tx";
 import { LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
+import type { FactoryDatum } from "../types";
 import {
   DUMMY_SEED_UTXO,
   assertValidator,
@@ -11,7 +10,6 @@ import {
   generateAccount,
   loadModule,
 } from "./utils";
-import * as T from "@minswap/translucent";
 
 let warehouse: any;
 
@@ -81,7 +79,7 @@ test("init-factory | FAIL | missing Factory Token", async () => {
   builder.buildInitFactory({ seedUtxo: DUMMY_SEED_UTXO });
   builder.tasks.pop();
   builder.tasks.push(() => {
-    const factoryDatum: FactoryValidateFactory["datum"] = {
+    const factoryDatum: FactoryDatum = {
       head: LBE_INIT_FACTORY_HEAD,
       tail: LBE_INIT_FACTORY_TAIL,
     };
@@ -104,7 +102,7 @@ test("init-factory | FAIL | Factory Datum is not correct", async () => {
   builder.buildInitFactory({ seedUtxo: DUMMY_SEED_UTXO });
   builder.tasks.pop();
   builder.tasks.push(() => {
-    const factoryDatum: FactoryValidateFactory["datum"] = {
+    const factoryDatum: FactoryDatum = {
       head: LBE_INIT_FACTORY_HEAD,
       tail: LBE_INIT_FACTORY_HEAD, // wrong here
     };

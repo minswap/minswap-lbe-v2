@@ -1,5 +1,12 @@
-import { beforeEach, expect, test } from "bun:test";
+import invariant from "@minswap/tiny-invariant";
 import * as T from "@minswap/translucent";
+import { beforeEach, expect, test } from "bun:test";
+import { FactoryValidatorValidateFactory as AmmValidateFactory } from "../../amm-plutus";
+import {
+  FeedTypeAmmPool,
+  FeedTypeOrder,
+  TreasuryValidateTreasurySpending,
+} from "../../plutus";
 import {
   WarehouseBuilder,
   type BuildAddSellersOptions,
@@ -12,41 +19,30 @@ import {
   type WarehouseBuilderOptions,
 } from "../build-tx";
 import {
+  collectMinswapValidators,
+  collectValidators,
+  deployMinswapValidators,
   deployValidators,
   type DeployedValidators,
-  type Validators,
-  collectValidators,
   type MinswapValidators,
-  deployMinswapValidators,
-  collectMinswapValidators,
+  type Validators,
 } from "../deploy-validators";
+import type {
+  Address,
+  Assets,
+  Emulator,
+  OrderDatum,
+  OutputData,
+  Translucent,
+  TreasuryDatum,
+  UTxO,
+} from "../types";
+import { address2PlutusAddress, calculateInitialLiquidity } from "../utils";
 import {
   generateAccount,
   quickSubmitBuilder,
   type GeneratedAccount,
 } from "./utils";
-import type {
-  Address,
-  Assets,
-  Emulator,
-  OutputData,
-  Translucent,
-  UTxO,
-} from "../types";
-import {
-  address2PlutusAddress,
-  calculateInitialLiquidity,
-  computeLPAssetName,
-} from "../utils";
-import { LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
-import {
-  FactoryValidateFactory,
-  FeedTypeAmmPool,
-  FeedTypeOrder,
-  TreasuryValidateTreasurySpending,
-} from "../../plutus";
-import { FactoryValidatorValidateFactory as AmmValidateFactory } from "../../amm-plutus";
-import invariant from "@minswap/tiny-invariant";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -174,7 +170,7 @@ test("example flow", async () => {
   // create treasury
   const discoveryStartSlot = emulator.slot + 60 * 60;
   const discoveryEndSlot = discoveryStartSlot + 60 * 60 * 24 * 2; // 2 days
-  const treasuryDatum: TreasuryValidateTreasurySpending["treasuryInDatum"] = {
+  const treasuryDatum: TreasuryDatum = {
     factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
     sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
     orderHash: t.utils.validatorToScriptHash(validators.orderValidator),
@@ -226,7 +222,7 @@ test("example flow", async () => {
       t.utils.validatorToAddress(validators.treasuryValidator),
     )
   ).find((u) => !u.scriptRef) as UTxO;
-  let orderDatum: FeedTypeOrder["_datum"] = {
+  let orderDatum: OrderDatum = {
     factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
     baseAsset,
     raiseAsset,

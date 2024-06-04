@@ -28,23 +28,20 @@ FAIL
   - Manager input
   - Manager output
 */
-import {
-  ManagerValidateManagerSpending,
-  SellerValidateSellerSpending,
-} from "../../plutus";
+import invariant from "@minswap/tiny-invariant";
+import * as T from "@minswap/translucent";
+import { ManagerValidateManagerSpending } from "../../plutus";
 import { WarehouseBuilder, type BuildCollectSellersOptions } from "../build-tx";
 import { MANAGER_MIN_ADA, TREASURY_MIN_ADA } from "../constants";
+import type { Assets, ManagerDatum, SellerDatum, UTxO } from "../types";
+import { plutusAddress2Address } from "../utils";
 import {
   assertValidator,
   assertValidatorFail,
   genWarehouseOptions,
   loadModule,
 } from "./utils";
-import * as T from "@minswap/translucent";
 import { genWarehouse } from "./warehouse";
-import type { Assets, UTxO } from "../types";
-import { plutusAddress2Address } from "../utils";
-import invariant from "@minswap/tiny-invariant";
 
 let utxoIndex: number;
 type AwaitedReturnType<T> = T extends Promise<infer R> ? R : T;
@@ -92,7 +89,7 @@ async function genTestWarehouse() {
     address: builder.treasuryAddress,
     datum: builder.toDatumTreasury(treasuryDatum),
   };
-  const managerDatum: ManagerValidateManagerSpending["managerInDatum"] = {
+  const managerDatum: ManagerDatum = {
     ...defaultManagerDatum,
   };
   const managerUTxO = {
@@ -104,7 +101,7 @@ async function genTestWarehouse() {
     address: builder.managerAddress,
     datum: builder.toDatumManager(managerDatum),
   };
-  const sellerDatums: SellerValidateSellerSpending["sellerInDatum"][] = [
+  const sellerDatums: SellerDatum[] = [
     {
       ...defaultSellerDatum,
       amount: -1_000n,
@@ -159,10 +156,7 @@ beforeEach(async () => {
   warehouse = await genTestWarehouse();
 });
 
-function genSellerUTxO(
-  datum: SellerValidateSellerSpending["sellerInDatum"],
-  builder: WarehouseBuilder,
-): UTxO {
+function genSellerUTxO(datum: SellerDatum, builder: WarehouseBuilder): UTxO {
   return {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
     outputIndex: ++utxoIndex,
