@@ -10,11 +10,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
       - uses: aiken-lang/setup-aiken@v1.0.2
         with:
           version: v1.0.26-alpha
-
-      - run: aiken fmt --check
+        name: Set up aiken
+      - uses: oven-sh/setup-bun@v1  
+        with:
+          bun-version: 1.1.4
+        name: Set up bun
+      - name: Install dependencies
+        run: bun install
+      - run: aiken fmt --check && bun format --check
+        name: Run format 
       - run: aiken check -D
-      - run: aiken build
+        name: Run onchain tests
+      - run: aiken build -t verbose && bun gen-plutus
+        name: Set up offchain tests
+      - run: bun test
+        name: Run offchain tests
