@@ -33,11 +33,16 @@ import type {
   Emulator,
   OrderDatum,
   OutputData,
+  ProtocolParameters,
   Translucent,
   TreasuryDatum,
   UTxO,
 } from "../types";
-import { address2PlutusAddress, calculateInitialLiquidity } from "../utils";
+import {
+  address2PlutusAddress,
+  calculateInitialLiquidity,
+  toUnit,
+} from "../utils";
 import {
   generateAccount,
   quickSubmitBuilder,
@@ -66,7 +71,11 @@ let ammFactoryAddress: string;
 beforeEach(async () => {
   await T.loadModule();
   await T.CModuleLoader.load();
-  emulator = new T.Emulator([]);
+  let protocolParameters: ProtocolParameters = {
+    ...T.PROTOCOL_PARAMETERS_DEFAULT,
+    maxTxSize: 36384,
+  };
+  emulator = new T.Emulator([], protocolParameters);
   t = await T.Translucent.new(emulator);
   ammValidators = collectMinswapValidators({
     t,
@@ -98,7 +107,7 @@ beforeEach(async () => {
     },
     assets: {
       lovelace: 10_000_000n,
-      [T.toUnit(
+      [toUnit(
         t.utils.validatorToScriptHash(ammValidators.authenValidator),
         "4d5346",
       )]: 1n,
@@ -114,12 +123,15 @@ beforeEach(async () => {
   };
   ACCOUNT_0 = await generateAccount({
     lovelace: 2000000000000000000n,
-    [T.toUnit(baseAsset.policyId, baseAsset.assetName)]: 69_000_000_000_000n,
+    [toUnit(baseAsset.policyId, baseAsset.assetName)]: 69_000_000_000_000n,
   });
   ACCOUNT_1 = await generateAccount({
     lovelace: 2000000000000000000n,
   });
-  emulator = new T.Emulator([ACCOUNT_0, ACCOUNT_1, factoryAccount]);
+  emulator = new T.Emulator(
+    [ACCOUNT_0, ACCOUNT_1, factoryAccount],
+    protocolParameters,
+  );
   t = await T.Translucent.new(emulator);
   emulator.awaitBlock(10_000); // For validity ranges to be valid
   t.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);

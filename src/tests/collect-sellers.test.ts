@@ -34,7 +34,7 @@ import { ManagerValidateManagerSpending } from "../../plutus";
 import { WarehouseBuilder, type BuildCollectSellersOptions } from "../build-tx";
 import { MANAGER_MIN_ADA, TREASURY_MIN_ADA } from "../constants";
 import type { Assets, ManagerDatum, SellerDatum, UTxO } from "../types";
-import { plutusAddress2Address } from "../utils";
+import { plutusAddress2Address, toUnit } from "../utils";
 import {
   assertValidator,
   assertValidatorFail,
@@ -83,7 +83,7 @@ async function genTestWarehouse() {
     assets: {
       lovelace: TREASURY_MIN_ADA,
       [builder.treasuryToken]: 1n,
-      [T.toUnit(baseAsset.policyId, baseAsset.assetName)]:
+      [toUnit(baseAsset.policyId, baseAsset.assetName)]:
         treasuryDatum.reserveBase,
     },
     address: builder.treasuryAddress,
