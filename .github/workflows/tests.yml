@@ -14,7 +14,11 @@ jobs:
       - uses: aiken-lang/setup-aiken@v1.0.2
         with:
           version: v1.0.26-alpha
-
+      - uses: oven-sh/setup-bun@v1  
+        with:
+          bun-version: 1.1.4  # Specify the Bun version (or 'latest')
       - run: aiken fmt --check
       - run: aiken check -D
-      - run: aiken build
+      - run: aiken build -t verbose
+      - run: bun gen-plutus
+      - run: bun test
