@@ -74,6 +74,7 @@ pub fn validate_creating_treasury_out(
     // treasury datum
     base_asset != raise_asset,
     base_asset_pid != ada_policy_id,
+    base_asset_an != ada_asset_name,
     factory_policy_id == t_factory_policy_id,
     manager_hash == t_manager_hash,
     seller_hash == t_seller_hash,
