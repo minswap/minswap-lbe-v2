@@ -983,7 +983,6 @@ pub fn validate_collect_order(
     collected_fund,
     base_asset,
     raise_asset,
-    is_cancelled,
     is_manager_collected,
     reserve_raise,
     total_penalty,
@@ -1033,12 +1032,9 @@ pub fn validate_collect_order(
     ),
     // 3. validate time range(no need to check because It must collect seller first)
     //    - datum.end_time < start_valid_time_range
-    // 4. collect manager
-    is_manager_collected == True,
     // 5. Mint nothing
     value.flatten(mint_value) == [],
-    // 6. Not cancel yet
-    is_cancelled == False,
+    // 6. Dont care about cancelation
     // 7. Collected manager
     is_manager_collected == True,
     // 8. Reach min raise
@@ -1475,15 +1471,17 @@ pub fn validate_refund(
   //        - value_out =  minimum_ada+ refund_amount(refund_amount= amount+penalty )
   //        - address = owner of order input datum
   //    - calculate all order fund
-  let (total_orders_collected_fund, total_orders_amount, total_orders_penalty) =
+  let (total_orders_amount, total_orders_penalty) =
     apply_refund_orders(
       order_inputs: order_inputs,
       outputs: outputs,
       base_asset: base_asset,
       raise_asset: raise_asset,
     )
-
+  let orders_collected_fund = total_orders_amount + total_orders_penalty
   and {
+    // check this LBE collected all orders
+    collected_fund == reserve_raise + total_penalty,
     // 2. validate treasury.
     //    - treasury_datum
     //      - is_cancelled = True
@@ -1496,13 +1494,13 @@ pub fn validate_refund(
     is_cancelled == True,
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
-      collected_fund: collected_fund - total_orders_collected_fund,
+      collected_fund: collected_fund - orders_collected_fund,
       reserve_raise: reserve_raise - total_orders_amount,
       total_penalty: total_penalty - total_orders_penalty,
     },
     treasury_out_value == (
       treasury_in_value
-        |> value.add(raise_asset_pid, raise_asset_an, -total_orders_collected_fund)
+        |> value.add(raise_asset_pid, raise_asset_an, -orders_collected_fund)
     ),
     // 3. Mint: burn order NFT
     value.flatten(mint_value) == [
@@ -1519,7 +1517,7 @@ pub fn apply_refund_orders(
   outputs: List<Output>,
   base_asset: Asset,
   raise_asset: Asset,
-) -> (Int, Int, Int) {
+) -> (Int, Int) {
   expect [order_input, ..remaining_order_inputs] = order_inputs
   expect Input {
     output: Output { datum: InlineDatum(raw_order_in_datum), .. },
@@ -1527,23 +1525,19 @@ pub fn apply_refund_orders(
   } = order_input
   expect order_in_datum: OrderDatum = raw_order_in_datum
   expect [order_output, ..remaining_outputs] = outputs
-  let (collected_fund, amount, penalty_amount) =
+  let (amount, penalty_amount) =
     apply_refund_order(order_in_datum, order_output, base_asset, raise_asset)
   if remaining_order_inputs == [] {
-    (collected_fund, amount, penalty_amount)
+    (amount, penalty_amount)
   } else {
-    let (acc_collected_fund, acc_amount, acc_penalty) =
+    let (acc_amount, acc_penalty) =
       apply_refund_orders(
         remaining_order_inputs,
         remaining_outputs,
         base_asset,
         raise_asset,
       )
-    (
-      acc_collected_fund + collected_fund,
-      acc_amount + amount,
-      acc_penalty + penalty_amount,
-    )
+    (acc_amount + amount, acc_penalty + penalty_amount)
   }
 }
 
@@ -1552,7 +1546,7 @@ fn apply_refund_order(
   order_output: Output,
   base_asset: Asset,
   raise_asset: Asset,
-) -> (Int, Int, Int) {
+) -> (Int, Int) {
   let OrderDatum {
     base_asset: o_base_asset,
     raise_asset: o_raise_asset,
@@ -1565,15 +1559,9 @@ fn apply_refund_order(
 
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
     raise_asset
-  let order_out_base_ada_amount =
-    if is_collected {
-      minimum_ada
-    } else {
-      minimum_ada + fee_ada
-    }
   let expected_order_out_value =
     value.zero()
-      |> value.add(ada_policy_id, ada_asset_name, order_out_base_ada_amount)
+      |> value.add(ada_policy_id, ada_asset_name, minimum_ada)
       |> value.add(raise_asset_pid, raise_asset_an, amount + penalty_amount)
   let Output { address: owner_address, value: order_out_value, .. } =
     order_output
@@ -1582,16 +1570,9 @@ fn apply_refund_order(
       raise_asset == o_raise_asset,
       owner_address == owner,
       expected_order_out_value == order_out_value,
+      is_collected == True,
     }
-  (
-    if is_collected {
-      amount + penalty_amount
-    } else {
-      0
-    },
-    amount,
-    penalty_amount,
-  )
+  (amount, penalty_amount)
 }
 
 pub fn validate_manage_seller(
