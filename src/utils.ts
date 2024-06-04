@@ -1,14 +1,27 @@
 import * as T from "@minswap/translucent";
 import { SHA3 } from "sha3";
+import { sqrt } from "./sqrt";
 import type {
-  Translucent,
-  UTxO,
-  Tx,
-  PrivateKey,
   Address,
   Network,
+  PolicyId,
+  PrivateKey,
+  Translucent,
+  Tx,
+  UTxO,
+  Unit,
 } from "./types";
-import { sqrt } from "./sqrt";
+
+export function toUnit(
+  policyId: PolicyId,
+  name?: string | null,
+  label?: number | null,
+): Unit | "lovelace" {
+  if (policyId === "" && (name ?? "") === "") {
+    return "lovelace";
+  }
+  return T.toUnit(policyId, name, label);
+}
 
 export function quickSubmit(t: Translucent) {
   return async function ({

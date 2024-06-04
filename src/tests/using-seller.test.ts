@@ -36,11 +36,10 @@ FAIL:
 - Update orders(withdraw fund): invalid penalty amount
 - TODO: No Treasury ref inputs
 */
-import * as T from "@minswap/translucent";
 import { WarehouseBuilder, type BuildUsingSellerOptions } from "../build-tx";
 import { LBE_FEE, LBE_MIN_OUTPUT_ADA, TREASURY_MIN_ADA } from "../constants";
 import type { OrderDatum, UTxO } from "../types";
-import { plutusAddress2Address } from "../utils";
+import { plutusAddress2Address, toUnit } from "../utils";
 import { assertValidator, genWarehouseOptions, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
 
@@ -78,7 +77,7 @@ async function genTestWarehouse() {
     assets: {
       lovelace: TREASURY_MIN_ADA,
       [builder.treasuryToken]: 1n,
-      [T.toUnit(baseAsset.policyId, baseAsset.assetName)]:
+      [toUnit(baseAsset.policyId, baseAsset.assetName)]:
         treasuryDatum.reserveBase,
     },
     address: builder.treasuryAddress,
