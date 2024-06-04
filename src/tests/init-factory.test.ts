@@ -2,7 +2,8 @@ import * as T from "@minswap/translucent";
 import { FactoryValidateFactoryMinting } from "../../plutus";
 import { WarehouseBuilder } from "../build-tx";
 import { LBE_INIT_FACTORY_HEAD, LBE_INIT_FACTORY_TAIL } from "../constants";
-import type { FactoryDatum } from "../types";
+import type { FactoryDatum, ProtocolParameters } from "../types";
+import { toUnit } from "../utils";
 import {
   DUMMY_SEED_UTXO,
   assertValidator,
@@ -24,9 +25,13 @@ beforeEach(async () => {
   };
   const ACCOUNT_0 = await generateAccount({
     lovelace: 2000000000000000000n,
-    [T.toUnit(baseAsset.policyId, baseAsset.assetName)]: 69_000_000_000_000n,
+    [toUnit(baseAsset.policyId, baseAsset.assetName)]: 69_000_000_000_000n,
   });
-  const emulator = new T.Emulator([ACCOUNT_0]);
+  let protocolParameters: ProtocolParameters = {
+    ...T.PROTOCOL_PARAMETERS_DEFAULT,
+    maxTxSize: 36384,
+  };
+  const emulator = new T.Emulator([ACCOUNT_0], protocolParameters);
   let t = await T.Translucent.new(emulator);
   emulator.awaitBlock(10_000); // For validity ranges to be valid
   t.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);

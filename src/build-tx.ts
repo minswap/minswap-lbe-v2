@@ -65,6 +65,7 @@ import {
   computeLPAssetName,
   plutusAddress2Address,
   sortUTxOs,
+  toUnit,
 } from "./utils";
 
 export type WarehouseBuilderOptions = {
@@ -265,11 +266,11 @@ export class WarehouseBuilder {
       validators.treasuryValidator,
     );
 
-    this.factoryToken = T.toUnit(this.factoryHash, FACTORY_AUTH_AN);
-    this.treasuryToken = T.toUnit(this.factoryHash, TREASURY_AUTH_AN);
-    this.managerToken = T.toUnit(this.factoryHash, MANAGER_AUTH_AN);
-    this.sellerToken = T.toUnit(this.factoryHash, SELLER_AUTH_AN);
-    this.orderToken = T.toUnit(this.factoryHash, ORDER_AUTH_AN);
+    this.factoryToken = toUnit(this.factoryHash, FACTORY_AUTH_AN);
+    this.treasuryToken = toUnit(this.factoryHash, TREASURY_AUTH_AN);
+    this.managerToken = toUnit(this.factoryHash, MANAGER_AUTH_AN);
+    this.sellerToken = toUnit(this.factoryHash, SELLER_AUTH_AN);
+    this.orderToken = toUnit(this.factoryHash, ORDER_AUTH_AN);
 
     // AMM
     this.ammValidators = ammValidators;
@@ -289,8 +290,8 @@ export class WarehouseBuilder {
     this.ammFactoryHash = t.utils.validatorToScriptHash(
       ammValidators.factoryValidator,
     );
-    this.ammPoolToken = T.toUnit(this.ammAuthenHash, MINSWAP_V2_POOL_AUTH_AN);
-    this.ammFactoryToken = T.toUnit(
+    this.ammPoolToken = toUnit(this.ammAuthenHash, MINSWAP_V2_POOL_AUTH_AN);
+    this.ammFactoryToken = toUnit(
       this.ammAuthenHash,
       MINSWAP_V2_FACTORY_AUTH_AN,
     );
@@ -922,7 +923,7 @@ export class WarehouseBuilder {
 
   setAmmLpToken() {
     invariant(this.baseAsset);
-    const lpToken = T.toUnit(this.ammAuthenHash, this.lpAssetName);
+    const lpToken = toUnit(this.ammAuthenHash, this.lpAssetName);
     this.ammLpToken = lpToken;
   }
 
@@ -1054,7 +1055,7 @@ export class WarehouseBuilder {
         [this.treasuryToken]: 1n,
         [this.ammLpToken]: treasuryOutDatum.totalLiquidity,
       };
-      const raiseAsset = T.toUnit(
+      const raiseAsset = toUnit(
         treasuryOutDatum.raiseAsset.policyId,
         treasuryOutDatum.raiseAsset.assetName,
       );
@@ -1079,7 +1080,7 @@ export class WarehouseBuilder {
       invariant(this.treasuryInputs.length > 0);
       const assets = { ...this.treasuryInputs[0].assets };
       invariant(deltaCollectedFund);
-      const raiseAsset = T.toUnit(
+      const raiseAsset = toUnit(
         treasuryOutDatum.raiseAsset.policyId,
         treasuryOutDatum.raiseAsset.assetName,
       );
@@ -1087,7 +1088,7 @@ export class WarehouseBuilder {
       return assets;
     };
     const createTreasury = () => {
-      const baseAsset = T.toUnit(
+      const baseAsset = toUnit(
         treasuryOutDatum.baseAsset.policyId,
         treasuryOutDatum.baseAsset.assetName,
       );
@@ -1140,7 +1141,7 @@ export class WarehouseBuilder {
         lovelace:
           LBE_MIN_OUTPUT_ADA + (datum.isCollected ? LBE_FEE : LBE_FEE * 2n),
       };
-      const raiseAsset = T.toUnit(
+      const raiseAsset = toUnit(
         datum.raiseAsset.policyId,
         datum.raiseAsset.assetName,
       );
@@ -1405,7 +1406,7 @@ export class WarehouseBuilder {
       poolDatum.assetA.policyId + poolDatum.assetA.assetName,
       poolDatum.assetB.policyId + poolDatum.assetB.assetName,
     );
-    const lpToken = T.toUnit(this.ammAuthenHash, lpAssetName);
+    const lpToken = toUnit(this.ammAuthenHash, lpAssetName);
     invariant(this.ammLpToken);
     const mintAssets: Assets = {
       [this.ammFactoryToken]: 1n,
@@ -1431,14 +1432,8 @@ export class WarehouseBuilder {
       [this.ammPoolToken]: 1n,
       [lpToken]: remainingLiquidity,
     };
-    const unitA = T.toUnit(
-      poolDatum.assetA.policyId,
-      poolDatum.assetA.assetName,
-    );
-    const unitB = T.toUnit(
-      poolDatum.assetB.policyId,
-      poolDatum.assetB.assetName,
-    );
+    const unitA = toUnit(poolDatum.assetA.policyId, poolDatum.assetA.assetName);
+    const unitB = toUnit(poolDatum.assetB.policyId, poolDatum.assetB.assetName);
     poolAssets[unitA] = (poolAssets[unitA] ?? 0n) + poolDatum.reserveA;
     poolAssets[unitB] = (poolAssets[unitB] ?? 0n) + poolDatum.reserveB;
     this.tx

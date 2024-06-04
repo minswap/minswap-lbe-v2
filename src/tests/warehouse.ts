@@ -10,11 +10,13 @@ import type {
   FactoryDatum,
   ManagerDatum,
   OrderDatum,
+  ProtocolParameters,
   SellerDatum,
   Translucent,
   TreasuryDatum,
+  UTxO,
 } from "../types";
-import { address2PlutusAddress } from "../utils";
+import { address2PlutusAddress, toUnit } from "../utils";
 import { genWarehouseOptions, generateAccount } from "./utils";
 
 export const skipToCountingPhase = (options: {
@@ -34,20 +36,21 @@ export const genWarehouse = async () => {
     policyId: "e16c2dc8ae937e8d3790c7fd7168d7b994621ba14ca11415f39fed72",
     assetName: "4d494e",
   };
-  const minswapTokenRaw = T.toUnit(
-    minswapToken.policyId,
-    minswapToken.assetName,
-  );
+  const minswapTokenRaw = toUnit(minswapToken.policyId, minswapToken.assetName);
   const adaToken: BluePrintAsset = {
     policyId: "",
     assetName: "",
   };
   const ACCOUNT_0 = await generateAccount({
     lovelace: 2000000000000000000n,
-    [T.toUnit(minswapToken.policyId, minswapToken.assetName)]:
+    [toUnit(minswapToken.policyId, minswapToken.assetName)]:
       69_000_000_000_000n,
   });
-  const emulator = new T.Emulator([ACCOUNT_0]);
+  let protocolParameters: ProtocolParameters = {
+    ...T.PROTOCOL_PARAMETERS_DEFAULT,
+    maxTxSize: 36384,
+  };
+  const emulator = new T.Emulator([ACCOUNT_0], protocolParameters);
   let t = await T.Translucent.new(emulator);
   emulator.awaitBlock(10_000); // For validity ranges to be valid
   t.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
@@ -108,6 +111,14 @@ export const genWarehouse = async () => {
     penaltyAmount: 0n,
   };
 
+  let findTreasuryInput = async (): Promise<UTxO> => {
+    return (
+      await emulator.getUtxos(
+        t.utils.validatorToAddress(validators.treasuryValidator),
+      )
+    ).find((u) => !u.scriptRef) as UTxO;
+  };
+
   return {
     adaToken,
     emulator,
@@ -120,5 +131,6 @@ export const genWarehouse = async () => {
     defaultManagerDatum,
     defaultSellerDatum,
     defaultOrderDatum,
+    findTreasuryInput,
   };
 };
