@@ -92,7 +92,7 @@ pub fn get_order_value(
   factory_policy_id: PolicyId,
   raise_asset: Asset,
 ) -> Value {
-  let base_ada = minimum_ada + fee_ada * 2
+  let base_ada = order_minimum_ada + fee_ada * 2
   value.zero()
     |> value.add(ada_policy_id, ada_asset_name, base_ada)
     |> value.add(

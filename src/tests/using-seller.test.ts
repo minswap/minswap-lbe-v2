@@ -37,7 +37,7 @@ FAIL:
 - TODO: No Treasury ref inputs
 */
 import { WarehouseBuilder, type BuildUsingSellerOptions } from "../build-tx";
-import { LBE_FEE, LBE_MIN_OUTPUT_ADA, TREASURY_MIN_ADA } from "../constants";
+import { LBE_FEE, LBE_MIN_OUTPUT_ADA, ORDER_MIN_ADA, TREASURY_MIN_ADA } from "../constants";
 import type { OrderDatum, UTxO } from "../types";
 import { plutusAddress2Address, toUnit } from "../utils";
 import { assertValidator, genWarehouseOptions, loadModule } from "./utils";
@@ -48,9 +48,8 @@ const MINt = {
   assetName: "4d494e74",
 };
 let utxoIndex: number;
-type AwaitedReturnType<T> = T extends Promise<infer R> ? R : T;
 
-let warehouse: AwaitedReturnType<ReturnType<typeof genTestWarehouse>>;
+let warehouse: Awaited<ReturnType<typeof genTestWarehouse>>;
 async function genTestWarehouse() {
   const {
     t,
@@ -172,7 +171,7 @@ function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): UTxO {
     outputIndex: ++utxoIndex,
     assets: {
       [builder.orderToken]: 1n,
-      lovelace: 5_000_000n + datum.amount + datum.penaltyAmount,
+      lovelace: ORDER_MIN_ADA + 2n*LBE_FEE + datum.amount + datum.penaltyAmount,
     },
     address: builder.orderAddress,
     datum: builder.toDatumOrder(datum),

@@ -1,3 +1,4 @@
+use aiken/cbor
 use aiken/dict.{Dict}
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
@@ -788,6 +789,7 @@ pub fn validate_using_seller(
       factory_policy_id: factory_policy_id,
       order_hash: order_hash,
     )
+  trace cbor.diagnostic(#"1234")
   let (delta_amount, delta_penalty) =
     apply_order(
       order_inputs: order_inputs,
@@ -801,6 +803,8 @@ pub fn validate_using_seller(
       inputs: inputs,
       minimum_order_raise: minimum_order_raise,
     )
+  trace cbor.diagnostic(delta_amount)
+  trace cbor.diagnostic(delta_penalty)
   let order_input_count = list.length(order_inputs)
   let order_output_count = list.length(order_outputs)
   let is_valid_minting =
@@ -897,6 +901,9 @@ pub fn apply_order(
             factory_policy_id: factory_policy_id,
             raise_asset: raise_asset,
           )
+        trace cbor.diagnostic(expected_order)
+        trace cbor.diagnostic(order_value)
+
         // validate orders
         expect and {
             validate_authorize_by_owner(
