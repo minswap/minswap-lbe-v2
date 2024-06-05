@@ -454,6 +454,7 @@ fn validate_initialization(
   mint_value: Value,
 ) -> Bool {
   // Ensure transaction's outptus contain exactly 1 Factory Output 
+  // check ref script
   expect [Output { value: out_value, datum, .. }] =
     list.filter(
       outputs,
