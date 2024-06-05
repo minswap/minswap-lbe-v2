@@ -29,6 +29,7 @@ import {
   MINSWAP_V2_MAX_LIQUIDITY,
   MINSWAP_V2_POOL_AUTH_AN,
   ORDER_AUTH_AN,
+  ORDER_MIN_ADA,
   SELLER_AUTH_AN,
   SELLER_MIN_ADA,
   TREASURY_AUTH_AN,
@@ -705,13 +706,14 @@ export class WarehouseBuilder {
     const { treasuryInput, orderInputs, validFrom, validTo } = options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
-    const treasuryOutDatum: TreasuryDatum = {
+    let treasuryOutDatum: TreasuryDatum = {
       ...treasuryInDatum,
     };
     const orderOutDatums: OrderDatum[] = [];
     let deltaCollectedFund = 0n;
 
-    for (const o of orderInputs) {
+    const sortedOrders = sortUTxOs(orderInputs);
+    for (const o of sortedOrders) {
       invariant(o.datum);
       const datum: OrderDatum = {
         ...this.fromDatumOrder(o.datum),
@@ -720,7 +722,10 @@ export class WarehouseBuilder {
       orderOutDatums.push(datum);
       deltaCollectedFund += datum.amount + datum.penaltyAmount;
     }
-    treasuryOutDatum.collectedFund += deltaCollectedFund;
+    treasuryOutDatum = {
+      ...treasuryOutDatum,
+      collectedFund: treasuryOutDatum.collectedFund + deltaCollectedFund,
+    };
 
     this.tasks.push(
       () => {
@@ -1139,7 +1144,7 @@ export class WarehouseBuilder {
       const assets = {
         [this.orderToken]: 1n,
         lovelace:
-          LBE_MIN_OUTPUT_ADA + (datum.isCollected ? LBE_FEE : LBE_FEE * 2n),
+          ORDER_MIN_ADA + (datum.isCollected ? LBE_FEE : LBE_FEE * 2n),
       };
       const raiseAsset = toUnit(
         datum.raiseAsset.policyId,
