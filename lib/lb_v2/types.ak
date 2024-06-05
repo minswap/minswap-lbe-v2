@@ -96,6 +96,7 @@ pub type TreasuryRedeemer {
   UpdateLBE
 }
 
+// remove unuse hash
 pub type ManagerDatum {
   factory_policy_id: PolicyId,
   order_hash: ValidatorHash,

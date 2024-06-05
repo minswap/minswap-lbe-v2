@@ -40,6 +40,7 @@ validator(
     } = transaction
     let mint_value = value.from_minted_value(mint)
     let ManagerDatum { order_hash, factory_policy_id, .. } = manager_in_datum
+    // dont need this line
     expect [] =
       validation.get_order_inputs(
         inputs: inputs,
@@ -63,13 +64,13 @@ validator(
             fn(input) {
               let Input {
                 output_reference: out_ref,
-                output: Output { value: sm_in_value, .. },
+                output: Output { value: m_in_value, .. },
               } = input
               and {
                 out_ref == manager_out_ref,
                 assert(
                   value.quantity_of(
-                    sm_in_value,
+                    m_in_value,
                     factory_policy_id,
                     manager_auth_an,
                   ) == 1,

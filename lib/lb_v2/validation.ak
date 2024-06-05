@@ -774,12 +774,14 @@ pub fn validate_using_seller(
     is_cancelled,
     ..
   }: TreasuryDatum = raw_treasury_datum
+  // duplicate validating value
   let order_inputs =
     get_order_inputs(
       inputs: inputs,
       factory_policy_id: factory_policy_id,
       order_hash: order_hash,
     )
+  // duplicate logic: just need to find by addr, value will validate later in `apply_order`
   let order_outputs =
     get_order_outputs(
       outputs: outputs,
@@ -888,6 +890,7 @@ pub fn apply_order(
           ..
         }: OrderDatum = raw_o_datum
         let Address { payment_credential: owner_payment_credential, .. } = owner
+        // dont need to validate here because
         let expected_order =
           get_order_value(
             amount: amount,
