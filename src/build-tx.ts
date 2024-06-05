@@ -20,7 +20,6 @@ import {
   LBE_FEE,
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
-  LBE_MIN_OUTPUT_ADA,
   LP_COLATERAL,
   MANAGER_AUTH_AN,
   MANAGER_MIN_ADA,
@@ -653,7 +652,7 @@ export class WarehouseBuilder {
       const output: { address: Address; assets: Assets } = {
         address: plutusAddress2Address(this.t.network, datum.owner),
         assets: {
-          lovelace: LBE_MIN_OUTPUT_ADA,
+          lovelace: ORDER_MIN_ADA,
           [this.ammLpToken]: lpAmount,
         },
       };
