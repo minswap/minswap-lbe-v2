@@ -49,8 +49,13 @@ validator {
       },
       ..
     } = treasury_input
-    let TreasuryDatum { factory_policy_id, manager_hash, order_hash, .. } =
-      treasury_in_datum
+    let TreasuryDatum {
+      factory_policy_id,
+      manager_hash,
+      order_hash,
+      is_cancelled,
+      ..
+    } = treasury_in_datum
     let mint_value = value.from_minted_value(mint)
     expect Interval {
       upper_bound: IntervalBound {
@@ -156,9 +161,18 @@ validator {
           list.filter(
             inputs,
             fn(input) {
-              let Input { output, .. } = input
-              let Output { value: out_value, .. } = output
-              value.quantity_of(out_value, factory_policy_id, factory_auth_an) == 1
+              let Input {
+                output: Output {
+                  address: Address { payment_credential, .. },
+                  value: out_value,
+                  ..
+                },
+                ..
+              } = input
+              and {
+                payment_credential == ScriptCredential(factory_policy_id),
+                value.quantity_of(out_value, factory_policy_id, factory_auth_an) == 1,
+              }
             },
           )
         True
@@ -192,42 +206,27 @@ validator {
           project_owner_outputs: owner_outputs,
         )
       }
-      RedeemOrders -> {
-        let TreasuryDatum { total_liquidity, .. } = treasury_in_datum
-        let treasury_output =
-          validation.get_treasury_output(
-            outputs,
-            factory_policy_id,
-            treasury_hash,
-          )
-
-        let order_inputs =
-          validation.get_order_inputs(
-            inputs: inputs,
-            factory_policy_id: factory_policy_id,
-            order_hash: order_hash,
-          )
-        if total_liquidity != 0 {
-          validation.validate_redeem_lp(
-            order_inputs: order_inputs,
-            outputs: outputs,
-            treasury_output: treasury_output,
-            treasury_in_datum: treasury_in_datum,
-            treasury_in_value: treasury_in_value,
-            mint_value: mint_value,
-            factory_policy_id: factory_policy_id,
-          )
-        } else {
-          validation.validate_refund(
-            order_inputs: order_inputs,
-            outputs: outputs,
-            treasury_output: treasury_output,
-            treasury_in_datum: treasury_in_datum,
-            treasury_in_value: treasury_in_value,
-            mint_value: mint_value,
-          )
+      RedeemOrders ->
+        when is_cancelled is {
+          True ->
+            validation.validate_refund(
+              inputs: inputs,
+              outputs: outputs,
+              treasury_in_datum: treasury_in_datum,
+              treasury_in_value: treasury_in_value,
+              mint_value: mint_value,
+              treasury_hash: treasury_hash,
+            )
+          False ->
+            validation.validate_redeem(
+              inputs: inputs,
+              outputs: outputs,
+              treasury_in_datum: treasury_in_datum,
+              treasury_in_value: treasury_in_value,
+              mint_value: mint_value,
+              treasury_hash: treasury_hash,
+            )
         }
-      }
       CancelLBE(reason) -> {
         // finding exactly 1 Legit Treasury Output
         let treasury_output =

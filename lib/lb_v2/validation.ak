@@ -623,9 +623,8 @@ pub fn get_order_outputs(
   )
 }
 
-// Checking Condition to collect manager
 // Assertions:
-// - 1 Treasury Ouput needs to be paid
+// - 1 Treasury Output needs to be paid
 // - 1 Manager Input needs to be spent
 // - Treasury Input and Manager Input must be the same LBE ID.
 // - The Treasury Values have no changes.
@@ -985,6 +984,7 @@ pub fn apply_order(
 // - The length of Order Inputs equals the length of Order Outputs.
 // - Transaction mint nothing.
 // Notes:
+// - Order Outputs should correspond to Order Inputs.
 // - Collecting orders and cancelling LBE are independent operations.
 // - There's no need to check the time range since it should collect sellers first.
 pub fn validate_collect_orders(
@@ -1110,16 +1110,33 @@ pub fn apply_collecting_orders(
   }
 }
 
-pub fn validate_redeem_lp(
-  order_inputs: List<Input>,
+// Assertions:
+// - All Sellers, Manager, Orders have been collected.
+// - All Inputs and Treasury Output must be legitimate by containing an Auth Token.
+// - Treasury Input, Order Inputs must share the same LBE ID.
+// - Paying Treasury Output correctly!
+// - Paying User Outputs correctly!
+// - Redeem at least 1 Order.
+// - The length of Order Inputs equals the length of User Outputs.
+// - Transaction burn Order Tokens correctly!
+// Notes:
+// - AMM Pool create successfully!
+// - User will receive: 
+//  + `order_minimum_ada` lovelace
+//  + `total_lp * amount / reserve_raise` LP Token
+//  + `(reserve_raise + total_penalty - maximum_raise) * amount / reserve_raise) Raise Token if exceed soft-cap
+// - Transaction Outputs = [...(User Outputs correspond to Order Inputs), Treasury Output]
+pub fn validate_redeem(
+  inputs: List<Input>,
   outputs: List<Output>,
-  treasury_output: Output,
   treasury_in_datum: TreasuryDatum,
   treasury_in_value: Value,
   mint_value: Value,
-  factory_policy_id: PolicyId,
+  treasury_hash: ValidatorHash,
 ) -> Bool {
   let TreasuryDatum {
+    factory_policy_id,
+    order_hash,
     collected_fund,
     base_asset,
     raise_asset,
@@ -1129,16 +1146,24 @@ pub fn validate_redeem_lp(
     total_penalty,
     ..
   } = treasury_in_datum
+  let order_inputs =
+    get_order_inputs(
+      inputs: inputs,
+      factory_policy_id: factory_policy_id,
+      order_hash: order_hash,
+    )
+  let treasury_output =
+    get_treasury_output(outputs, factory_policy_id, treasury_hash)
   expect Output {
     value: treasury_out_value,
     datum: InlineDatum(raw_treasury_out_datum),
+    reference_script: treasury_out_rs,
     ..
   } = treasury_output
   expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
   let lp_asset_name =
     compute_asset_name_from_base_and_raise(base_asset, raise_asset)
-
-  let total_remaining_raise =
+  let remaining_raise =
     when maximum_raise is {
       Some(maxx) ->
         when reserve_raise + total_penalty > maxx is {
@@ -1149,137 +1174,108 @@ pub fn validate_redeem_lp(
     }
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
     raise_asset
-  // 1. validate orders. 
-  //    - each order validate(n first output is n output of order)
-  //      - check id of order input
-  //      - order output 
-  //        - value_out =  minimum_ada+ LP + remaining raise asset depend on how much they provided
-  //        - address = owner of order input datum
-  //    - calculate acc amount and penalty of all order(from input datum) and total LP and remaining raise asset that users redeemed
-  let (total_o_fund, total_o_lp, total_o_remaining_raise) =
-    apply_redeeming_lp_orders(
+  let (total_fund, total_lp, total_raise) =
+    apply_redeem_orders(
       order_inputs: order_inputs,
       outputs: outputs,
       base_asset: base_asset,
       raise_asset: raise_asset,
       total_lp: total_liquidity,
       reserve_raise: reserve_raise,
-      remaing_raise: total_remaining_raise,
+      remaning_raise: remaining_raise,
       lp_asset_name: lp_asset_name,
+      acc_fund: 0,
+      acc_lp: 0,
+      acc_raise: 0,
     )
   and {
-    // 2. validate treasury.
-    //    - treasury_datum
-    //      - collected_fund: 
-    //            total_o_fund = amount+penalty(of all orders)
-    //            datum_out.collected_fund = datum_in.collected_fund - delta_fund
-    //      - other field: nothing change
-    //    - treasury_value: t_value_out = t_value_in - ((totalLP+raise asset) user redeem in this tx)
+    // Paying Treasury Output correctly!
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
-      collected_fund: collected_fund - total_o_fund,
+      collected_fund: collected_fund - total_fund,
     },
     treasury_out_value == (
       treasury_in_value
-        |> value.add(amm_authen_policy_id, lp_asset_name, -total_o_lp)
-        |> value.add(raise_asset_pid, raise_asset_an, -total_o_remaining_raise)
+        |> value.add(amm_authen_policy_id, lp_asset_name, -total_lp)
+        |> value.add(raise_asset_pid, raise_asset_an, -total_raise)
     ),
-    // 3. Mint: burn order NFT
+    treasury_out_rs == None,
+    // Transaction burn Order Tokens correctly!
     value.flatten(mint_value) == [
       (factory_policy_id, order_auth_an, -list.length(order_inputs)),
     ],
   }
-  // this function dont need to check collected beacause treasury must collect before create pool
 }
 
 // return (total fund(amount and penalty) of orders, total lp that users redeemed, total raise asset that user redeem)
-pub fn apply_redeeming_lp_orders(
+pub fn apply_redeem_orders(
   order_inputs: List<Input>,
   outputs: List<Output>,
   base_asset: Asset,
   raise_asset: Asset,
   total_lp: Int,
   reserve_raise: Int,
-  remaing_raise: Int,
+  remaning_raise: Int,
   lp_asset_name: AssetName,
+  acc_fund: Int,
+  acc_lp: Int,
+  acc_raise: Int,
 ) -> (Int, Int, Int) {
   expect [order_input, ..remaining_order_inputs] = order_inputs
+  expect [user_output, ..remaining_outputs] = outputs
   expect Input {
     output: Output { datum: InlineDatum(raw_order_in_datum), .. },
     ..
   } = order_input
   expect order_in_datum: OrderDatum = raw_order_in_datum
-  expect [order_output, ..remaining_outputs] = outputs
-  let (o_fund, o_lp_amount, o_remaining_raise_amount) =
-    apply_redeeming_lp_order(
-      order_in_datum,
-      order_output,
-      base_asset,
-      raise_asset,
-      total_lp,
-      reserve_raise,
-      remaing_raise,
-      lp_asset_name,
-    )
-  if remaining_order_inputs == [] {
-    (o_fund, o_lp_amount, o_remaining_raise_amount)
-  } else {
-    let (acc_fund, acc_lp, acc_raise) =
-      apply_redeeming_lp_orders(
-        remaining_order_inputs,
-        remaining_outputs,
-        base_asset,
-        raise_asset,
-        total_lp,
-        reserve_raise,
-        remaing_raise,
-        lp_asset_name,
-      )
-    (
-      acc_fund + o_fund,
-      acc_lp + o_lp_amount,
-      acc_raise + o_remaining_raise_amount,
-    )
-  }
-}
-
-fn apply_redeeming_lp_order(
-  order_in_datum: OrderDatum,
-  order_output: Output,
-  base_asset: Asset,
-  raise_asset: Asset,
-  total_lp: Int,
-  reserve_raise: Int,
-  remaing_raise: Int,
-  lp_asset_name: AssetName,
-) -> (Int, Int, Int) {
   let OrderDatum {
+    owner,
     base_asset: o_base_asset,
     raise_asset: o_raise_asset,
-    owner,
     amount,
     penalty_amount,
     ..
   } = order_in_datum
-  let o_lp_amount = total_lp * amount / reserve_raise
-  let o_remaining_raise_amount = remaing_raise * amount / reserve_raise
-
+  let Output { address: user_address, value: user_value, .. } = user_output
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
     raise_asset
-  let expected_order_out_value =
-    value.zero()
+  // amount LP Token user will receive
+  let user_lp = total_lp * amount / reserve_raise
+  // accumulate LP token amount
+  let lp_amount = acc_lp + user_lp
+  // bonus fund user will receive
+  let fund_amount = acc_fund + amount + penalty_amount
+  // accumulate Raise Asset amount
+  let raise_bonus = remaning_raise * amount / reserve_raise
+  // Amount of order
+  let raise_amount = acc_raise + raise_bonus
+  let expect_user_value =
+    value.from_asset(amm_authen_policy_id, lp_asset_name, user_lp)
+      |> value.add(raise_asset_pid, raise_asset_an, raise_bonus)
       |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada)
-      |> value.add(raise_asset_pid, raise_asset_an, o_remaining_raise_amount)
-      |> value.add(amm_authen_policy_id, lp_asset_name, o_lp_amount)
-  let Output { address: owner_address, value: order_out_value, .. } =
-    order_output
   expect and {
       base_asset == o_base_asset,
       raise_asset == o_raise_asset,
-      owner_address == owner,
-      expected_order_out_value == order_out_value,
+      user_address == owner,
+      expect_user_value == user_value,
     }
-  (amount + penalty_amount, o_lp_amount, o_remaining_raise_amount)
+  when remaining_order_inputs == [] is {
+    True -> (fund_amount, lp_amount, raise_amount)
+    False ->
+      apply_redeem_orders(
+        order_inputs: remaining_order_inputs,
+        outputs: remaining_outputs,
+        base_asset: base_asset,
+        raise_asset: raise_asset,
+        total_lp: total_lp,
+        reserve_raise: reserve_raise,
+        remaning_raise: remaning_raise,
+        lp_asset_name: lp_asset_name,
+        acc_fund: fund_amount,
+        acc_lp: lp_amount,
+        acc_raise: raise_amount,
+      )
+  }
 }
 
 // If transaction showing that AMM Pool have been created
@@ -1426,143 +1422,138 @@ pub fn validate_cancel_lbe(
   }
 }
 
+// Assertions:
+// - All Sellers, Manager, Orders have been collected.
+// - All Inputs and Treasury Output must be legitimate by containing an Auth Token.
+// - Treasury Input, Order Inputs must share the same LBE ID.
+// - Paying Treasury Output correctly!
+// - Paying User Outputs correctly!
+// - Refund at least 1 Order.
+// - The length of Order Inputs equals the length of User Outputs.
+// - Transaction burn Order Tokens correctly!
+// Notes:
+// - The LBE is cancelled
+// - User will receive `order_minimum_ada` + (amount + penalty_amount) Raise Asset.
+// - Transaction Outputs = [...(User Outputs correspond to Order Inputs), Treasury Output]
 pub fn validate_refund(
-  order_inputs: List<Input>,
+  inputs: List<Input>,
   outputs: List<Output>,
-  treasury_output: Output,
   treasury_in_datum: TreasuryDatum,
   treasury_in_value: Value,
   mint_value: Value,
+  treasury_hash: ValidatorHash,
 ) -> Bool {
   let TreasuryDatum {
     factory_policy_id,
+    order_hash,
     collected_fund,
     base_asset,
     raise_asset,
-    is_cancelled,
     reserve_raise,
     total_penalty,
     is_manager_collected,
     ..
   } = treasury_in_datum
+  let order_inputs =
+    get_order_inputs(
+      inputs: inputs,
+      factory_policy_id: factory_policy_id,
+      order_hash: order_hash,
+    )
+  let treasury_output =
+    get_treasury_output(outputs, factory_policy_id, treasury_hash)
   expect Output {
     value: treasury_out_value,
     datum: InlineDatum(raw_treasury_out_datum),
+    reference_script: treasury_out_rs,
     ..
   } = treasury_output
   expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
-
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
     raise_asset
-  // 1. validate orders. 
-  //    - each order validate(n first output is n output of order)
-  //      - check lbe id of order input
-  //      - order output 
-  //        - value_out =  minimum_ada+ refund_amount(refund_amount= amount+penalty )
-  //        - address = owner of order input datum
-  //    - calculate all order fund
   let (total_orders_amount, total_orders_penalty) =
     apply_refund_orders(
       order_inputs: order_inputs,
       outputs: outputs,
       base_asset: base_asset,
       raise_asset: raise_asset,
+      acc_amount: 0,
+      acc_penalty: 0,
     )
-  let orders_collected_fund = total_orders_amount + total_orders_penalty
+  let refund_amount = total_orders_amount + total_orders_penalty
   and {
-    // check this LBE collected all orders
+    // All Sellers, Manager, Orders have been collected.
+    is_manager_collected == True,
     collected_fund == reserve_raise + total_penalty,
-    // 2. validate treasury.
-    //    - treasury_datum
-    //      - is_cancelled = True
-    //      - collected_fund: 
-    //            datum_out.collected_fund: datum_in.collected_fund - total_orders_collected_fund
-    //            datum_out.reserve_raise: datum_in.reserve_raise - total_orders_amount
-    //            datum_out.total_penalty: datum_in.total_penalty - total_orders_penalty
-    //      - other field: nothing change
-    //    - treasury_value: t_value_out = t_value_in - (total_orders_collected_fund)
-    is_cancelled == True,
+    // Paying Treasury Output correctly!
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
-      collected_fund: collected_fund - orders_collected_fund,
+      collected_fund: collected_fund - refund_amount,
       reserve_raise: reserve_raise - total_orders_amount,
       total_penalty: total_penalty - total_orders_penalty,
     },
     treasury_out_value == (
       treasury_in_value
-        |> value.add(raise_asset_pid, raise_asset_an, -orders_collected_fund)
+        |> value.add(raise_asset_pid, raise_asset_an, -refund_amount)
     ),
-    // 3. Mint: burn order NFT
+    treasury_out_rs == None,
+    // Transaction burn Order Tokens correctly!
     value.flatten(mint_value) == [
       (factory_policy_id, order_auth_an, -list.length(order_inputs)),
     ],
-    is_manager_collected == True,
   }
 }
 
-// return (total fund(amount and penalty) of orders, total lp that users redeemed, total raise asset that user redeem)
-// (total_collected_fund, total_amount, total_penalty)
+// Refund at least 1 Order.
+// User Outputs appear at the start of Transaction Outputs.
+// return (acc_amount, acc_penalty)
 pub fn apply_refund_orders(
   order_inputs: List<Input>,
   outputs: List<Output>,
   base_asset: Asset,
   raise_asset: Asset,
+  acc_amount: Int,
+  acc_penalty: Int,
 ) -> (Int, Int) {
   expect [order_input, ..remaining_order_inputs] = order_inputs
+  expect [user_output, ..remaining_outputs] = outputs
   expect Input {
-    output: Output { datum: InlineDatum(raw_order_in_datum), .. },
+    output: Output { datum: InlineDatum(order_raw_datum), .. },
     ..
   } = order_input
-  expect order_in_datum: OrderDatum = raw_order_in_datum
-  expect [order_output, ..remaining_outputs] = outputs
-  let (amount, penalty_amount) =
-    apply_refund_order(order_in_datum, order_output, base_asset, raise_asset)
-  if remaining_order_inputs == [] {
-    (amount, penalty_amount)
-  } else {
-    let (acc_amount, acc_penalty) =
-      apply_refund_orders(
-        remaining_order_inputs,
-        remaining_outputs,
-        base_asset,
-        raise_asset,
-      )
-    (acc_amount + amount, acc_penalty + penalty_amount)
-  }
-}
-
-fn apply_refund_order(
-  order_in_datum: OrderDatum,
-  order_output: Output,
-  base_asset: Asset,
-  raise_asset: Asset,
-) -> (Int, Int) {
-  let OrderDatum {
-    base_asset: o_base_asset,
-    raise_asset: o_raise_asset,
-    owner,
-    amount,
-    penalty_amount,
-    is_collected,
-    ..
-  } = order_in_datum
-
+  expect order_datum: OrderDatum = order_raw_datum
+  let OrderDatum { owner, amount, penalty_amount, .. } = order_datum
+  let Output { address: user_address, value: user_value, .. } = user_output
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
     raise_asset
-  let expected_order_out_value =
-    value.zero()
+  let expect_user_out_value =
+    value.from_asset(raise_asset_pid, raise_asset_an, amount + penalty_amount)
       |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada)
-      |> value.add(raise_asset_pid, raise_asset_an, amount + penalty_amount)
-  let Output { address: owner_address, value: order_out_value, .. } =
-    order_output
   expect and {
-      base_asset == o_base_asset,
-      raise_asset == o_raise_asset,
-      owner_address == owner,
-      expected_order_out_value == order_out_value,
-      is_collected == True,
+      // Order, Treasury must share the same LBE ID
+      order_datum == OrderDatum {
+        ..order_datum,
+        base_asset: base_asset,
+        raise_asset: raise_asset,
+      },
+      // Paying User Output correctly!
+      user_address == owner,
+      user_value == expect_user_out_value,
     }
-  (amount, penalty_amount)
+  let refund_amount = acc_amount + amount
+  let refund_penalty = acc_penalty + penalty_amount
+  when remaining_order_inputs == [] is {
+    True -> (refund_amount, refund_penalty)
+    False ->
+      apply_refund_orders(
+        order_inputs: remaining_order_inputs,
+        outputs: remaining_outputs,
+        base_asset: base_asset,
+        raise_asset: raise_asset,
+        acc_amount: refund_amount,
+        acc_penalty: refund_penalty,
+      )
+  }
 }
 
 pub fn validate_manage_seller(
