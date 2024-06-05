@@ -37,11 +37,7 @@ FAIL:
 - TODO: No Treasury ref inputs
 */
 import { WarehouseBuilder, type BuildUsingSellerOptions } from "../build-tx";
-import {
-  LBE_FEE,
-  ORDER_MIN_ADA,
-  TREASURY_MIN_ADA,
-} from "../constants";
+import { LBE_FEE, ORDER_MIN_ADA, TREASURY_MIN_ADA } from "../constants";
 import type { OrderDatum, UTxO } from "../types";
 import { plutusAddress2Address, toUnit } from "../utils";
 import { assertValidator, genWarehouseOptions, loadModule } from "./utils";

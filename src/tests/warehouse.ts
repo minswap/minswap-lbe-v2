@@ -1,10 +1,12 @@
 import * as T from "@minswap/translucent";
+import { WarehouseBuilder } from "../build-tx";
 import {
   DEFAULT_NUMBER_SELLER,
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
 } from "../constants";
 import type {
+  AmmPoolDatum,
   BluePrintAsset,
   Emulator,
   FactoryDatum,
@@ -60,12 +62,12 @@ export const genWarehouse = async () => {
     head: LBE_INIT_FACTORY_HEAD,
     tail: LBE_INIT_FACTORY_TAIL,
   };
-  let validators = warehouseOptions.validators;
+  let builder = new WarehouseBuilder(warehouseOptions);
   const defaultTreasuryDatum: TreasuryDatum = {
-    factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
-    sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
-    orderHash: t.utils.validatorToScriptHash(validators.orderValidator),
-    managerHash: t.utils.validatorToScriptHash(validators.managerValidator),
+    factoryPolicyId: builder.factoryHash,
+    sellerHash: builder.sellerHash,
+    orderHash: builder.orderHash,
+    managerHash: builder.managerHash,
     collectedFund: 0n,
     baseAsset: minswapToken,
     raiseAsset: adaToken,
@@ -85,9 +87,9 @@ export const genWarehouse = async () => {
     isCancelable: false,
   };
   const defaultManagerDatum: ManagerDatum = {
-    factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
-    orderHash: t.utils.validatorToScriptHash(validators.orderValidator),
-    sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
+    factoryPolicyId: builder.factoryHash,
+    orderHash: builder.orderHash,
+    sellerHash: builder.sellerHash,
     baseAsset: minswapToken,
     raiseAsset: adaToken,
     sellerCount: DEFAULT_NUMBER_SELLER,
@@ -95,14 +97,14 @@ export const genWarehouse = async () => {
     totalPenalty: 0n,
   };
   const defaultSellerDatum: SellerDatum = {
-    factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
+    factoryPolicyId: builder.factoryHash,
     baseAsset: minswapToken,
     raiseAsset: adaToken,
     amount: 0n,
     penaltyAmount: 0n,
   };
   const defaultOrderDatum: OrderDatum = {
-    factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
+    factoryPolicyId: builder.factoryHash,
     baseAsset: minswapToken,
     raiseAsset: adaToken,
     owner: address2PlutusAddress(ACCOUNT_0.address),
@@ -111,12 +113,34 @@ export const genWarehouse = async () => {
     penaltyAmount: 0n,
   };
 
+  let ammPoolDatum: AmmPoolDatum = {
+    poolBatchingStakeCredential: {
+      Inline: [{ ScriptCredential: [builder.ammPoolHash] }],
+    },
+    assetA: adaToken,
+    assetB: minswapToken,
+    totalLiquidity: 0n,
+    reserveA: 0n,
+    reserveB: 0n,
+    baseFeeANumerator: 0n,
+    baseFeeBNumerator: 0n,
+    feeSharingNumeratorOpt: null,
+    allowDynamicFee: false,
+  };
+  let ammPoolInput: UTxO = {
+    address: builder.ammPoolAddress,
+    assets: {
+      [builder.ammPoolToken]: 1n,
+    },
+    datum: builder.toDatumAmmPool(ammPoolDatum),
+    txHash: "01".repeat(32),
+    outputIndex: 0,
+  };
+
   let findTreasuryInput = async (): Promise<UTxO> => {
-    return (
-      await emulator.getUtxos(
-        t.utils.validatorToAddress(validators.treasuryValidator),
-      )
-    ).find((u) => !u.scriptRef) as UTxO;
+    return (await emulator.getUtxos(builder.treasuryAddress)).find(
+      (u) => !u.scriptRef,
+    ) as UTxO;
   };
 
   return {
@@ -131,6 +155,7 @@ export const genWarehouse = async () => {
     defaultManagerDatum,
     defaultSellerDatum,
     defaultOrderDatum,
+    ammPoolInput,
     findTreasuryInput,
   };
 };

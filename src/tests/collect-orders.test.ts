@@ -1,4 +1,8 @@
-import { WarehouseBuilder, type BuildCollectOrdersOptions } from "../build-tx";
+import {
+  WarehouseBuilder,
+  type BuildCancelLBEOptions,
+  type BuildCollectOrdersOptions,
+} from "../build-tx";
 import { LBE_FEE, ORDER_MIN_ADA, TREASURY_MIN_ADA } from "../constants";
 import type { OrderDatum, TreasuryDatum, UTxO } from "../types";
 import { assertValidator, loadModule, quickSubmitBuilder } from "./utils";
@@ -178,10 +182,40 @@ test(`collect-orders | PASS | collect -> cancel -> collect`, async () => {
     W.emulator.addUTxO(o);
   }
 
+  // 1. Collect Orders
   options = { ...options, orderInputs: orderInputs.slice(0, 3) };
   builder.buildCollectOrders(options);
   const tx1 = await quickSubmitBuilder(W.emulator)({
     txBuilder: builder.complete(),
   });
   expect(tx1).toBeTruthy();
+
+  // 2. Cancel LBE
+  let treasuryInput = await W.findTreasuryInput();
+  W.emulator.addUTxO(W.ammPoolInput);
+  let cancelOptions: BuildCancelLBEOptions = {
+    treasuryInput,
+    ammFactoryRefInput: W.ammPoolInput,
+    validFrom: W.t.utils.slotToUnixTime(W.emulator.slot),
+    validTo: W.t.utils.slotToUnixTime(W.emulator.slot + 60),
+    reason: "CreatedPool",
+  };
+  // restart builder
+  builder = new WarehouseBuilder(W.warehouseOptions);
+  builder.buildCancelLBE(cancelOptions);
+  const tx2 = await quickSubmitBuilder(W.emulator)({
+    txBuilder: builder.complete(),
+  });
+  expect(tx2).toBeTruthy();
+
+  // 3. Continue Collect Orders
+  treasuryInput = await W.findTreasuryInput();
+  options = { ...options, orderInputs: orderInputs.slice(3), treasuryInput };
+  // restart builder
+  builder = new WarehouseBuilder(W.warehouseOptions);
+  builder.buildCollectOrders(options);
+  const tx3 = await quickSubmitBuilder(W.emulator)({
+    txBuilder: builder.complete(),
+  });
+  expect(tx3).toBeTruthy();
 });

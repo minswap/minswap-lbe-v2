@@ -41,6 +41,7 @@ import type {
 } from "./deploy-validators";
 import type {
   Address,
+  AmmPoolDatum,
   Assets,
   BluePrintAsset,
   FactoryDatum,
@@ -132,7 +133,9 @@ export type BuildCollectOrdersOptions = {
 export type BuildCancelLBEOptions = {
   treasuryInput: UTxO;
   ammFactoryRefInput?: UTxO;
-  validTo?: UnixTime;
+  validFrom: UnixTime;
+  validTo: UnixTime;
+  reason: "CreatedPool" | "ByOwner" | "NotReachMinimum";
 };
 
 export type BuildCreateAmmPoolOptions = {
@@ -497,7 +500,8 @@ export class WarehouseBuilder {
   }
 
   public buildCancelLBE(options: BuildCancelLBEOptions): WarehouseBuilder {
-    const { treasuryInput, validTo, ammFactoryRefInput } = options;
+    const { treasuryInput, validFrom, validTo, ammFactoryRefInput, reason } =
+      options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
     const treasuryOutDatum: TreasuryDatum = {
@@ -508,15 +512,15 @@ export class WarehouseBuilder {
     this.tasks.push(
       () => {
         this.treasuryInputs = [treasuryInput];
-        this.treasuryRedeemer = { CancelLBE: { reason: "ByOwner" } };
-        if (validTo) {
-          this.tx
-            .validTo(validTo)
-            .addSigner(
-              plutusAddress2Address(this.t.network, treasuryInDatum.owner),
-            );
-        } else if (ammFactoryRefInput) {
+        this.treasuryRedeemer = { CancelLBE: { reason } };
+      },
+      () => {
+        if (ammFactoryRefInput) {
           this.tx.readFrom([ammFactoryRefInput]);
+        } else {
+          this.tx.addSigner(
+            plutusAddress2Address(this.t.network, treasuryInDatum.owner),
+          );
         }
       },
       () => {
@@ -524,6 +528,9 @@ export class WarehouseBuilder {
       },
       () => {
         this.payingTreasuryOutput({ treasuryOutDatum });
+      },
+      () => {
+        this.tx.validFrom(validFrom).validTo(validTo);
       },
     );
     return this;
@@ -895,6 +902,10 @@ export class WarehouseBuilder {
 
   toRedeemerFactory(redeemer: FactoryRedeemer): string {
     return T.Data.to(redeemer, FactoryValidateFactory.redeemer);
+  }
+
+  toDatumAmmPool(datum: AmmPoolDatum): string {
+    return T.Data.to(datum, FeedTypeAmmPool._datum);
   }
 
   calFinalReserveRaise(datum: TreasuryDatum) {
@@ -1473,7 +1484,7 @@ export class WarehouseBuilder {
       .payToAddressWithData(
         this.ammPoolAddress,
         {
-          inline: T.Data.to(poolDatum, FeedTypeAmmPool._datum),
+          inline: this.toDatumAmmPool(poolDatum),
         },
         poolAssets,
       );

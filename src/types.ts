@@ -2,6 +2,7 @@ import * as T from "@minswap/translucent";
 import type {
   FactoryValidateFactory,
   FactoryValidateFactoryMinting,
+  FeedTypeAmmPool,
   FeedTypeOrder,
   ManagerValidateManagerSpending,
   SellerValidateSellerSpending,
@@ -28,6 +29,7 @@ export type Unit = T.Unit;
 export type UnixTime = T.UnixTime;
 export type UTxO = T.UTxO;
 
+export type AmmPoolDatum = FeedTypeAmmPool["_datum"];
 export type FactoryDatum = FactoryValidateFactory["datum"];
 export type ManagerDatum = ManagerValidateManagerSpending["managerInDatum"];
 export type OrderDatum = FeedTypeOrder["_datum"];

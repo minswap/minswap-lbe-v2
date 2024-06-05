@@ -98,7 +98,7 @@ export const DUMMY_SEED_UTXO: UTxO = {
 
 export const DUMMY_SEED_AMM_UTXO: UTxO = {
   txHash: "5428517bd92102ce1af705f8b66560d445e620aead488b47fb824426484912f8",
-  outputIndex: 1,
+  outputIndex: 0,
   assets: { lovelace: 5_000_000n },
   address: "addr_test1vqtx6ahdpzm0nm9qa4wh4avhze8gv3j6jv6v3gmrukdxfrqm6m8d3",
 };
