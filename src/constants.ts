@@ -13,7 +13,6 @@ export const SELLER_AUTH_AN = "73656c6c6572";
 export const MANAGER_AUTH_AN = "4d616e61676572";
 export const ORDER_AUTH_AN = "6f72646572";
 export const DEFAULT_NUMBER_SELLER = 20n;
-export const LBE_MIN_OUTPUT_ADA = 3_000_000n;
 export const LBE_FEE = 1_000_000n;
 export const DUMMY_REDEEMER = "d87980"; // 121([])
 export const TREASURY_MIN_ADA = 3_000_000n;

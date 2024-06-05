@@ -1142,8 +1142,7 @@ export class WarehouseBuilder {
     const innerPay = (datum: OrderDatum) => {
       const assets = {
         [this.orderToken]: 1n,
-        lovelace:
-          ORDER_MIN_ADA + (datum.isCollected ? LBE_FEE : LBE_FEE * 2n),
+        lovelace: ORDER_MIN_ADA + (datum.isCollected ? LBE_FEE : LBE_FEE * 2n),
       };
       const raiseAsset = toUnit(
         datum.raiseAsset.policyId,

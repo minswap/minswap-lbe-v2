@@ -37,7 +37,11 @@ FAIL:
 - TODO: No Treasury ref inputs
 */
 import { WarehouseBuilder, type BuildUsingSellerOptions } from "../build-tx";
-import { LBE_FEE, LBE_MIN_OUTPUT_ADA, ORDER_MIN_ADA, TREASURY_MIN_ADA } from "../constants";
+import {
+  LBE_FEE,
+  ORDER_MIN_ADA,
+  TREASURY_MIN_ADA,
+} from "../constants";
 import type { OrderDatum, UTxO } from "../types";
 import { plutusAddress2Address, toUnit } from "../utils";
 import { assertValidator, genWarehouseOptions, loadModule } from "./utils";
@@ -171,7 +175,8 @@ function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): UTxO {
     outputIndex: ++utxoIndex,
     assets: {
       [builder.orderToken]: 1n,
-      lovelace: ORDER_MIN_ADA + 2n*LBE_FEE + datum.amount + datum.penaltyAmount,
+      lovelace:
+        ORDER_MIN_ADA + 2n * LBE_FEE + datum.amount + datum.penaltyAmount,
     },
     address: builder.orderAddress,
     datum: builder.toDatumOrder(datum),
@@ -345,11 +350,7 @@ test("using-seller | FAIL | update orders: Invalid order output value", async ()
       // raise asset is ADA
       const assets = {
         [builder.orderToken]: 1n,
-        lovelace:
-          LBE_MIN_OUTPUT_ADA +
-          (datum.isCollected ? LBE_FEE : LBE_FEE * 2n) +
-          datum.amount -
-          1n,
+        lovelace: ORDER_MIN_ADA + LBE_FEE * 2n + datum.amount - 1n,
       };
 
       builder.tx.payToAddressWithData(
