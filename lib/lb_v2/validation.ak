@@ -21,9 +21,8 @@ use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
   amm_pool_validation_hash, assert, calculate_penalty,
   compute_asset_name_from_base_and_raise, default_burn_liquidity, fee_ada,
-  get_order_value, manager_auth_an, minimum_ada, order_auth_an,
-  order_minimum_ada, seller_auth_an, treasury_auth_an, treasury_minimum_ada,
-  two_day_ms,
+  get_order_value, manager_auth_an, order_auth_an, order_minimum_ada,
+  seller_auth_an, treasury_auth_an, treasury_minimum_ada, two_day_ms,
 }
 
 pub fn validate_creating_treasury_out(
@@ -1276,7 +1275,7 @@ fn apply_redeeming_lp_order(
     raise_asset
   let expected_order_out_value =
     value.zero()
-      |> value.add(ada_policy_id, ada_asset_name, minimum_ada)
+      |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada)
       |> value.add(raise_asset_pid, raise_asset_an, o_remaining_raise_amount)
       |> value.add(amm_authen_policy_id, lp_asset_name, o_lp_amount)
   let Output { address: owner_address, value: order_out_value, .. } =
@@ -1559,7 +1558,7 @@ fn apply_refund_order(
     raise_asset
   let expected_order_out_value =
     value.zero()
-      |> value.add(ada_policy_id, ada_asset_name, minimum_ada)
+      |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada)
       |> value.add(raise_asset_pid, raise_asset_an, amount + penalty_amount)
   let Output { address: owner_address, value: order_out_value, .. } =
     order_output

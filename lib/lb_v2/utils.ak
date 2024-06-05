@@ -36,8 +36,6 @@ pub const amm_pool_validation_hash =
 pub const default_burn_liquidity = 10
 
 /// *******************************************
-pub const minimum_ada = 3_000_000
-
 pub const fee_ada = 1_000_000
 
 pub const penalty_fee = 2_000_000
