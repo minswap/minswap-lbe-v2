@@ -39,14 +39,7 @@ validator(
       ..
     } = transaction
     let mint_value = value.from_minted_value(mint)
-    let ManagerDatum { order_hash, factory_policy_id, .. } = manager_in_datum
-    // dont need this line
-    expect [] =
-      validation.get_order_inputs(
-        inputs: inputs,
-        factory_policy_id: factory_policy_id,
-        order_hash: order_hash,
-      )
+    let ManagerDatum { factory_policy_id, .. } = manager_in_datum
     when redeemer is {
       ManageSeller -> {
         expect Some(Input {

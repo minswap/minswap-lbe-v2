@@ -128,20 +128,21 @@ validator(
         asset_b_policy_id,
         asset_b_asset_name,
       )
+    let factory_outputs =
+      list.filter(
+        outputs,
+        fn(output) {
+          let Output { address: Address { payment_credential, .. }, .. } =
+            output
+          payment_credential == ScriptCredential(factory_hash)
+        },
+      )
     when redeemer is {
       CreateTreasury { .. } -> {
         // finding exactly 1 Factory Input
         expect [factory_input] = factory_inputs
         // finding exactly 2 Factory Outputs
-        expect [f_out_head, f_out_tail] =
-          list.filter(
-            outputs,
-            fn(output) {
-              let Output { address: Address { payment_credential, .. }, .. } =
-                output
-              payment_credential == ScriptCredential(factory_hash)
-            },
-          )
+        expect [f_out_head, f_out_tail] = factory_outputs
         // finding exactly 1 Treasury Input
         let treasury_output =
           validation.get_treasury_output(
@@ -161,10 +162,18 @@ validator(
         let Input { output: Output { value: factory_input_value, .. }, .. } =
           factory_input
         // ref script of factory out
-        let Output { datum: f_out_head_datum, value: f_out_head_value, .. } =
-          f_out_head
-        let Output { datum: f_out_tail_datum, value: f_out_tail_value, .. } =
-          f_out_tail
+        let Output {
+          datum: f_out_head_datum,
+          value: f_out_head_value,
+          reference_script: f_out_head_ref_script,
+          ..
+        } = f_out_head
+        let Output {
+          datum: f_out_tail_datum,
+          value: f_out_tail_value,
+          reference_script: f_out_tail_ref_script,
+          ..
+        } = f_out_tail
         // finding Manager Address
         let Output { address: manager_address, .. } = manager_out
         // finding Seller Address
@@ -223,6 +232,8 @@ validator(
               f_out_tail_datum == InlineDatum(
                 FactoryDatum { head: lp_asset_name, tail: current_tail },
               ),
+              f_out_head_ref_script == None,
+              f_out_tail_ref_script == None,
             }, @"2 Factory Outputs must pay correctly!")
         // Assertions:
         and {
@@ -258,17 +269,8 @@ validator(
       CloseTreasury { .. } -> {
         // finding exactly 2 Factory Inputs
         expect [factory_input_1, factory_input_2] = factory_inputs
-        // duplicate logic find factory out
         // finding exactly 1 Factory Output
-        expect [factory_output] =
-          list.filter(
-            outputs,
-            fn(output) {
-              let Output { address: Address { payment_credential, .. }, .. } =
-                output
-              payment_credential == ScriptCredential(factory_hash)
-            },
-          )
+        expect [factory_output] = factory_outputs
         // finding exactly 1 Treasury Input
         expect [treasury_input] =
           list.filter(
@@ -304,6 +306,7 @@ validator(
         expect Output {
           value: factory_out_value,
           datum: InlineDatum(factory_out_datum),
+          reference_script: factory_out_ref_script,
           ..
         } = factory_output
         expect Input {
@@ -368,6 +371,7 @@ validator(
           ),
           assert(reserve_raise == 0, @"All Orders have been executed."),
           assert(total_penalty == 0, @"All Penalty have been handled."),
+          factory_out_ref_script == None,
         }
       }
       _ -> False
@@ -455,7 +459,7 @@ fn validate_initialization(
 ) -> Bool {
   // Ensure transaction's outptus contain exactly 1 Factory Output 
   // check ref script
-  expect [Output { value: out_value, datum, .. }] =
+  expect [Output { value: out_value, datum, reference_script, .. }] =
     list.filter(
       outputs,
       fn(output) {
@@ -491,6 +495,7 @@ fn validate_initialization(
       ),
       @"Factory Datum must be correct!",
     ),
+    reference_script == None,
   }
 }
 
