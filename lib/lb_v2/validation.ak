@@ -20,8 +20,8 @@ use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
   amm_pool_validation_hash, assert, calculate_penalty,
   compute_asset_name_from_base_and_raise, default_burn_liquidity, fee_ada,
-  get_order_value, manager_auth_an, minimum_ada, order_auth_an, seller_auth_an,
-  treasury_auth_an, treasury_minimum_ada, two_day_ms,
+  get_order_value, manager_auth_an, order_auth_an, order_minimum_ada,
+  seller_auth_an, treasury_auth_an, treasury_minimum_ada, two_day_ms,
 }
 
 pub fn validate_creating_treasury_out(
@@ -372,9 +372,14 @@ pub fn get_order_inputs(
   list.filter(
     inputs,
     fn(input) {
-      let Input { output: Output { address: in_addr, value: in_value, .. }, .. } =
-        input
-      let Address { payment_credential, .. } = in_addr
+      let Input {
+        output: Output {
+          address: Address { payment_credential, .. },
+          value: in_value,
+          ..
+        },
+        ..
+      } = input
       and {
         value.quantity_of(in_value, factory_policy_id, order_auth_an) == 1,
         payment_credential == ScriptCredential(order_hash),
@@ -970,154 +975,139 @@ pub fn apply_order(
   )
 }
 
-pub fn validate_collect_order(
-  order_inputs: List<Input>,
-  order_outputs: List<Output>,
-  treasury_output: Output,
+// Assertions:
+// - All Sellers, Manager have been collected.
+// - All Inputs and Outputs must be legitimate by containing an Auth Token.
+// - Treasury Input, Order Inputs must share the same LBE ID.
+// - Paying Treasury Output correctly!
+// - Paying Order Outputs correctly!
+// - Collect at least 1 Order.
+// - The length of Order Inputs equals the length of Order Outputs.
+// - Transaction mint nothing.
+// Notes:
+// - Collecting orders and cancelling LBE are independent operations.
+// - There's no need to check the time range since it should collect sellers first.
+pub fn validate_collect_orders(
+  inputs: List<Input>,
+  outputs: List<Output>,
   treasury_in_datum: TreasuryDatum,
   treasury_in_value: Value,
   mint_value: Value,
+  treasury_hash: ValidatorHash,
 ) -> Bool {
   let TreasuryDatum {
     factory_policy_id,
+    order_hash,
     collected_fund,
     base_asset,
     raise_asset,
     is_manager_collected,
-    reserve_raise,
-    total_penalty,
-    minimum_raise,
     ..
   } = treasury_in_datum
+  let order_inputs =
+    get_order_inputs(
+      inputs: inputs,
+      factory_policy_id: factory_policy_id,
+      order_hash: order_hash,
+    )
+  let order_outputs = get_order_outputs(outputs, factory_policy_id, order_hash)
+  let treasury_output =
+    get_treasury_output(outputs, factory_policy_id, treasury_hash)
   expect Output {
     value: treasury_out_value,
     datum: InlineDatum(raw_treasury_out_datum),
+    reference_script: treasury_out_rs,
     ..
   } = treasury_output
   expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
-  // 1. validate orders. 
-  //    - each order validate
-  //      - order datum 
-  //        - order_in.is_collected = False
-  //        - order_out.is_collected = True
-  //        - other field: no change
-  //      - order value
-  //        - value_out =  minimum_ada+1fee
-  //    - calculate acc amount and penalty of all order
-  //    - order length > 0 && order_ins.length ==order_outs.length
-  let delta_fund =
+  let collect_amount =
     apply_collecting_orders(
       order_inputs: order_inputs,
       order_outputs: order_outputs,
       base_asset: base_asset,
       raise_asset: raise_asset,
       factory_policy_id: factory_policy_id,
+      acc_collect_amount: 0,
     )
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
     raise_asset
   and {
-    // 2. validate treasury
-    //    - treasury_datum
-    //      - collected_fund: 
-    //            datum_out.collected_fund = datum_in.collected_fund + delta_fund
-    //      - other field: nothing change
-    //    - treasury_value: t_value_out = t_value_in + (raise_asset, delta_fund)
+    // Treasury Out Datum should update correctly!
     TreasuryDatum {
       ..treasury_in_datum,
-      collected_fund: collected_fund + delta_fund,
+      collected_fund: collected_fund + collect_amount,
     } == treasury_out_datum,
+    // Accumulate Treasury Out Value with the `collect_amount` of `raise_asset` Token.
     treasury_out_value == (
       treasury_in_value
-        |> value.add(raise_asset_pid, raise_asset_an, delta_fund)
+        |> value.add(raise_asset_pid, raise_asset_an, collect_amount)
     ),
-    // 3. validate time range(no need to check because It must collect seller first)
-    //    - datum.end_time < start_valid_time_range
-    // 5. Mint nothing
+    // prevent Treasury Output becomes heavy.
+    treasury_out_rs == None,
+    // Transaction mint nothing.
     value.flatten(mint_value) == [],
-    // 6. Dont care about cancelation
-    // 7. Collected manager
+    // All Sellers, Manager have been collected.
     is_manager_collected == True,
-    // 8. Reach min raise
-    when minimum_raise is {
-      None -> True
-      Some(min) -> reserve_raise + total_penalty >= min
-    },
   }
 }
 
-// return (total_amount+total_penalty) of orders
+// Transaction must collects at least 1 order.
+// return Sum(amount + penalty_amount) of orders
 pub fn apply_collecting_orders(
   order_inputs: List<Input>,
   order_outputs: List<Output>,
   base_asset: Asset,
   raise_asset: Asset,
   factory_policy_id: PolicyId,
+  acc_collect_amount: Int,
 ) -> Int {
-  expect [order_input, ..remaining_order_inputs] = order_inputs
-  expect Input {
-    output: Output { datum: InlineDatum(raw_order_in_datum), .. },
-    ..
-  } = order_input
-  expect order_in_datum: OrderDatum = raw_order_in_datum
-  expect [order_output, ..remaining_order_outputs] = order_outputs
-  let fund_amount =
-    apply_collecting_order(
-      order_in_datum,
-      order_output,
-      base_asset,
-      raise_asset,
-      factory_policy_id: factory_policy_id,
-    )
-  if remaining_order_inputs == [] {
-    expect remaining_order_outputs == []
-    fund_amount
-  } else {
-    let acc_fund =
-      apply_collecting_orders(
-        remaining_order_inputs,
-        remaining_order_outputs,
-        base_asset,
-        raise_asset,
-        factory_policy_id,
-      )
-    acc_fund + fund_amount
-  }
-}
-
-pub fn apply_collecting_order(
-  order_in_datum: OrderDatum,
-  order_output: Output,
-  base_asset: Asset,
-  raise_asset: Asset,
-  factory_policy_id: PolicyId,
-) -> Int {
-  let OrderDatum {
-    base_asset: o_base_asset,
-    raise_asset: o_raise_asset,
-    amount,
-    is_collected,
-    penalty_amount,
-    ..
-  } = order_in_datum
+  expect [input, ..inputs] = order_inputs
+  expect [output, ..outputs] = order_outputs
+  expect Input { output: Output { datum: InlineDatum(in_datum_raw), .. }, .. } =
+    input
+  expect in_datum: OrderDatum = in_datum_raw
   expect Output {
-    datum: InlineDatum(raw_order_out_datum),
-    value: order_out_value,
+    value: out_value,
+    datum: InlineDatum(out_datum_raw),
+    reference_script: out_ref_script,
     ..
-  } = order_output
-  expect order_out_datum: OrderDatum = raw_order_out_datum
-  // validate
+  } = output
+  expect out_datum: OrderDatum = out_datum_raw
   expect and {
-      order_out_value == (
-        value.zero() // fee for redeemLP
-          |> value.add(ada_policy_id, ada_asset_name, fee_ada + minimum_ada)
-          |> value.add(factory_policy_id, order_auth_an, 1)
+      // Order, Treasury must share the same LBE ID
+      in_datum == OrderDatum {
+        ..in_datum,
+        base_asset: base_asset,
+        raise_asset: raise_asset,
+      },
+      // Out Datum only changes: {is_collected: True } compare to In Datum
+      out_datum == OrderDatum { ..in_datum, is_collected: True },
+      // Out Value should be correct!
+      out_value == (
+        value.from_asset(factory_policy_id, order_auth_an, 1)
+          |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
       ),
-      o_base_asset == base_asset,
-      o_raise_asset == raise_asset,
-      is_collected == False,
-      OrderDatum { ..order_in_datum, is_collected: True } == order_out_datum,
+      // Prevent Order Output from becoming heavy
+      out_ref_script == None,
     }
-  amount + penalty_amount
+  let OrderDatum { amount, penalty_amount, .. } = in_datum
+  let collect_amount = acc_collect_amount + amount + penalty_amount
+  when inputs == [] is {
+    True -> {
+      // Ensure order_inputs.length == order_outputs.length
+      expect outputs == []
+      collect_amount
+    }
+    False ->
+      apply_collecting_orders(
+        order_inputs: inputs,
+        order_outputs: outputs,
+        base_asset: base_asset,
+        raise_asset: raise_asset,
+        factory_policy_id: factory_policy_id,
+        acc_collect_amount: collect_amount,
+      )
+  }
 }
 
 pub fn validate_redeem_lp(
@@ -1278,7 +1268,7 @@ fn apply_redeeming_lp_order(
     raise_asset
   let expected_order_out_value =
     value.zero()
-      |> value.add(ada_policy_id, ada_asset_name, minimum_ada)
+      |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada)
       |> value.add(raise_asset_pid, raise_asset_an, o_remaining_raise_amount)
       |> value.add(amm_authen_policy_id, lp_asset_name, o_lp_amount)
   let Output { address: owner_address, value: order_out_value, .. } =
@@ -1561,7 +1551,7 @@ fn apply_refund_order(
     raise_asset
   let expected_order_out_value =
     value.zero()
-      |> value.add(ada_policy_id, ada_asset_name, minimum_ada)
+      |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada)
       |> value.add(raise_asset_pid, raise_asset_an, amount + penalty_amount)
   let Output { address: owner_address, value: order_out_value, .. } =
     order_output

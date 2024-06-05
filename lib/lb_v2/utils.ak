@@ -36,8 +36,6 @@ pub const amm_pool_validation_hash =
 pub const default_burn_liquidity = 10
 
 /// *******************************************
-pub const minimum_ada = 3_000_000
-
 pub const fee_ada = 1_000_000
 
 pub const penalty_fee = 2_000_000
@@ -47,6 +45,8 @@ pub const treasury_minimum_ada = 3_000_000
 pub const manager_minimum_ada = 2_000_000
 
 pub const seller_minimum_ada = 2_000_000
+
+pub const order_minimum_ada = 2_000_000
 
 // sort 2 assets in bytearray ascending
 pub fn sort_two_assets(asset_a: Asset, asset_b: Asset) -> (Asset, Asset) {
@@ -90,7 +90,7 @@ pub fn get_order_value(
   factory_policy_id: PolicyId,
   raise_asset: Asset,
 ) -> Value {
-  let base_ada = minimum_ada + fee_ada * 2
+  let base_ada = order_minimum_ada + fee_ada * 2
   value.zero()
     |> value.add(ada_policy_id, ada_asset_name, base_ada)
     |> value.add(

@@ -20,7 +20,6 @@ import {
   LBE_FEE,
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
-  LBE_MIN_OUTPUT_ADA,
   LP_COLATERAL,
   MANAGER_AUTH_AN,
   MANAGER_MIN_ADA,
@@ -29,6 +28,7 @@ import {
   MINSWAP_V2_MAX_LIQUIDITY,
   MINSWAP_V2_POOL_AUTH_AN,
   ORDER_AUTH_AN,
+  ORDER_MIN_ADA,
   SELLER_AUTH_AN,
   SELLER_MIN_ADA,
   TREASURY_AUTH_AN,
@@ -41,6 +41,7 @@ import type {
 } from "./deploy-validators";
 import type {
   Address,
+  AmmPoolDatum,
   Assets,
   BluePrintAsset,
   FactoryDatum,
@@ -132,7 +133,9 @@ export type BuildCollectOrdersOptions = {
 export type BuildCancelLBEOptions = {
   treasuryInput: UTxO;
   ammFactoryRefInput?: UTxO;
-  validTo?: UnixTime;
+  validFrom: UnixTime;
+  validTo: UnixTime;
+  reason: "CreatedPool" | "ByOwner" | "NotReachMinimum";
 };
 
 export type BuildCreateAmmPoolOptions = {
@@ -497,7 +500,8 @@ export class WarehouseBuilder {
   }
 
   public buildCancelLBE(options: BuildCancelLBEOptions): WarehouseBuilder {
-    const { treasuryInput, validTo, ammFactoryRefInput } = options;
+    const { treasuryInput, validFrom, validTo, ammFactoryRefInput, reason } =
+      options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
     const treasuryOutDatum: TreasuryDatum = {
@@ -508,15 +512,15 @@ export class WarehouseBuilder {
     this.tasks.push(
       () => {
         this.treasuryInputs = [treasuryInput];
-        this.treasuryRedeemer = { CancelLBE: { reason: "ByOwner" } };
-        if (validTo) {
-          this.tx
-            .validTo(validTo)
-            .addSigner(
-              plutusAddress2Address(this.t.network, treasuryInDatum.owner),
-            );
-        } else if (ammFactoryRefInput) {
+        this.treasuryRedeemer = { CancelLBE: { reason } };
+      },
+      () => {
+        if (ammFactoryRefInput) {
           this.tx.readFrom([ammFactoryRefInput]);
+        } else {
+          this.tx.addSigner(
+            plutusAddress2Address(this.t.network, treasuryInDatum.owner),
+          );
         }
       },
       () => {
@@ -524,6 +528,9 @@ export class WarehouseBuilder {
       },
       () => {
         this.payingTreasuryOutput({ treasuryOutDatum });
+      },
+      () => {
+        this.tx.validFrom(validFrom).validTo(validTo);
       },
     );
     return this;
@@ -652,7 +659,7 @@ export class WarehouseBuilder {
       const output: { address: Address; assets: Assets } = {
         address: plutusAddress2Address(this.t.network, datum.owner),
         assets: {
-          lovelace: LBE_MIN_OUTPUT_ADA,
+          lovelace: ORDER_MIN_ADA,
           [this.ammLpToken]: lpAmount,
         },
       };
@@ -705,13 +712,14 @@ export class WarehouseBuilder {
     const { treasuryInput, orderInputs, validFrom, validTo } = options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
-    const treasuryOutDatum: TreasuryDatum = {
+    let treasuryOutDatum: TreasuryDatum = {
       ...treasuryInDatum,
     };
     const orderOutDatums: OrderDatum[] = [];
     let deltaCollectedFund = 0n;
 
-    for (const o of orderInputs) {
+    const sortedOrders = sortUTxOs(orderInputs);
+    for (const o of sortedOrders) {
       invariant(o.datum);
       const datum: OrderDatum = {
         ...this.fromDatumOrder(o.datum),
@@ -720,7 +728,10 @@ export class WarehouseBuilder {
       orderOutDatums.push(datum);
       deltaCollectedFund += datum.amount + datum.penaltyAmount;
     }
-    treasuryOutDatum.collectedFund += deltaCollectedFund;
+    treasuryOutDatum = {
+      ...treasuryOutDatum,
+      collectedFund: treasuryOutDatum.collectedFund + deltaCollectedFund,
+    };
 
     this.tasks.push(
       () => {
@@ -891,6 +902,10 @@ export class WarehouseBuilder {
 
   toRedeemerFactory(redeemer: FactoryRedeemer): string {
     return T.Data.to(redeemer, FactoryValidateFactory.redeemer);
+  }
+
+  toDatumAmmPool(datum: AmmPoolDatum): string {
+    return T.Data.to(datum, FeedTypeAmmPool._datum);
   }
 
   calFinalReserveRaise(datum: TreasuryDatum) {
@@ -1138,8 +1153,7 @@ export class WarehouseBuilder {
     const innerPay = (datum: OrderDatum) => {
       const assets = {
         [this.orderToken]: 1n,
-        lovelace:
-          LBE_MIN_OUTPUT_ADA + (datum.isCollected ? LBE_FEE : LBE_FEE * 2n),
+        lovelace: ORDER_MIN_ADA + (datum.isCollected ? LBE_FEE : LBE_FEE * 2n),
       };
       const raiseAsset = toUnit(
         datum.raiseAsset.policyId,
@@ -1470,7 +1484,7 @@ export class WarehouseBuilder {
       .payToAddressWithData(
         this.ammPoolAddress,
         {
-          inline: T.Data.to(poolDatum, FeedTypeAmmPool._datum),
+          inline: this.toDatumAmmPool(poolDatum),
         },
         poolAssets,
       );

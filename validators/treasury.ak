@@ -49,7 +49,7 @@ validator {
       },
       ..
     } = treasury_input
-    let TreasuryDatum { factory_policy_id, manager_hash, .. } =
+    let TreasuryDatum { factory_policy_id, manager_hash, order_hash, .. } =
       treasury_in_datum
     let mint_value = value.from_minted_value(mint)
     expect Interval {
@@ -97,7 +97,6 @@ validator {
           owner,
           start_time,
           seller_hash,
-          order_hash,
           ..
         } = treasury_in_datum
         let Address { payment_credential: owner_payment_credential, .. } = owner
@@ -142,31 +141,15 @@ validator {
           manager_hash: manager_hash,
           treasury_hash: treasury_hash,
         )
-      CollectOrders -> {
-        let TreasuryDatum { order_hash, .. } = treasury_in_datum
-        let order_inputs =
-          validation.get_order_inputs(
-            inputs: inputs,
-            factory_policy_id: factory_policy_id,
-            order_hash: order_hash,
-          )
-        let order_outputs =
-          validation.get_order_outputs(outputs, factory_policy_id, order_hash)
-        let treasury_output =
-          validation.get_treasury_output(
-            outputs,
-            factory_policy_id,
-            treasury_hash,
-          )
-        validation.validate_collect_order(
-          order_inputs: order_inputs,
-          order_outputs: order_outputs,
-          treasury_output: treasury_output,
+      CollectOrders ->
+        validation.validate_collect_orders(
+          inputs: inputs,
+          outputs: outputs,
           treasury_in_datum: treasury_in_datum,
           treasury_in_value: treasury_in_value,
           mint_value: mint_value,
+          treasury_hash: treasury_hash,
         )
-      }
       CloseEvent -> {
         // forward logic to factory with case 2 factory inputs
         expect [_, _] =
@@ -210,8 +193,7 @@ validator {
         )
       }
       RedeemOrders -> {
-        let TreasuryDatum { total_liquidity, order_hash, .. } =
-          treasury_in_datum
+        let TreasuryDatum { total_liquidity, .. } = treasury_in_datum
         let treasury_output =
           validation.get_treasury_output(
             outputs,
