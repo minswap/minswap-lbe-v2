@@ -5,6 +5,7 @@ use aiken/transaction.{
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value
+use lb_v2/cancel_validation.{validate_cancel_lbe}
 use lb_v2/types.{
   CancelLBE, CloseEvent, CollectManager, CollectOrders, CreateAmmPool, PoolDatum,
   RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
@@ -236,7 +237,7 @@ validator {
             treasury_hash,
           )
         and {
-          validation.validate_cancel_lbe(
+          validate_cancel_lbe(
             treasury_in_datum: treasury_in_datum,
             treasury_in_value: treasury_in_value,
             treasury_output: treasury_output,
