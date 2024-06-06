@@ -383,14 +383,10 @@ pub fn get_order_outputs(
         reference_script,
         ..
       } = output
-      if payment_credential == ScriptCredential(order_hash) {
-        expect and {
-            value.quantity_of(out_value, factory_policy_id, order_auth_an) == 1,
-            reference_script == None,
-          }
-        True
-      } else {
-        False
+      and {
+        payment_credential == ScriptCredential(order_hash),
+        value.quantity_of(out_value, factory_policy_id, order_auth_an) == 1,
+        reference_script == None,
       }
     },
   )
