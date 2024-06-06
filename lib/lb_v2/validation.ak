@@ -232,26 +232,6 @@ pub fn get_treasury_input_by_out_ref(
   treasury_input
 }
 
-pub fn get_seller_input_by_out_ref(
-  inputs: List<Input>,
-  factory_policy_id: PolicyId,
-  out_ref: OutputReference,
-) -> Input {
-  expect [seller_input] =
-    list.filter(
-      inputs,
-      fn(input) {
-        let Input { output_reference, output: Output { value: out_value, .. } } =
-          input
-        and {
-          value.quantity_of(out_value, factory_policy_id, seller_auth_an) == 1,
-          output_reference == out_ref,
-        }
-      },
-    )
-  seller_input
-}
-
 pub fn get_amm_pool_output(outputs: List<Output>) -> Output {
   expect [pool_output] =
     list.filter(
@@ -259,16 +239,13 @@ pub fn get_amm_pool_output(outputs: List<Output>) -> Output {
       fn(output) {
         let Output { address: Address { payment_credential, .. }, value, .. } =
           output
-        when payment_credential is {
-          ScriptCredential(hash) -> and {
-              hash == amm_pool_validation_hash,
-              value.quantity_of(
-                value,
-                amm_authen_policy_id,
-                amm_pool_auth_asset_name,
-              ) == 1,
-            }
-          _ -> False
+        and {
+          payment_credential == ScriptCredential(amm_pool_validation_hash),
+          value.quantity_of(
+            value,
+            amm_authen_policy_id,
+            amm_pool_auth_asset_name,
+          ) == 1,
         }
       },
     )
@@ -335,40 +312,6 @@ pub fn get_manager_output(
   manager_output
 }
 
-pub fn get_seller_outputs(
-  outputs: List<Output>,
-  factory_policy_id: PolicyId,
-  seller_hash: ValidatorHash,
-  seller_datum: Data,
-) -> List<Output> {
-  let seller_outputs =
-    list.filter(
-      outputs,
-      fn(output) {
-        let Output { address: Address { payment_credential, .. }, .. } = output
-        payment_credential == ScriptCredential(seller_hash)
-      },
-    )
-  expect
-    list.all(
-      seller_outputs,
-      fn(output) {
-        let Output { value: out_value, datum: out_datum, .. } = output
-        and {
-          assert(
-            value.quantity_of(out_value, factory_policy_id, seller_auth_an) == 1,
-            @"Seller output don't have any seller token",
-          ),
-          assert(
-            InlineDatum(seller_datum) == out_datum,
-            @"Invalid seller output datum",
-          ),
-        }
-      },
-    )
-  seller_outputs
-}
-
 pub fn get_order_outputs(
   outputs: List<Output>,
   factory_policy_id: PolicyId,
@@ -393,11 +336,11 @@ pub fn get_order_outputs(
 }
 
 // Assertions:
+// - All Sellers must be collected before collecting Manager => no need to check time range
 // - 1 Treasury Output needs to be paid
 // - 1 Manager Input needs to be spent
 // - Treasury Input and Manager Input must be the same LBE ID.
 // - The Treasury Values have no changes.
-// - All Sellers must be collected before collecting Manager.
 // - Burn 1 Manager Token
 // - Treasury In Datum must be correct!
 // - Treasury Out Datum must be correct!
@@ -477,6 +420,15 @@ pub fn validate_collect_manager(
   }
 }
 
+// Assertions:
+// 3 use-cases: Deposit | Update | WithdrawAll Orders
+// The LBE is not cancelled
+// Treasury, Seller, Orders share the same LBE ID
+// Time Range: in discovery phase
+// Spending exactly 1 Legit Seller Input
+// Paying 1 Seller Output correctly!
+// Paying Order Outputs correctly!
+// Spending Order Input requires the owner's authorization
 pub fn validate_using_seller(
   treasury_hash: ValidatorHash,
   out_ref: OutputReference,
@@ -491,35 +443,7 @@ pub fn validate_using_seller(
 ) -> Bool {
   let (start_valid_time_range, end_valid_time_range) =
     must_get_start_end_validity(validity_range)
-  // Validate always spend exactly 1 Seller UTxO
-  let seller_input =
-    get_seller_input_by_out_ref(
-      inputs: inputs,
-      factory_policy_id: factory_policy_id,
-      out_ref: out_ref,
-    )
-  expect Input {
-    output: Output {
-      address: Address { payment_credential: ScriptCredential(seller_hash), .. },
-      ..
-    },
-    ..
-  } = seller_input
-  expect [_] =
-    list.filter(
-      inputs,
-      fn(input) {
-        let Input {
-          output: Output { address: Address { payment_credential, .. }, .. },
-          ..
-        } = input
-        when payment_credential is {
-          ScriptCredential(hash) -> hash == seller_hash
-          _ -> False
-        }
-      },
-    )
-  // Validate Datums
+  // Finding 1 Treasury Ref Input, 1 Seller Input, 1 Seller Output, Order Inputs, Order Outputs
   expect [treasury_ref_input] =
     get_treasury_ref_inputs(reference_inputs, factory_policy_id, treasury_hash)
   expect Input {
@@ -528,6 +452,7 @@ pub fn validate_using_seller(
   } = treasury_ref_input
   expect TreasuryDatum {
     factory_policy_id,
+    seller_hash,
     base_asset,
     raise_asset,
     order_hash,
@@ -538,6 +463,38 @@ pub fn validate_using_seller(
     is_cancelled,
     ..
   }: TreasuryDatum = raw_treasury_datum
+  expect Some(seller_input) =
+    list.find(
+      inputs,
+      fn(input) {
+        let Input { output_reference, .. } = input
+        output_reference == out_ref
+      },
+    )
+  let SellerDatum {
+    base_asset: s_base_asset,
+    raise_asset: s_raise_asset,
+    amount,
+    penalty_amount,
+    ..
+  } = seller_in_datum
+  let Input { output: Output { value: seller_input_value, .. }, .. } =
+    seller_input
+  expect [seller_output] =
+    list.filter(
+      outputs,
+      fn(output) {
+        let Output { address: Address { payment_credential, .. }, .. } = output
+        payment_credential == ScriptCredential(seller_hash)
+      },
+    )
+  expect Output {
+    value: seller_output_value,
+    datum: InlineDatum(seller_output_raw_datum),
+    reference_script: seller_output_rs,
+    ..
+  } = seller_output
+  expect seller_output_datum: SellerDatum = seller_output_raw_datum
   let order_inputs =
     get_order_inputs(
       inputs: inputs,
@@ -565,54 +522,43 @@ pub fn validate_using_seller(
     )
   let order_input_count = list.length(order_inputs)
   let order_output_count = list.length(order_outputs)
-  let is_valid_minting =
-    if order_input_count == order_output_count {
-      value.flatten(mint_value) == []
-    } else {
-      value.flatten(mint_value) == [
-        (
-          factory_policy_id,
-          order_auth_an,
-          order_output_count - order_input_count,
-        ),
-      ]
-    }
-  expect [_] =
-    get_seller_outputs(
-      outputs: outputs,
-      factory_policy_id: factory_policy_id,
-      seller_hash: seller_hash,
-      seller_datum: SellerDatum {
-        factory_policy_id,
-        base_asset,
-        raise_asset,
-        amount: seller_in_datum.amount + delta_amount,
-        penalty_amount: seller_in_datum.penalty_amount + delta_penalty,
-      },
-    )
   and {
-    // validate LBE ID
-    assert(
-      base_asset == seller_in_datum.base_asset,
-      @"Invalid seller input LBE ID",
-    ),
-    assert(
-      raise_asset == seller_in_datum.raise_asset,
-      @"Invalid seller input LBE ID",
-    ),
+    // prevent spam
+    order_input_count + order_output_count > 0,
+    // Validate Seller Input
+    value.quantity_of(seller_input_value, factory_policy_id, seller_auth_an) == 1,
+    s_base_asset == base_asset,
+    s_raise_asset == raise_asset,
+    // Spending exactly 1 Legit Seller Input
+    list.filter(
+      inputs,
+      fn(input) {
+        let Input {
+          output: Output { address: Address { payment_credential, .. }, .. },
+          ..
+        } = input
+        payment_credential == ScriptCredential(seller_hash)
+      },
+    ) == [seller_input],
+    // Validate Seller Output
+    seller_output_value == seller_input_value,
+    seller_output_rs == None,
+    seller_output_datum == SellerDatum {
+      ..seller_in_datum,
+      amount: amount + delta_amount,
+      penalty_amount: penalty_amount + delta_penalty,
+    },
     // validate time frame
-    assert(
-      start_time <= start_valid_time_range,
-      @"Using-seller: Before discovery phase",
-    ),
-    assert(
-      end_valid_time_range <= end_time,
-      @"Using-seller: After discovery phase",
-    ),
+    start_time <= start_valid_time_range,
+    end_valid_time_range <= end_time,
     // validate minting
-    assert(is_valid_minting, @"Using-seller: Invalid minting"),
-    // not cancelled yet
-    assert(is_cancelled == False, @"Using-seller: LBE is cancelled"),
+    mint_value == value.from_asset(
+      factory_policy_id,
+      order_auth_an,
+      order_output_count - order_input_count,
+    ),
+    // The LBE is not cancelled
+    is_cancelled == False,
   }
 }
 
@@ -634,11 +580,7 @@ pub fn apply_order(
       (0, 0),
       fn(order_input, acc) {
         expect Input {
-          output: Output {
-            datum: InlineDatum(raw_o_datum),
-            value: order_value,
-            ..
-          },
+          output: Output { datum: InlineDatum(raw_o_datum), .. },
           ..
         } = order_input
         let (acc_amount, acc_penalty) = acc
@@ -646,19 +588,11 @@ pub fn apply_order(
           base_asset: o_base_asset,
           raise_asset: o_raise_asset,
           amount,
-          is_collected,
           penalty_amount,
           owner,
           ..
         }: OrderDatum = raw_o_datum
         let Address { payment_credential: owner_payment_credential, .. } = owner
-        let expected_order =
-          get_order_value(
-            amount: amount,
-            penalty_amount: penalty_amount,
-            factory_policy_id: factory_policy_id,
-            raise_asset: raise_asset,
-          )
         // validate orders
         expect and {
             validate_authorize_by_owner(
@@ -666,10 +600,8 @@ pub fn apply_order(
               extra_signatories: extra_signatories,
               inputs: inputs,
             ),
-            is_collected == False,
-            assert(o_base_asset == base_asset, @"Invalid order input LBE ID"),
-            assert(o_raise_asset == raise_asset, @"Invalid order input LBE ID"),
-            expected_order == order_value,
+            o_base_asset == base_asset,
+            o_raise_asset == raise_asset,
           }
         (acc_amount + amount, acc_penalty + penalty_amount)
       },
@@ -682,10 +614,12 @@ pub fn apply_order(
         expect Output {
           datum: InlineDatum(raw_o_datum),
           value: order_value,
+          reference_script: None,
           ..
         } = order_output
         let (acc_amount, acc_penalty) = acc
         expect OrderDatum {
+          factory_policy_id: o_factory_policy_id,
           base_asset: o_base_asset,
           raise_asset: o_raise_asset,
           amount,
@@ -700,19 +634,25 @@ pub fn apply_order(
             factory_policy_id: factory_policy_id,
             raise_asset: raise_asset,
           )
+        let minimum_amount =
+          when minimum_order_raise is {
+            Some(minn) -> minn
+            None -> 0
+          }
         // validate orders
         expect and {
-            when minimum_order_raise is {
-              Some(min_order_raise) -> amount >= min_order_raise
-              None -> amount > 0
-            },
-            assert(
-              penalty_amount >= 0,
-              @"penalty_amount must higher than or equal to 0",
-            ),
+            o_factory_policy_id == factory_policy_id,
             is_collected == False,
-            assert(o_base_asset == base_asset, @"Invalid order output LBE ID"),
-            assert(o_raise_asset == raise_asset, @"Invalid order output LBE ID"),
+            o_base_asset == base_asset,
+            o_raise_asset == raise_asset,
+            penalty_amount >= 0,
+            amount + penalty_amount > 0,
+            when amount is {
+              // order amount == 0 mean withdraw all
+              0 -> True
+              // order amount cannot less than minimum_amount
+              _ -> amount >= minimum_amount
+            },
             assert(expected_order == order_value, @"Invalid order output value"),
           }
         (acc_amount + amount, acc_penalty + penalty_amount)
@@ -728,7 +668,7 @@ pub fn apply_order(
     )
   expect
     assert(
-      total_output_penalty - total_input_penalty == penalty,
+      total_output_penalty == penalty + total_input_penalty,
       @"Invalid penalty amount",
     )
 

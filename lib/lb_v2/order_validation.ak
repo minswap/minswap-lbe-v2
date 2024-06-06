@@ -52,7 +52,6 @@ pub fn validate_collect_orders(
   expect Output {
     value: treasury_out_value,
     datum: InlineDatum(raw_treasury_out_datum),
-    reference_script: treasury_out_rs,
     ..
   } = treasury_output
   expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
@@ -78,8 +77,6 @@ pub fn validate_collect_orders(
       treasury_in_value
         |> value.add(raise_asset_pid, raise_asset_an, collect_amount)
     ),
-    // prevent Treasury Output becomes heavy.
-    treasury_out_rs == None,
     // Transaction mint nothing.
     value.flatten(mint_value) == [],
     // All Sellers, Manager have been collected.
@@ -102,12 +99,8 @@ pub fn apply_collecting_orders(
   expect Input { output: Output { datum: InlineDatum(in_datum_raw), .. }, .. } =
     input
   expect in_datum: OrderDatum = in_datum_raw
-  expect Output {
-    value: out_value,
-    datum: InlineDatum(out_datum_raw),
-    reference_script: out_ref_script,
-    ..
-  } = output
+  expect Output { value: out_value, datum: InlineDatum(out_datum_raw), .. } =
+    output
   expect out_datum: OrderDatum = out_datum_raw
   expect and {
       // Order, Treasury must share the same LBE ID
@@ -123,8 +116,6 @@ pub fn apply_collecting_orders(
         value.from_asset(factory_policy_id, order_auth_an, 1)
           |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
       ),
-      // Prevent Order Output from becoming heavy
-      out_ref_script == None,
     }
   let OrderDatum { amount, penalty_amount, .. } = in_datum
   let collect_amount = acc_collect_amount + amount + penalty_amount
@@ -193,7 +184,6 @@ pub fn validate_redeem(
   expect Output {
     value: treasury_out_value,
     datum: InlineDatum(raw_treasury_out_datum),
-    reference_script: treasury_out_rs,
     ..
   } = treasury_output
   expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
@@ -218,7 +208,7 @@ pub fn validate_redeem(
       raise_asset: raise_asset,
       total_lp: total_liquidity,
       reserve_raise: reserve_raise,
-      remaning_raise: remaining_raise,
+      remaining_raise: remaining_raise,
       lp_asset_name: lp_asset_name,
       acc_fund: 0,
       acc_lp: 0,
@@ -237,7 +227,6 @@ pub fn validate_redeem(
         |> value.add(amm_authen_policy_id, lp_asset_name, -total_lp)
         |> value.add(raise_asset_pid, raise_asset_an, -total_raise)
     ),
-    treasury_out_rs == None,
     // Transaction burn Order Tokens correctly!
     value.flatten(mint_value) == [
       (factory_policy_id, order_auth_an, -list.length(order_inputs)),
@@ -253,7 +242,7 @@ pub fn apply_redeem_orders(
   raise_asset: Asset,
   total_lp: Int,
   reserve_raise: Int,
-  remaning_raise: Int,
+  remaining_raise: Int,
   lp_asset_name: AssetName,
   acc_fund: Int,
   acc_lp: Int,
@@ -284,7 +273,7 @@ pub fn apply_redeem_orders(
   // bonus fund user will receive
   let fund_amount = acc_fund + amount + penalty_amount
   // accumulate Raise Asset amount
-  let raise_bonus = remaning_raise * amount / reserve_raise
+  let raise_bonus = remaining_raise * amount / reserve_raise
   // Amount of order
   let raise_amount = acc_raise + raise_bonus
   let expect_user_value =
@@ -307,7 +296,7 @@ pub fn apply_redeem_orders(
         raise_asset: raise_asset,
         total_lp: total_lp,
         reserve_raise: reserve_raise,
-        remaning_raise: remaning_raise,
+        remaining_raise: remaining_raise,
         lp_asset_name: lp_asset_name,
         acc_fund: fund_amount,
         acc_lp: lp_amount,
@@ -359,7 +348,6 @@ pub fn validate_refund(
   expect Output {
     value: treasury_out_value,
     datum: InlineDatum(raw_treasury_out_datum),
-    reference_script: treasury_out_rs,
     ..
   } = treasury_output
   expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
@@ -390,7 +378,6 @@ pub fn validate_refund(
       treasury_in_value
         |> value.add(raise_asset_pid, raise_asset_an, -refund_amount)
     ),
-    treasury_out_rs == None,
     // Transaction burn Order Tokens correctly!
     value.flatten(mint_value) == [
       (factory_policy_id, order_auth_an, -list.length(order_inputs)),

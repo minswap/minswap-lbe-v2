@@ -1,11 +1,10 @@
 use aiken/list
-use aiken/transaction.{InlineDatum, Output, ValidityRange}
+use aiken/transaction.{InlineDatum, Output}
 use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
 use lb_v2/types.{Asset, PenaltyConfig, PoolDatum, TreasuryDatum, ValidatorHash}
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
-  default_burn_liquidity, must_get_start_validity, treasury_auth_an,
-  treasury_minimum_ada, two_day_ms,
+  default_burn_liquidity, treasury_auth_an, treasury_minimum_ada, two_day_ms,
 }
 
 pub fn validate_creating_treasury_out(
@@ -21,7 +20,6 @@ pub fn validate_creating_treasury_out(
   expect Output {
     value: treasury_out_value,
     datum: InlineDatum(treasury_out_raw_datum),
-    reference_script,
     ..
   } = treasury_out
   expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
@@ -57,8 +55,7 @@ pub fn validate_creating_treasury_out(
   and {
     // treasury datum
     base_asset != raise_asset,
-    base_asset_pid != ada_policy_id,
-    base_asset_an != ada_asset_name,
+    base_asset != Asset { policy_id: ada_policy_id, asset_name: ada_asset_name },
     factory_policy_id == t_factory_policy_id,
     manager_hash == t_manager_hash,
     seller_hash == t_seller_hash,
@@ -104,15 +101,20 @@ pub fn validate_creating_treasury_out(
     is_manager_collected == False,
     // treasury value
     treasury_out_value == expected_treasury_out_value,
-    // reference_script
-    reference_script == None,
   }
 }
 
+// Assertion:
+// - Not cancelled yet
+// - Collected all orders
+// - 1 Treasury Input
+// - 1 Legit Treasury Output
+// - 1 Legit AMM Pool Output
+// - Exactly Minting Value
+// - validate owner Outputs
 pub fn validate_create_dex_pool(
   treasury_in_datum: TreasuryDatum,
   treasury_output: Output,
-  validity_range: ValidityRange,
   mint_value: Value,
   amm_pool_datum: PoolDatum,
   factory_policy_id: PolicyId,
@@ -122,7 +124,6 @@ pub fn validate_create_dex_pool(
     collected_fund,
     base_asset,
     raise_asset,
-    end_time,
     minimum_raise,
     maximum_raise,
     reserve_base,
@@ -132,8 +133,6 @@ pub fn validate_create_dex_pool(
     is_manager_collected,
     ..
   } = treasury_in_datum
-  // vaidate timing when create amm pool
-  let start_valid_time_range = must_get_start_validity(validity_range)
   let final_reserve_raise =
     when maximum_raise is {
       Some(maxx) ->
@@ -146,14 +145,16 @@ pub fn validate_create_dex_pool(
   let Asset { policy_id: raise_pid, asset_name: raise_an } = raise_asset
   // validate LBE status
   expect and {
-      start_valid_time_range > end_time,
+      // - Not cancelled yet
+      is_cancelled == False,
+      // - All Order have been collected.
       collected_fund == reserve_raise + total_penalty,
+      // Manager, Sellers have been collected.
+      is_manager_collected == True,
       when minimum_raise is {
         Some(minn) -> final_reserve_raise >= minn
         None -> True
       },
-      is_cancelled == False,
-      is_manager_collected == True,
     }
   let (asset_a, asset_b) = utils.sort_two_assets(base_asset, raise_asset)
   let (datum_in_reserve_a, datum_in_reserve_b) =

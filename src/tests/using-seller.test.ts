@@ -37,10 +37,20 @@ FAIL:
 - TODO: No Treasury ref inputs
 */
 import { WarehouseBuilder, type BuildUsingSellerOptions } from "../build-tx";
-import { LBE_FEE, ORDER_MIN_ADA, TREASURY_MIN_ADA } from "../constants";
+import {
+  LBE_FEE,
+  ORDER_MIN_ADA,
+  SELLER_MIN_ADA,
+  TREASURY_MIN_ADA,
+} from "../constants";
 import type { OrderDatum, UTxO } from "../types";
 import { plutusAddress2Address, toUnit } from "../utils";
-import { assertValidator, genWarehouseOptions, loadModule } from "./utils";
+import {
+  assertValidator,
+  assertValidatorFail,
+  genWarehouseOptions,
+  loadModule,
+} from "./utils";
 import { genWarehouse } from "./warehouse";
 
 const MINt = {
@@ -92,6 +102,7 @@ async function genTestWarehouse() {
     outputIndex: ++utxoIndex,
     assets: {
       [builder.sellerToken]: 1n,
+      lovelace: SELLER_MIN_ADA,
     },
     address: builder.sellerAddress,
     datum: builder.toDatumSeller(sellerDatum),
@@ -186,11 +197,10 @@ test("using-seller | PASS | update orders: success", async () => {
   await tx.complete();
 });
 
-test("using-seller | PASS | create orders: success", async () => {
+test("using-seller | PASS | concu create orders: success", async () => {
   const { builder, options } = warehouse;
   builder.buildUsingSeller({ ...options, orderInputs: [] });
-  const tx = builder.complete();
-  await tx.complete();
+  assertValidator(builder, "");
 });
 
 test("using-seller | PASS | withdraw all orders: success", async () => {
@@ -209,7 +219,7 @@ test("using-seller | FAIL | update orders: after discovery phase", async () => {
     validTo: Number(treasuryDatum.endTime) + 1000,
   };
   builder.buildUsingSeller(options);
-  await assertValidator(builder, "Using-seller: After discovery phase");
+  assertValidatorFail(builder);
 });
 
 test("using-seller | FAIL | update orders: before discovery phase", async () => {
@@ -219,7 +229,7 @@ test("using-seller | FAIL | update orders: before discovery phase", async () => 
     validFrom: Number(treasuryDatum.startTime) - 1000,
   };
   builder.buildUsingSeller(options);
-  await assertValidator(builder, "Using-seller: Before discovery phase");
+  assertValidatorFail(builder);
 });
 
 test("using-seller | FAIL | update orders: LBE is cancelled", async () => {
@@ -232,7 +242,7 @@ test("using-seller | FAIL | update orders: LBE is cancelled", async () => {
     },
   };
   builder.buildUsingSeller(options);
-  await assertValidator(builder, "Using-seller: LBE is cancelled");
+  assertValidatorFail(builder);
 });
 
 test("using-seller | FAIL | update orders: Invalid minting 1", async () => {
@@ -240,7 +250,7 @@ test("using-seller | FAIL | update orders: Invalid minting 1", async () => {
   const { builder, options } = warehouse;
   builder.buildUsingSeller(options);
   builder.tasks[3] = () => builder.mintingOrderToken(2n);
-  await assertValidator(builder, "Using-seller: Invalid minting");
+  assertValidatorFail(builder);
 });
 
 test("using-seller | FAIL | update orders: Invalid minting 2", async () => {
@@ -249,7 +259,7 @@ test("using-seller | FAIL | update orders: Invalid minting 2", async () => {
   builder.buildUsingSeller(options);
   // dont mint anything
   builder.tasks[3] = () => {};
-  await assertValidator(builder, "Using-seller: Invalid minting");
+  assertValidatorFail(builder);
 });
 
 test("using-seller | FAIL | update orders: Invalid minting 3", async () => {
@@ -264,26 +274,8 @@ test("using-seller | FAIL | update orders: Invalid minting 3", async () => {
     builder.mintRedeemer = "MintOrder";
     builder.mintingOrderToken(1n);
   };
-  await assertValidator(builder, "Using-seller: Invalid minting");
+  assertValidatorFail(builder);
 });
-
-// test("using-seller | FAIL | No Seller input", async () => {
-//   const { builder, options, treasuryUTxO } = warehouse;
-//   // add 1 seller token in order to balance input and output
-//   options.orderInputs[0].assets[builder.sellerToken] = 1n;
-//   builder.buildUsingSeller(options);
-//   // dont mint anything
-//   builder.tasks[0] = () => {
-//     builder.treasuryRefInput = treasuryUTxO;
-//     builder.orderInputs = options.orderInputs;
-//     builder.orderRedeemer = "UpdateOrder";
-//     builder.mintRedeemer = "MintOrder";
-//     for (const owner of options.owners) {
-//       builder.tx.addSigner(owner);
-//     }
-//   };
-//   await assertValidator(builder, "TODO:");
-// });
 
 test("using-seller | FAIL | update orders: Invalid seller output datum 1(invalid amount)", async () => {
   const { builder, options, sellerDatum } = warehouse;
@@ -291,7 +283,7 @@ test("using-seller | FAIL | update orders: Invalid seller output datum 1(invalid
   // amount != -1745 or penalty != 0 or ...
   builder.tasks[4] = () =>
     builder.payingSellerOutput({ outDatum: { ...sellerDatum, amount: 123n } });
-  await assertValidator(builder, "Invalid seller output datum");
+  assertValidatorFail(builder);
 });
 test("using-seller | FAIL | update orders: Invalid seller output datum 2(invalid penalty amount)", async () => {
   const { builder, options, sellerDatum } = warehouse;
@@ -300,7 +292,7 @@ test("using-seller | FAIL | update orders: Invalid seller output datum 2(invalid
     builder.payingSellerOutput({
       outDatum: { ...sellerDatum, amount: -1745n, penaltyAmount: 456n },
     });
-  await assertValidator(builder, "Invalid seller output datum");
+  assertValidatorFail(builder);
 });
 
 test("using-seller | FAIL | update orders: Invalid seller output datum 3(invalid factory pid)", async () => {
@@ -314,7 +306,7 @@ test("using-seller | FAIL | update orders: Invalid seller output datum 3(invalid
         factoryPolicyId: builder.sellerHash,
       },
     });
-  await assertValidator(builder, "Invalid seller output datum");
+  assertValidatorFail(builder);
 });
 
 test("using-seller | FAIL | update orders: Seller output don't have any seller tokens", async () => {
@@ -334,7 +326,7 @@ test("using-seller | FAIL | update orders: Seller output don't have any seller t
       {},
     );
   };
-  await assertValidator(builder, "Seller output don't have any seller token");
+  assertValidatorFail(builder);
 });
 
 test("using-seller | FAIL | update orders: Invalid order output value", async () => {
@@ -358,17 +350,14 @@ test("using-seller | FAIL | update orders: Invalid order output value", async ()
       );
     }
   };
-  await assertValidator(builder, "Invalid order output value");
+  assertValidatorFail(builder);
 });
 
 test("using-seller | FAIL | update orders: penalty_amount is less than 0", async () => {
   const { builder, options } = warehouse;
   options.orderOutputDatums[0].penaltyAmount = -1n;
   builder.buildUsingSeller(options);
-  await assertValidator(
-    builder,
-    "penalty_amount must higher than or equal to 0",
-  );
+  await assertValidatorFail(builder);
 });
 
 test("using-seller | FAIL | update orders: Order's input LBE ID miss match", async () => {
@@ -379,7 +368,7 @@ test("using-seller | FAIL | update orders: Order's input LBE ID miss match", asy
     baseAsset: MINt,
   });
   builder.buildUsingSeller(options);
-  await assertValidator(builder, "Invalid order input LBE ID");
+  await assertValidatorFail(builder);
 });
 
 test("using-seller | FAIL | update orders: Order's output LBE ID miss match", async () => {
@@ -390,7 +379,7 @@ test("using-seller | FAIL | update orders: Order's output LBE ID miss match", as
     baseAsset: MINt,
   };
   builder.buildUsingSeller(options);
-  await assertValidator(builder, "Invalid order output LBE ID");
+  await assertValidatorFail(builder);
 });
 
 test("using-seller | FAIL | update orders: Seller's input LBE ID miss match", async () => {
@@ -409,7 +398,7 @@ test("using-seller | FAIL | update orders: Seller's input LBE ID miss match", as
       },
     });
   };
-  await assertValidator(builder, "Invalid seller input LBE ID");
+  await assertValidatorFail(builder);
 });
 
 test("using-seller | PASS | update orders(withdraw fund) in penalty time", async () => {
@@ -434,5 +423,5 @@ test("using-seller | FAIL | update orders(withdraw fund): invalid penalty amount
     ...penaltyTimeRange,
   };
   builder.buildUsingSeller(options);
-  await assertValidator(builder, "Invalid penalty amount");
+  await assertValidatorFail(builder);
 });

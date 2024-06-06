@@ -8,6 +8,7 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
+  assert,
 }
 use lb_v2/validation.{validate_authorize_by_owner}
 
@@ -120,6 +121,7 @@ pub fn validate_cancel_lbe(
   extra_signatories: List<PubKeyHash>,
   end_valid_time_range: Int,
   cancel_reason: CancelReason,
+  mint_value: Value,
 ) -> Bool {
   // Extract some necessary data.
   let TreasuryDatum { is_cancelled, .. } = treasury_in_datum
@@ -154,5 +156,6 @@ pub fn validate_cancel_lbe(
       is_cancelled: True,
     },
     treasury_in_value == treasury_out_value,
+    assert(mint_value == value.zero(), @"Avoid minting unnecessary"),
   }
 }

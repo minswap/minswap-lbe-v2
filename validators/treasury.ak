@@ -36,7 +36,6 @@ validator {
       extra_signatories,
       ..
     } = transaction
-    // get input being spent (aka treasury input)
     expect Some(treasury_input) =
       list.find(
         inputs,
@@ -198,7 +197,6 @@ validator {
         validate_create_dex_pool(
           treasury_in_datum: treasury_in_datum,
           treasury_output: treasury_output,
-          validity_range: validity_range,
           mint_value: mint_value,
           amm_pool_datum: amm_pool_datum,
           factory_policy_id: factory_policy_id,
@@ -234,19 +232,17 @@ validator {
             factory_policy_id,
             treasury_hash,
           )
-        and {
-          validate_cancel_lbe(
-            treasury_in_datum: treasury_in_datum,
-            treasury_in_value: treasury_in_value,
-            treasury_output: treasury_output,
-            ref_inputs: reference_inputs,
-            inputs: inputs,
-            extra_signatories: extra_signatories,
-            end_valid_time_range: end_valid_time_range,
-            cancel_reason: reason,
-          ),
-          assert(mint_value == value.zero(), @"Avoid minting unnecessary"),
-        }
+        validate_cancel_lbe(
+          treasury_in_datum: treasury_in_datum,
+          treasury_in_value: treasury_in_value,
+          treasury_output: treasury_output,
+          ref_inputs: reference_inputs,
+          inputs: inputs,
+          extra_signatories: extra_signatories,
+          end_valid_time_range: end_valid_time_range,
+          cancel_reason: reason,
+          mint_value: mint_value,
+        )
       }
     }
   }
