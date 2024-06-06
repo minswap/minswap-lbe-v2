@@ -9,6 +9,9 @@ use lb_v2/cancel_validation.{validate_cancel_lbe}
 use lb_v2/order_validation.{
   validate_collect_orders, validate_redeem, validate_refund,
 }
+use lb_v2/treasury_validation.{
+  validate_create_dex_pool, validate_creating_treasury_out,
+}
 use lb_v2/types.{
   CancelLBE, CloseEvent, CollectManager, CollectOrders, CreateAmmPool, PoolDatum,
   RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
@@ -125,7 +128,7 @@ validator {
             inputs: inputs,
           ),
           // create new one
-          validation.validate_creating_treasury_out(
+          validate_creating_treasury_out(
             treasury_out: treasury_output,
             base_asset: base_asset,
             raise_asset: raise_asset,
@@ -200,7 +203,7 @@ validator {
               address == project_owner
             },
           )
-        validation.validate_create_dex_pool(
+        validate_create_dex_pool(
           treasury_in_datum: treasury_in_datum,
           treasury_output: treasury_output,
           validity_range: validity_range,

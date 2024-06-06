@@ -8,6 +8,7 @@ use aiken/transaction.{
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{AssetName, PolicyId, Value}
+use lb_v2/treasury_validation.{validate_creating_treasury_out}
 use lb_v2/types.{
   Asset, CloseTreasury, CollectManager, CreateTreasury, FactoryDatum,
   FactoryRedeemer, Initialization, ManageSeller, ManagerDatum, MintManager,
@@ -233,7 +234,7 @@ validator(
             @"Must pay enough Legitimate Seller Outputs!",
           ),
           assert(
-            validation.validate_creating_treasury_out(
+            validate_creating_treasury_out(
               treasury_out: treasury_output,
               base_asset: base_asset,
               raise_asset: raise_asset,
