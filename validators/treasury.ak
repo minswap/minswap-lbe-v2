@@ -6,6 +6,9 @@ use aiken/transaction.{
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value
 use lb_v2/cancel_validation.{validate_cancel_lbe}
+use lb_v2/order_validation.{
+  validate_collect_orders, validate_redeem, validate_refund,
+}
 use lb_v2/types.{
   CancelLBE, CloseEvent, CollectManager, CollectOrders, CreateAmmPool, PoolDatum,
   RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
@@ -148,7 +151,7 @@ validator {
           treasury_hash: treasury_hash,
         )
       CollectOrders ->
-        validation.validate_collect_orders(
+        validate_collect_orders(
           inputs: inputs,
           outputs: outputs,
           treasury_in_datum: treasury_in_datum,
@@ -210,7 +213,7 @@ validator {
       RedeemOrders ->
         when is_cancelled is {
           True ->
-            validation.validate_refund(
+            validate_refund(
               inputs: inputs,
               outputs: outputs,
               treasury_in_datum: treasury_in_datum,
@@ -219,7 +222,7 @@ validator {
               treasury_hash: treasury_hash,
             )
           False ->
-            validation.validate_redeem(
+            validate_redeem(
               inputs: inputs,
               outputs: outputs,
               treasury_in_datum: treasury_in_datum,
