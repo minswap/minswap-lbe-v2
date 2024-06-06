@@ -3,16 +3,16 @@ use aiken/dict.{Dict}
 use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Redeemer, ScriptContext,
-  ScriptPurpose, Spend, Transaction,
+  ScriptPurpose, Spend, Transaction, WithdrawFrom,
 }
-use aiken/transaction/credential.{Address, ScriptCredential}
+use aiken/transaction/credential.{Address, Inline, ScriptCredential}
 use aiken/transaction/value.{AssetName, PolicyId, Value}
 use lb_v2/treasury_validation.{validate_creating_treasury_out}
 use lb_v2/types.{
-  Asset, CloseTreasury, CollectManager, CreateTreasury, FactoryDatum,
-  FactoryRedeemer, Initialization, ManageSeller, ManagerDatum, MintManager,
-  MintOrder, MintRedeemOrders, MintSeller, RedeemOrders, TreasuryDatum,
-  UsingSeller, ValidatorHash,
+  Asset, CloseTreasury, CollectManager, CollectOrders, CreateTreasury,
+  FactoryDatum, FactoryRedeemer, Initialization, ManageOrder, ManageSeller,
+  ManagerDatum, MintManager, MintOrder, MintRedeemOrders, MintSeller,
+  RedeemOrders, TreasuryDatum, UsingSeller, ValidatorHash,
 }
 use lb_v2/utils.{
   assert, compute_lp_asset_name, default_number_seller, factory_auth_an,
@@ -367,68 +367,97 @@ validator(
   }
 
   fn validate_factory_minting(redeemer: FactoryRedeemer, context: ScriptContext) {
-    expect ScriptContext {
+    let ScriptContext {
       transaction: Transaction { inputs, outputs, redeemers, mint, .. },
-      purpose: Mint(factory_policy_id),
+      purpose,
     } = context
     let mint_value = value.from_minted_value(mint)
-    when redeemer is {
-      // Init Factory Linked List
-      Initialization ->
-        validate_initialization(
-          inputs: inputs,
-          outputs: outputs,
-          factory_policy_id: factory_policy_id,
-          out_ref: out_ref,
-          mint_value: mint_value,
-        )
-      // Delegate validation logic to the Treasury Validator.
-      CreateTreasury { .. } ->
-        has_spend_factory(inputs, factory_policy_id, redeemers, redeemer)
-      // Delegate validation logic to the Treasury Validator.
-      CloseTreasury { .. } ->
-        has_spend_factory(inputs, factory_policy_id, redeemers, redeemer)
-      // Collect Manager Transaction note:
-      //   1 Manager Token needs to be burned (trigger Factory Minting)
-      //   1 Manager Input needs to be spent
-      //   1 Treasury Input needs to be spent
-      //   1 Treasury Output needs to be paid
-      // Delegate validation logic to the Treasury Validator.
-      MintManager ->
-        validation.has_spend_treasury(
-          inputs: inputs,
-          factory_policy_id: factory_policy_id,
-          treasury_hash: treasury_hash,
-          redeemers: redeemers,
-          expected_redeemer: CollectManager,
-        )
-      MintSeller ->
-        validation.has_spend_manager(
-          inputs: inputs,
-          factory_policy_id: factory_policy_id,
-          manager_hash: manager_hash,
-          redeemers: redeemers,
-          expected_redeemer: ManageSeller,
-        )
-      MintOrder ->
-        assert(
-          validation.has_spend_seller(
-            inputs: inputs,
-            factory_policy_id: factory_policy_id,
-            seller_hash: seller_hash,
-            redeemers: redeemers,
-            expected_redeemer: UsingSeller,
-          ),
-          @"Using-seller: Tx don't have any seller",
-        )
-      MintRedeemOrders ->
-        validation.has_spend_treasury(
-          inputs: inputs,
-          factory_policy_id: factory_policy_id,
-          treasury_hash: treasury_hash,
-          redeemers: redeemers,
-          expected_redeemer: RedeemOrders,
-        )
+    when purpose is {
+      WithdrawFrom(stake_credential) -> {
+        expect Inline(ScriptCredential(factory_policy_id)) = stake_credential
+        and {
+          when value.flatten(mint_value) is {
+            [] ->
+              validation.has_spend_treasury(
+                inputs: inputs,
+                factory_policy_id: factory_policy_id,
+                treasury_hash: treasury_hash,
+                redeemers: redeemers,
+                expected_redeemer: CollectOrders,
+              )
+            _ ->
+              validation.has_spend_treasury(
+                inputs: inputs,
+                factory_policy_id: factory_policy_id,
+                treasury_hash: treasury_hash,
+                redeemers: redeemers,
+                expected_redeemer: RedeemOrders,
+              )
+          },
+          redeemer == ManageOrder,
+        }
+      }
+      Mint(factory_policy_id) ->
+        when redeemer is {
+          // Init Factory Linked List
+          Initialization ->
+            validate_initialization(
+              inputs: inputs,
+              outputs: outputs,
+              factory_policy_id: factory_policy_id,
+              out_ref: out_ref,
+              mint_value: mint_value,
+            )
+          // Delegate validation logic to the Treasury Validator.
+          CreateTreasury { .. } ->
+            has_spend_factory(inputs, factory_policy_id, redeemers, redeemer)
+          // Delegate validation logic to the Treasury Validator.
+          CloseTreasury { .. } ->
+            has_spend_factory(inputs, factory_policy_id, redeemers, redeemer)
+          // Collect Manager Transaction note:
+          //   1 Manager Token needs to be burned (trigger Factory Minting)
+          //   1 Manager Input needs to be spent
+          //   1 Treasury Input needs to be spent
+          //   1 Treasury Output needs to be paid
+          // Delegate validation logic to the Treasury Validator.
+          MintManager ->
+            validation.has_spend_treasury(
+              inputs: inputs,
+              factory_policy_id: factory_policy_id,
+              treasury_hash: treasury_hash,
+              redeemers: redeemers,
+              expected_redeemer: CollectManager,
+            )
+          MintSeller ->
+            validation.has_spend_manager(
+              inputs: inputs,
+              factory_policy_id: factory_policy_id,
+              manager_hash: manager_hash,
+              redeemers: redeemers,
+              expected_redeemer: ManageSeller,
+            )
+          MintOrder ->
+            assert(
+              validation.has_spend_seller(
+                inputs: inputs,
+                factory_policy_id: factory_policy_id,
+                seller_hash: seller_hash,
+                redeemers: redeemers,
+                expected_redeemer: UsingSeller,
+              ),
+              @"Using-seller: Tx don't have any seller",
+            )
+          MintRedeemOrders ->
+            validation.has_spend_treasury(
+              inputs: inputs,
+              factory_policy_id: factory_policy_id,
+              treasury_hash: treasury_hash,
+              redeemers: redeemers,
+              expected_redeemer: RedeemOrders,
+            )
+          _ -> False
+        }
+      _ -> False
     }
   }
 }
