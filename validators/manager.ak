@@ -4,6 +4,7 @@ use aiken/transaction.{
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value
+use lb_v2/manager_validation.{validate_manage_seller}
 use lb_v2/types.{
   CollectManager, ManageSeller, ManagerDatum, ManagerRedeemer, SpendManager,
   TreasuryDatum, ValidatorHash,
@@ -100,7 +101,7 @@ validator(
               },
             ) == [manager_input],
           }
-        validation.validate_manage_seller(
+        validate_manage_seller(
           outputs: outputs,
           factory_policy_id: factory_policy_id,
           manager_in_datum: manager_in_datum,
