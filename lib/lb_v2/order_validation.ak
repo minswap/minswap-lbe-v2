@@ -128,13 +128,13 @@ pub fn apply_collecting_orders(
     }
   let OrderDatum { amount, penalty_amount, .. } = in_datum
   let collect_amount = acc_collect_amount + amount + penalty_amount
-  when inputs == [] is {
-    True -> {
+  when inputs is {
+    [] -> {
       // Ensure order_inputs.length == order_outputs.length
       expect outputs == []
       collect_amount
     }
-    False ->
+    _ ->
       apply_collecting_orders(
         order_inputs: inputs,
         order_outputs: outputs,
@@ -297,9 +297,9 @@ pub fn apply_redeem_orders(
       user_address == owner,
       expect_user_value == user_value,
     }
-  when remaining_order_inputs == [] is {
-    True -> (fund_amount, lp_amount, raise_amount)
-    False ->
+  when remaining_order_inputs is {
+    [] -> (fund_amount, lp_amount, raise_amount)
+    _ ->
       apply_redeem_orders(
         order_inputs: remaining_order_inputs,
         outputs: remaining_outputs,
@@ -436,9 +436,9 @@ pub fn apply_refund_orders(
     }
   let refund_amount = acc_amount + amount
   let refund_penalty = acc_penalty + penalty_amount
-  when remaining_order_inputs == [] is {
-    True -> (refund_amount, refund_penalty)
-    False ->
+  when remaining_order_inputs is {
+    [] -> (refund_amount, refund_penalty)
+    _ ->
       apply_refund_orders(
         order_inputs: remaining_order_inputs,
         outputs: remaining_outputs,

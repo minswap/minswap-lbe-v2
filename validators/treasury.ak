@@ -1,4 +1,3 @@
-use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Output, ScriptContext, Spend, Transaction,
@@ -16,7 +15,9 @@ use lb_v2/types.{
   CancelLBE, CloseEvent, CollectManager, CollectOrders, CreateAmmPool, PoolDatum,
   RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
 }
-use lb_v2/utils.{assert, factory_auth_an, treasury_auth_an}
+use lb_v2/utils.{
+  assert, factory_auth_an, must_get_end_validity, treasury_auth_an,
+}
 use lb_v2/validation
 
 validator {
@@ -64,16 +65,7 @@ validator {
       ..
     } = treasury_in_datum
     let mint_value = value.from_minted_value(mint)
-    expect Interval {
-      upper_bound: IntervalBound {
-        bound_type: Finite(end_valid_time_range),
-        ..
-      },
-      lower_bound: IntervalBound {
-        bound_type: Finite(_start_valid_time_range),
-        ..
-      },
-    } = validity_range
+    let end_valid_time_range = must_get_end_validity(validity_range)
     expect and {
         assert(
           value.quantity_of(

@@ -1,6 +1,5 @@
 use aiken/builtin
 use aiken/dict.{Dict}
-use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Mint, Output, OutputReference, Redeemer, ScriptContext,
@@ -12,13 +11,13 @@ use lb_v2/treasury_validation.{validate_creating_treasury_out}
 use lb_v2/types.{
   Asset, CloseTreasury, CollectManager, CreateTreasury, FactoryDatum,
   FactoryRedeemer, Initialization, ManageSeller, ManagerDatum, MintManager,
-  MintOrder, MintRedeemOrders, MintSeller, RedeemOrders, SellerDatum,
-  TreasuryDatum, UsingSeller, ValidatorHash,
+  MintOrder, MintRedeemOrders, MintSeller, RedeemOrders, TreasuryDatum,
+  UsingSeller, ValidatorHash,
 }
 use lb_v2/utils.{
   assert, compute_lp_asset_name, default_number_seller, factory_auth_an,
-  make_wrapper_redeemer, manager_auth_an, manager_minimum_ada, seller_auth_an,
-  seller_minimum_ada, treasury_auth_an,
+  make_wrapper_redeemer, manager_auth_an, manager_minimum_ada,
+  must_get_end_validity, seller_auth_an, treasury_auth_an,
 }
 use lb_v2/validation
 
@@ -109,13 +108,7 @@ validator(
         },
       )
     // Extract some necessary data.
-    expect Interval {
-      upper_bound: IntervalBound {
-        bound_type: Finite(end_valid_time_range),
-        ..
-      },
-      ..
-    } = validity_range
+    let end_valid_time_range = must_get_end_validity(validity_range)
     let FactoryDatum { head: current_head, tail: current_tail } = datum
     let (base_asset, raise_asset) =
       when redeemer is {
@@ -178,33 +171,19 @@ validator(
           reference_script: f_out_tail_ref_script,
           ..
         } = f_out_tail
-        // finding Manager Address
-        let Output { address: manager_address, .. } = manager_output
-        // finding Seller Address
-        expect Some(Output { address: seller_address, .. }) =
-          list.find(
-            outputs,
-            fn(output) {
-              let Output { address: Address { payment_credential, .. }, .. } =
-                output
-              payment_credential == ScriptCredential(seller_hash)
-            },
-          )
         let default_manager_output =
           build_default_manager_output(
             factory_policy_id: factory_hash,
-            seller_hash: seller_hash,
-            order_hash: order_hash,
-            manager_address: manager_address,
+            manager_hash: manager_hash,
             base_asset: base_asset,
             raise_asset: raise_asset,
           )
         let default_seller_output =
-          build_default_seller_output(
+          validation.build_default_seller_output(
             factory_policy_id: factory_hash,
             base_asset: base_asset,
             raise_asset: raise_asset,
-            seller_address: seller_address,
+            seller_hash: seller_hash,
           )
         // finding all Legitimate Seller Outputs
         let seller_outputs =
@@ -576,18 +555,15 @@ fn has_spend_factory(
 // return Manager Output when creating Treasury
 fn build_default_manager_output(
   factory_policy_id: ValidatorHash,
-  seller_hash: ValidatorHash,
-  order_hash: ValidatorHash,
-  manager_address: Address,
+  manager_hash: ValidatorHash,
   base_asset: Asset,
   raise_asset: Asset,
 ) -> Output {
+  let manager_address = credential.from_script(manager_hash)
   // build default manager datum
   let manager_datum =
     ManagerDatum {
       factory_policy_id,
-      seller_hash,
-      order_hash,
       base_asset,
       raise_asset,
       seller_count: default_number_seller,
@@ -602,34 +578,6 @@ fn build_default_manager_output(
     address: manager_address,
     value: manager_value,
     datum: InlineDatum(manager_datum),
-    reference_script: None,
-  }
-}
-
-// return Seller Output when creating Treasury
-fn build_default_seller_output(
-  factory_policy_id: ValidatorHash,
-  base_asset: Asset,
-  raise_asset: Asset,
-  seller_address: Address,
-) -> Output {
-  // build default seller datum
-  let seller_datum =
-    SellerDatum {
-      factory_policy_id,
-      base_asset,
-      raise_asset,
-      amount: 0,
-      penalty_amount: 0,
-    }
-  // build default seller value
-  let seller_value =
-    value.from_lovelace(seller_minimum_ada)
-      |> value.add(factory_policy_id, seller_auth_an, 1)
-  Output {
-    address: seller_address,
-    value: seller_value,
-    datum: InlineDatum(seller_datum),
     reference_script: None,
   }
 }

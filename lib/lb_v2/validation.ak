@@ -1,5 +1,4 @@
 use aiken/dict.{Dict}
-use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Output, OutputReference, Redeemer, ScriptPurpose, Spend,
@@ -15,8 +14,9 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  assert, calculate_penalty, get_order_value, manager_auth_an, order_auth_an,
-  seller_auth_an, treasury_auth_an,
+  assert, calculate_penalty, get_order_value, manager_auth_an,
+  must_get_start_end_validity, order_auth_an, seller_auth_an, seller_minimum_ada,
+  treasury_auth_an,
 }
 
 pub fn has_spend_treasury(
@@ -121,15 +121,17 @@ pub fn get_seller_inputs(
   list.filter(
     inputs,
     fn(input) {
-      let Input { output: Output { address: in_addr, value: in_value, .. }, .. } =
-        input
-      let Address { payment_credential, .. } = in_addr
+      let Input {
+        output: Output {
+          address: Address { payment_credential, .. },
+          value: in_value,
+          ..
+        },
+        ..
+      } = input
       and {
         value.quantity_of(in_value, factory_policy_id, seller_auth_an) == 1,
-        when payment_credential is {
-          ScriptCredential(hash) -> seller_hash == hash
-          _ -> False
-        },
+        payment_credential == ScriptCredential(seller_hash),
       }
     },
   )
@@ -491,13 +493,8 @@ pub fn validate_using_seller(
   mint_value: Value,
   factory_policy_id: PolicyId,
 ) -> Bool {
-  expect Interval {
-    upper_bound: IntervalBound { bound_type: Finite(end_valid_time_range), .. },
-    lower_bound: IntervalBound {
-      bound_type: Finite(start_valid_time_range),
-      ..
-    },
-  } = validity_range
+  let (start_valid_time_range, end_valid_time_range) =
+    must_get_start_end_validity(validity_range)
   // Validate always spend exactly 1 Seller UTxO
   let seller_input =
     get_seller_input_by_out_ref(
@@ -745,110 +742,154 @@ pub fn apply_order(
   )
 }
 
+// return Seller Output when creating Treasury
+pub fn build_default_seller_output(
+  factory_policy_id: ValidatorHash,
+  base_asset: Asset,
+  raise_asset: Asset,
+  seller_hash: ValidatorHash,
+) -> Output {
+  let seller_address = credential.from_script(seller_hash)
+  // build default seller datum
+  let seller_datum =
+    SellerDatum {
+      factory_policy_id,
+      base_asset,
+      raise_asset,
+      amount: 0,
+      penalty_amount: 0,
+    }
+  // build default seller value
+  let seller_value =
+    value.from_lovelace(seller_minimum_ada)
+      |> value.add(factory_policy_id, seller_auth_an, 1)
+  Output {
+    address: seller_address,
+    value: seller_value,
+    datum: InlineDatum(seller_datum),
+    reference_script: None,
+  }
+}
+
+// Assertions:
+// - Manager, Treasury share the same LBE ID
+// - Paying Manager Output correctly!
+// Add Seller:
+//  + Before `end_time` and LBE is not cancelled
+//  + No Seller Inputs
+//  + Mint should be correctly!
+//  + Paying Seller Outputs correctly!
+// Collect Sellers:
+//  + After `end_time` or LBE is cancelled
+//  + Mint should be correctly!
+//  + No Seller Outputs (no need to check)
+//  + Collect at least 1 Seller
+//  + Spending Seller Inputs correctly!
 pub fn validate_manage_seller(
+  outputs: List<Output>,
   factory_policy_id: PolicyId,
   manager_in_datum: ManagerDatum,
-  manager_out: Output,
+  manager_in_value: Value,
   validity_range: ValidityRange,
   mint_value: Value,
   treasury_datum: TreasuryDatum,
   seller_inputs: List<Input>,
-  seller_outputs: List<Output>,
 ) -> Bool {
-  expect Interval {
-    upper_bound: IntervalBound { bound_type: Finite(end_valid_time_range), .. },
-    lower_bound: IntervalBound {
-      bound_type: Finite(start_valid_time_range),
-      ..
-    },
-  } = validity_range
-  let TreasuryDatum { base_asset, raise_asset, end_time, is_cancelled, .. } =
-    treasury_datum
+  let (start_valid_time_range, end_valid_time_range) =
+    must_get_start_end_validity(validity_range)
+  let TreasuryDatum {
+    manager_hash,
+    seller_hash,
+    base_asset,
+    raise_asset,
+    end_time,
+    is_cancelled,
+    ..
+  } = treasury_datum
   let ManagerDatum {
-    base_asset: sm_base_asset,
-    raise_asset: sm_raise_asset,
+    base_asset: m_base_asset,
+    raise_asset: m_raise_asset,
     seller_count,
     reserve_raise,
     total_penalty,
     ..
   } = manager_in_datum
-  // validate LBE ID
-  expect assert(and {
-        sm_base_asset == base_asset,
-        sm_raise_asset == raise_asset,
-      }, @"Collect Sellers: invalid manager input's LBE ID")
-  expect Output { datum: InlineDatum(raw_manager_out_datum), .. } = manager_out
+  // Finding exactly 1 Manager Output
+  expect [manager_out] =
+    list.filter(
+      outputs,
+      fn(output) {
+        let Output { address: Address { payment_credential, .. }, .. } = output
+        payment_credential == ScriptCredential(manager_hash)
+      },
+    )
+  expect Output {
+    value: manager_out_value,
+    datum: InlineDatum(raw_manager_out_datum),
+    reference_script: manager_out_rs,
+    ..
+  } = manager_out
   expect manager_out_datum: ManagerDatum = raw_manager_out_datum
+  expect and {
+      // Manager, Treasury share the same LBE ID
+      m_base_asset == base_asset,
+      m_raise_asset == raise_asset,
+      manager_out_value == manager_in_value,
+      manager_out_rs == None,
+    }
   if and {
     end_valid_time_range < end_time,
     is_cancelled == False,
   } {
-    let addition_seller = list.length(seller_outputs)
-    // add seller
+    // Validate Add Sellers
+    let default_seller_output =
+      build_default_seller_output(
+        factory_policy_id: factory_policy_id,
+        base_asset: base_asset,
+        raise_asset: raise_asset,
+        seller_hash: seller_hash,
+      )
+    // Paying Seller Outputs correctly!
+    let seller_outputs =
+      list.filter(outputs, fn(output) { output == default_seller_output })
+    let seller_output_length = list.length(seller_outputs)
     and {
-      // mint value
+      // Mint should be correctly!
       mint_value == value.from_asset(
         factory_policy_id,
         seller_auth_an,
-        addition_seller,
+        seller_output_length,
       ),
-      // no input
-      list.length(seller_inputs) == 0,
-      // update datum
+      // No Seller Inputs
+      seller_inputs == [],
+      // Paying Manager Output correctly!
       manager_out_datum == ManagerDatum {
         ..manager_in_datum,
-        seller_count: seller_count + addition_seller,
+        seller_count: seller_count + seller_output_length,
       },
     }
   } else if or {
     start_valid_time_range > end_time,
     is_cancelled == True,
   } {
-    // total amount and penalty
-    // -> update manager datum
-    expect [total_reserve_raise, total_penalty_input, seller_input_count] =
-      list.foldl(
-        seller_inputs,
-        [0, 0, 0],
-        fn(seller_input, acc) {
-          expect [acc_reserve_raise, acc_total_penalty, acc_seller_count] = acc
-          expect Input {
-            output: Output { datum: InlineDatum(seller_raw_datum), .. },
-            ..
-          } = seller_input
-          expect seller_datum: SellerDatum = seller_raw_datum
-          let SellerDatum {
-            base_asset: s_base_asset,
-            raise_asset: s_raise_asset,
-            amount,
-            penalty_amount,
-            ..
-          } = seller_datum
-          expect assert(and {
-                s_base_asset == base_asset,
-                s_raise_asset == raise_asset,
-              }, @"Collect Sellers: invalid seller inputs' LBE ID")
-          [
-            acc_reserve_raise + amount,
-            acc_total_penalty + penalty_amount,
-            acc_seller_count + 1,
-          ]
-        },
+    // Validate collect sellers
+    let seller_input_count = list.length(seller_inputs)
+    let (total_reserve_raise, total_penalty_input) =
+      apply_collect_sellers(
+        seller_inputs: seller_inputs,
+        base_asset: base_asset,
+        raise_asset: raise_asset,
+        acc_raise: 0,
+        acc_penalty: 0,
       )
     and {
-      // no seller outputs
-      assert(
-        list.length(seller_outputs) == 0,
-        @"Collect sellers: Tx mustn't have seller output",
+      // Mint should be correctly!
+      mint_value == value.from_asset(
+        factory_policy_id,
+        seller_auth_an,
+        -seller_input_count,
       ),
-      // mint value
-      assert(
-        value.flatten(mint_value) == [
-          (factory_policy_id, seller_auth_an, -seller_input_count),
-        ],
-        @"Collect sellers: Invalid minting",
-      ),
-      // update datum
+      // Paying Manager Output correctly!
       assert(
         manager_out_datum == ManagerDatum {
           ..manager_in_datum,
@@ -861,6 +902,43 @@ pub fn validate_manage_seller(
     }
   } else {
     fail @"Unable to determine action"
+  }
+}
+
+fn apply_collect_sellers(
+  seller_inputs: List<Input>,
+  base_asset: Asset,
+  raise_asset: Asset,
+  acc_raise: Int,
+  acc_penalty: Int,
+) -> (Int, Int) {
+  expect [input, ..inputs] = seller_inputs
+  expect Input { output: Output { datum: InlineDatum(raw_datum), .. }, .. } =
+    input
+  expect seller_datum: SellerDatum = raw_datum
+  let SellerDatum {
+    base_asset: s_base_asset,
+    raise_asset: s_raise_asset,
+    amount,
+    penalty_amount,
+    ..
+  } = seller_datum
+  expect assert(and {
+        s_base_asset == base_asset,
+        s_raise_asset == raise_asset,
+      }, @"Collect Sellers: invalid seller inputs' LBE ID")
+  let collect_raise = acc_raise + amount
+  let collect_penalty = acc_penalty + penalty_amount
+  when inputs is {
+    [] -> (collect_raise, collect_penalty)
+    _ ->
+      apply_collect_sellers(
+        seller_inputs: inputs,
+        base_asset: base_asset,
+        raise_asset: raise_asset,
+        acc_raise: collect_raise,
+        acc_penalty: collect_penalty,
+      )
   }
 }
 

@@ -1,6 +1,8 @@
 use aiken/builtin
 use aiken/bytearray
 use aiken/hash
+use aiken/interval.{Finite, Interval, IntervalBound}
+use aiken/transaction.{ValidityRange}
 use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
@@ -177,4 +179,28 @@ pub fn assert(bool: Bool, str: String) {
     True -> True
     False -> fail str
   }
+}
+
+pub fn must_get_start_end_validity(validity_range: ValidityRange) -> (Int, Int) {
+  expect Interval {
+    lower_bound: IntervalBound { bound_type: Finite(start), .. },
+    upper_bound: IntervalBound { bound_type: Finite(end), .. },
+  } = validity_range
+  (start, end)
+}
+
+pub fn must_get_end_validity(validity_range: ValidityRange) -> Int {
+  expect Interval {
+    upper_bound: IntervalBound { bound_type: Finite(end), .. },
+    ..
+  } = validity_range
+  end
+}
+
+pub fn must_get_start_validity(validity_range: ValidityRange) -> Int {
+  expect Interval {
+    lower_bound: IntervalBound { bound_type: Finite(start), .. },
+    ..
+  } = validity_range
+  start
 }

@@ -1,11 +1,11 @@
-use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{InlineDatum, Output, ValidityRange}
 use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
 use lb_v2/types.{Asset, PenaltyConfig, PoolDatum, TreasuryDatum, ValidatorHash}
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
-  default_burn_liquidity, treasury_auth_an, treasury_minimum_ada, two_day_ms,
+  default_burn_liquidity, must_get_start_validity, treasury_auth_an,
+  treasury_minimum_ada, two_day_ms,
 }
 
 pub fn validate_creating_treasury_out(
@@ -133,13 +133,7 @@ pub fn validate_create_dex_pool(
     ..
   } = treasury_in_datum
   // vaidate timing when create amm pool
-  expect Interval {
-    lower_bound: IntervalBound {
-      bound_type: Finite(start_valid_time_range),
-      ..
-    },
-    ..
-  } = validity_range
+  let start_valid_time_range = must_get_start_validity(validity_range)
   let final_reserve_raise =
     when maximum_raise is {
       Some(maxx) ->

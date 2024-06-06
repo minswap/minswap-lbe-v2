@@ -98,8 +98,6 @@ pub type TreasuryRedeemer {
 
 pub type ManagerDatum {
   factory_policy_id: PolicyId,
-  order_hash: ValidatorHash,
-  seller_hash: ValidatorHash,
   base_asset: Asset,
   raise_asset: Asset,
   seller_count: Int,

@@ -333,8 +333,6 @@ export class WarehouseBuilder {
     const { factoryUtxo, treasuryDatum, validFrom, validTo } = options;
     const managerDatum: ManagerDatum = {
       factoryPolicyId: this.factoryHash,
-      orderHash: this.orderHash,
-      sellerHash: this.sellerHash,
       baseAsset: treasuryDatum.baseAsset,
       raiseAsset: treasuryDatum.raiseAsset,
       sellerCount: DEFAULT_NUMBER_SELLER,
