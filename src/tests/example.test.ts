@@ -158,6 +158,13 @@ beforeEach(async () => {
         t.utils.validatorToRewardAddress(validators.sellerValidator),
       ),
   });
+  await quickSubmitBuilder(emulator)({
+    txBuilder: t
+      .newTx()
+      .registerStake(
+        t.utils.validatorToRewardAddress(validators.factoryValidator),
+      ),
+  });
 });
 
 test("example flow", async () => {
@@ -267,7 +274,7 @@ test("example flow", async () => {
     });
     console.info(`adding Seller ${addSellerCount} done.`);
   };
-  await addingSeller(20n);
+  await addingSeller(30n);
 
   const depositing = async (maxCount?: number) => {
     const sellerUtxos: UTxO[] = (
@@ -339,7 +346,7 @@ test("example flow", async () => {
     });
     console.info(`update ${orderUtxos.length} orders done.`);
   };
-  await updatingOrders(1);
+  await updatingOrders(10);
 
   // collect manager
   while (emulator.slot <= discoveryEndSlot) {
@@ -442,7 +449,7 @@ test("example flow", async () => {
     });
     console.info(`collect order ${maxCount} done.`);
   };
-  await collectingOrders(1);
+  await collectingOrders(30);
   await collectingOrders(15);
   await collectingOrders(15);
   await collectingOrders(15);

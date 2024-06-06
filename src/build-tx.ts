@@ -183,6 +183,7 @@ export class WarehouseBuilder {
   orderAddress: Address;
   sellerRewardAddress: RewardAddress;
   treasuryRewardAddress: RewardAddress;
+  factoryRewardAddress: RewardAddress;
 
   // Auth Token
   factoryToken: string;
@@ -267,6 +268,9 @@ export class WarehouseBuilder {
     );
     this.treasuryRewardAddress = t.utils.validatorToRewardAddress(
       validators.treasuryValidator,
+    );
+    this.factoryRewardAddress = t.utils.validatorToRewardAddress(
+      validators.factoryValidator,
     );
 
     this.factoryToken = toUnit(this.factoryHash, FACTORY_AUTH_AN);
@@ -547,6 +551,11 @@ export class WarehouseBuilder {
     } = options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
+    invariant(
+      treasuryInDatum.collectedFund ==
+        treasuryInDatum.reserveRaise + treasuryInDatum.totalPenalty,
+      "Please collect all orders!",
+    );
     const projectOwnerLp = (totalLiquidity - LP_COLATERAL) / 2n;
     const treasuryOutDatum: TreasuryDatum = {
       ...treasuryInDatum,
@@ -700,6 +709,9 @@ export class WarehouseBuilder {
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
       },
+      () => {
+        this.withdrawFromFactory();
+      },
     );
     return this;
   }
@@ -752,6 +764,9 @@ export class WarehouseBuilder {
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
+      },
+      () => {
+        this.withdrawFromFactory();
       },
     );
     return this;
@@ -900,6 +915,10 @@ export class WarehouseBuilder {
 
   toRedeemerFactory(redeemer: FactoryRedeemer): string {
     return T.Data.to(redeemer, FactoryValidateFactory.redeemer);
+  }
+
+  toRedeemerMinting(redeemer: MintRedeemer): string {
+    return T.Data.to(redeemer, FactoryValidateFactoryMinting.redeemer);
   }
 
   toDatumAmmPool(datum: AmmPoolDatum): string {
@@ -1314,6 +1333,16 @@ export class WarehouseBuilder {
       .withdraw(this.treasuryRewardAddress, 0n, DUMMY_REDEEMER);
   }
 
+  withdrawFromFactory() {
+    this.tx
+      .readFrom([this.deployedValidators["factoryValidator"]])
+      .withdraw(
+        this.factoryRewardAddress,
+        0n,
+        this.toRedeemerMinting("ManageOrder"),
+      );
+  }
+
   /************************* MINTING *************************/
   mintingTreasuryToken() {
     invariant(this.mintRedeemer);
@@ -1326,7 +1355,7 @@ export class WarehouseBuilder {
       {
         [this.treasuryToken]: amount,
       },
-      T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
+      this.toRedeemerMinting(this.mintRedeemer),
     );
   }
 
@@ -1337,7 +1366,7 @@ export class WarehouseBuilder {
       {
         [this.managerToken]: amount,
       },
-      T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
+      this.toRedeemerMinting(this.mintRedeemer),
     );
   }
 
@@ -1350,7 +1379,7 @@ export class WarehouseBuilder {
       {
         [this.sellerToken]: mintAmount,
       },
-      T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
+      this.toRedeemerMinting(this.mintRedeemer),
     );
   }
 
@@ -1363,11 +1392,8 @@ export class WarehouseBuilder {
       {
         [this.orderToken]: mintAmount,
       },
-      T.Data.to(this.mintRedeemer, FactoryValidateFactoryMinting.redeemer),
+      this.toRedeemerMinting(this.mintRedeemer),
     );
-    // if (count > 0) {
-    //   this.withdrawFromSeller();
-    // }
   }
 
   mintingFactoryToken(options?: {
@@ -1395,7 +1421,7 @@ export class WarehouseBuilder {
       {
         [this.factoryToken]: amount,
       },
-      T.Data.to(redeemer, FactoryValidateFactoryMinting.redeemer),
+      this.toRedeemerMinting(redeemer),
     );
   }
 

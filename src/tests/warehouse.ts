@@ -19,7 +19,11 @@ import type {
   UTxO,
 } from "../types";
 import { address2PlutusAddress, toUnit } from "../utils";
-import { genWarehouseOptions, generateAccount } from "./utils";
+import {
+  genWarehouseOptions,
+  generateAccount,
+  quickSubmitBuilder,
+} from "./utils";
 
 export const skipToCountingPhase = (options: {
   t: Translucent;
@@ -57,6 +61,17 @@ export const genWarehouse = async () => {
   emulator.awaitBlock(10_000); // For validity ranges to be valid
   t.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
   const warehouseOptions = await genWarehouseOptions(t);
+
+  // registerStake
+  await quickSubmitBuilder(emulator)({
+    txBuilder: t
+      .newTx()
+      .registerStake(
+        t.utils.validatorToRewardAddress(
+          warehouseOptions.validators.factoryValidator,
+        ),
+      ),
+  });
 
   const defaultFactoryDatum: FactoryDatum = {
     head: LBE_INIT_FACTORY_HEAD,

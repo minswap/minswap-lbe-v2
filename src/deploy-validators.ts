@@ -92,10 +92,7 @@ export function collectValidators(options: {
     managerValidatorHash,
   );
   const sellerValidatorHash = t.utils.validatorToScriptHash(sellerValidator);
-  const orderValidator = new OrderValidateOrder(
-    sellerValidatorHash,
-    treasuryValidatorHash,
-  );
+  const orderValidator = new OrderValidateOrder(sellerValidatorHash);
   const orderValidatorHash = t.utils.validatorToScriptHash(orderValidator);
   const factoryValidator = new FactoryValidateFactory(
     {
