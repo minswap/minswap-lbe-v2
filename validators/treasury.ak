@@ -1,15 +1,23 @@
-use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Output, ScriptContext, Spend, Transaction,
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value
+use lb_v2/cancel_validation.{validate_cancel_lbe}
+use lb_v2/order_validation.{
+  validate_collect_orders, validate_redeem, validate_refund,
+}
+use lb_v2/treasury_validation.{
+  validate_create_dex_pool, validate_creating_treasury_out,
+}
 use lb_v2/types.{
   CancelLBE, CloseEvent, CollectManager, CollectOrders, CreateAmmPool, PoolDatum,
   RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
 }
-use lb_v2/utils.{assert, factory_auth_an, treasury_auth_an}
+use lb_v2/utils.{
+  assert, factory_auth_an, must_get_end_validity, treasury_auth_an,
+}
 use lb_v2/validation
 
 validator {
@@ -28,7 +36,6 @@ validator {
       extra_signatories,
       ..
     } = transaction
-    // get input being spent (aka treasury input)
     expect Some(treasury_input) =
       list.find(
         inputs,
@@ -49,19 +56,15 @@ validator {
       },
       ..
     } = treasury_input
-    let TreasuryDatum { factory_policy_id, manager_hash, order_hash, .. } =
-      treasury_in_datum
+    let TreasuryDatum {
+      factory_policy_id,
+      manager_hash,
+      order_hash,
+      is_cancelled,
+      ..
+    } = treasury_in_datum
     let mint_value = value.from_minted_value(mint)
-    expect Interval {
-      upper_bound: IntervalBound {
-        bound_type: Finite(end_valid_time_range),
-        ..
-      },
-      lower_bound: IntervalBound {
-        bound_type: Finite(_start_valid_time_range),
-        ..
-      },
-    } = validity_range
+    let end_valid_time_range = must_get_end_validity(validity_range)
     expect and {
         assert(
           value.quantity_of(
@@ -116,7 +119,7 @@ validator {
             inputs: inputs,
           ),
           // create new one
-          validation.validate_creating_treasury_out(
+          validate_creating_treasury_out(
             treasury_out: treasury_output,
             base_asset: base_asset,
             raise_asset: raise_asset,
@@ -142,7 +145,7 @@ validator {
           treasury_hash: treasury_hash,
         )
       CollectOrders ->
-        validation.validate_collect_orders(
+        validate_collect_orders(
           inputs: inputs,
           outputs: outputs,
           treasury_in_datum: treasury_in_datum,
@@ -156,9 +159,18 @@ validator {
           list.filter(
             inputs,
             fn(input) {
-              let Input { output, .. } = input
-              let Output { value: out_value, .. } = output
-              value.quantity_of(out_value, factory_policy_id, factory_auth_an) == 1
+              let Input {
+                output: Output {
+                  address: Address { payment_credential, .. },
+                  value: out_value,
+                  ..
+                },
+                ..
+              } = input
+              and {
+                payment_credential == ScriptCredential(factory_policy_id),
+                value.quantity_of(out_value, factory_policy_id, factory_auth_an) == 1,
+              }
             },
           )
         True
@@ -182,52 +194,36 @@ validator {
               address == project_owner
             },
           )
-        validation.validate_create_dex_pool(
+        validate_create_dex_pool(
           treasury_in_datum: treasury_in_datum,
           treasury_output: treasury_output,
-          validity_range: validity_range,
           mint_value: mint_value,
           amm_pool_datum: amm_pool_datum,
           factory_policy_id: factory_policy_id,
           project_owner_outputs: owner_outputs,
         )
       }
-      RedeemOrders -> {
-        let TreasuryDatum { total_liquidity, .. } = treasury_in_datum
-        let treasury_output =
-          validation.get_treasury_output(
-            outputs,
-            factory_policy_id,
-            treasury_hash,
-          )
-
-        let order_inputs =
-          validation.get_order_inputs(
-            inputs: inputs,
-            factory_policy_id: factory_policy_id,
-            order_hash: order_hash,
-          )
-        if total_liquidity != 0 {
-          validation.validate_redeem_lp(
-            order_inputs: order_inputs,
-            outputs: outputs,
-            treasury_output: treasury_output,
-            treasury_in_datum: treasury_in_datum,
-            treasury_in_value: treasury_in_value,
-            mint_value: mint_value,
-            factory_policy_id: factory_policy_id,
-          )
-        } else {
-          validation.validate_refund(
-            order_inputs: order_inputs,
-            outputs: outputs,
-            treasury_output: treasury_output,
-            treasury_in_datum: treasury_in_datum,
-            treasury_in_value: treasury_in_value,
-            mint_value: mint_value,
-          )
+      RedeemOrders ->
+        when is_cancelled is {
+          True ->
+            validate_refund(
+              inputs: inputs,
+              outputs: outputs,
+              treasury_in_datum: treasury_in_datum,
+              treasury_in_value: treasury_in_value,
+              mint_value: mint_value,
+              treasury_hash: treasury_hash,
+            )
+          False ->
+            validate_redeem(
+              inputs: inputs,
+              outputs: outputs,
+              treasury_in_datum: treasury_in_datum,
+              treasury_in_value: treasury_in_value,
+              mint_value: mint_value,
+              treasury_hash: treasury_hash,
+            )
         }
-      }
       CancelLBE(reason) -> {
         // finding exactly 1 Legit Treasury Output
         let treasury_output =
@@ -236,19 +232,17 @@ validator {
             factory_policy_id,
             treasury_hash,
           )
-        and {
-          validation.validate_cancel_lbe(
-            treasury_in_datum: treasury_in_datum,
-            treasury_in_value: treasury_in_value,
-            treasury_output: treasury_output,
-            ref_inputs: reference_inputs,
-            inputs: inputs,
-            extra_signatories: extra_signatories,
-            end_valid_time_range: end_valid_time_range,
-            cancel_reason: reason,
-          ),
-          assert(mint_value == value.zero(), @"Avoid minting unnecessary"),
-        }
+        validate_cancel_lbe(
+          treasury_in_datum: treasury_in_datum,
+          treasury_in_value: treasury_in_value,
+          treasury_output: treasury_output,
+          ref_inputs: reference_inputs,
+          inputs: inputs,
+          extra_signatories: extra_signatories,
+          end_valid_time_range: end_valid_time_range,
+          cancel_reason: reason,
+          mint_value: mint_value,
+        )
       }
     }
   }

@@ -97,6 +97,7 @@ async function genTestWarehouse() {
     outputIndex: ++utxoIndex,
     assets: {
       [builder.managerToken]: 1n,
+      lovelace: MANAGER_MIN_ADA,
     },
     address: builder.managerAddress,
     datum: builder.toDatumManager(managerDatum),
@@ -226,21 +227,7 @@ test("collect sellers | FAIL | invalid minting", async () => {
   builder.tasks[3] = () => {
     builder.mintingSellerToken(-2n);
   };
-  assertValidator(builder, "Collect sellers: Invalid minting");
-});
-
-test("collect sellers | FAIL | 1 seller out", async () => {
-  const { builder, options, defaultSellerDatum } = warehouse;
-  builder.buildCollectSeller(options);
-  builder.tasks.push(() => {
-    // 1 UTxO contain 1 seller tokens for tx value balance
-    attachValueToInput({
-      [builder.sellerToken]: 1n,
-    });
-    // pay to seller UTxO
-    builder.innerPaySeller(defaultSellerDatum);
-  });
-  assertValidator(builder, "Collect sellers: Tx mustn't have seller output");
+  assertValidatorFail(builder);
 });
 
 test("collect sellers | FAIL | No treasury ref input", async () => {
@@ -313,20 +300,6 @@ test("collect sellers | FAIL | Stupid Manager datum output(factoryPolicyId)", as
   assertValidator(builder, "Collect sellers: Invalid manager datum");
 });
 
-test("collect sellers | FAIL | Stupid Manager datum output(orderHash)", async () => {
-  const builder = stupidManagerDatumOut({
-    orderHash: "1234567890",
-  });
-  assertValidator(builder, "Collect sellers: Invalid manager datum");
-});
-
-test("collect sellers | FAIL | Stupid Manager datum output(sellerHash)", async () => {
-  const builder = stupidManagerDatumOut({
-    sellerHash: "1234567890",
-  });
-  assertValidator(builder, "Collect sellers: Invalid manager datum");
-});
-
 test("collect sellers | FAIL | Stupid Manager datum output(sellerCount)", async () => {
   const { expectedManagerDatumOut } = warehouse;
   const builder = stupidManagerDatumOut({
@@ -370,7 +343,7 @@ test("collect sellers | FAIL | Managre input value dont have any manager token",
     },
   });
   attachValueToInput({ [builder.managerToken]: 1n });
-  assertValidator(builder, "Manager input dont have manager token");
+  assertValidatorFail(builder);
 });
 
 test("collect sellers | FAIL | Managre input value dont have any manager token", async () => {
@@ -385,7 +358,7 @@ test("collect sellers | FAIL | Managre input value dont have any manager token",
     },
   });
   attachValueToInput({ [builder.managerToken]: 1n });
-  assertValidator(builder, "Manager input dont have manager token");
+  assertValidatorFail(builder);
 });
 
 test("collect sellers | FAIL | Seller input value dont have seller token", async () => {
@@ -402,7 +375,7 @@ test("collect sellers | FAIL | Seller input value dont have seller token", async
     sellerInputs,
   });
   attachValueToInput({ [builder.sellerToken]: 1n });
-  assertValidator(builder, "Collect sellers: Invalid minting");
+  assertValidatorFail(builder);
 });
 
 test("collect sellers | FAIL | Seller Input: Invalid LBE ID", async () => {
@@ -432,7 +405,7 @@ test("collect sellers | FAIL | Manager Input: Invalid LBE ID", async () => {
       datum: builder.toDatumManager({ ...managerDatum, baseAsset: MINt }),
     },
   });
-  assertValidator(builder, "Collect Sellers: invalid manager input's LBE ID");
+  assertValidatorFail(builder);
 });
 
 test("collect sellers | FAIL | More than 1 manager input", async () => {

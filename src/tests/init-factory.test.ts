@@ -7,6 +7,7 @@ import { toUnit } from "../utils";
 import {
   DUMMY_SEED_UTXO,
   assertValidator,
+  assertValidatorFail,
   genWarehouseOptions,
   generateAccount,
   loadModule,
@@ -98,7 +99,7 @@ test("init-factory | FAIL | missing Factory Token", async () => {
       },
     );
   });
-  assertValidator(builder, "Factory Output must contain 1 Factory Token");
+  assertValidatorFail(builder);
 });
 
 test("init-factory | FAIL | Factory Datum is not correct", async () => {

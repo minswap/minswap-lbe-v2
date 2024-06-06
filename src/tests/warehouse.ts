@@ -88,8 +88,6 @@ export const genWarehouse = async () => {
   };
   const defaultManagerDatum: ManagerDatum = {
     factoryPolicyId: builder.factoryHash,
-    orderHash: builder.orderHash,
-    sellerHash: builder.sellerHash,
     baseAsset: minswapToken,
     raiseAsset: adaToken,
     sellerCount: DEFAULT_NUMBER_SELLER,

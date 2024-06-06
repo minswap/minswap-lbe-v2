@@ -301,6 +301,9 @@ test("example flow", async () => {
 
   // update + orders
   const updatingOrders = async (maxCount?: number) => {
+    if (maxCount == 0) {
+      return;
+    }
     const sellerUtxo: UTxO = (
       await emulator.getUtxos(
         t.utils.validatorToAddress(validators.sellerValidator),
@@ -336,7 +339,7 @@ test("example flow", async () => {
     });
     console.info(`update ${orderUtxos.length} orders done.`);
   };
-  await updatingOrders(0);
+  await updatingOrders(1);
 
   // collect manager
   while (emulator.slot <= discoveryEndSlot) {
@@ -538,24 +541,4 @@ test("example flow", async () => {
   await redeemingOrders(15);
   await redeemingOrders(15);
   await redeemingOrders(15);
-
-  // let treasuryUtxo = (
-  //   await emulator.getUtxos(
-  //     t.utils.validatorToAddress(validators.treasuryValidator),
-  //   )
-  // ).find((u) => u.scriptRef === undefined)!;
-  // let validFrom = t.utils.slotToUnixTime(emulator.slot);
-  // let validTo = t.utils.slotToUnixTime(emulator.slot + 60 * 10);
-  // builder = new WarehouseBuilder(options);
-  // builder.buildAddSeller({
-  //   treasuryUtxo,
-  //   addSellerCount: 5n,
-  //   validFrom,
-  //   validTo,
-  // })
-  // const addSellersTx = await quickSubmitBuilder(emulator)({
-  //   txBuilder: builder.complete(),
-  // });
-  // expect(addSellersTx).toBeTruthy();
-  // console.info("Add Sellers done");
 });

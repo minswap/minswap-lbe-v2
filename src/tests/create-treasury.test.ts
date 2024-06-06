@@ -242,20 +242,6 @@ test("create-treasury | FAIL | Manager Output Datum incorrect! | X | factory_pol
   );
 });
 
-test("create-treasury | FAIL | Manager Output Datum incorrect! | X | orderHash", async () => {
-  assertValidator(
-    remixManagerDatum({ orderHash: "00" }),
-    "Manager Output must pay correctly!",
-  );
-});
-
-test("create-treasury | FAIL | Manager Output Datum incorrect! | X | sellerHash", async () => {
-  assertValidator(
-    remixManagerDatum({ sellerHash: "00" }),
-    "Manager Output must pay correctly!",
-  );
-});
-
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | baseAsset", async () => {
   assertValidator(
     remixManagerDatum({ baseAsset: W.adaToken }),

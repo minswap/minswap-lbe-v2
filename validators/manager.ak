@@ -4,11 +4,12 @@ use aiken/transaction.{
 }
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value
+use lb_v2/manager_validation.{validate_manage_seller}
 use lb_v2/types.{
-  CollectManager, ManageSeller, ManagerDatum, ManagerRedeemer, SellerDatum,
-  SpendManager, TreasuryDatum, ValidatorHash,
+  CollectManager, ManageSeller, ManagerDatum, ManagerRedeemer, SpendManager,
+  TreasuryDatum, ValidatorHash,
 }
-use lb_v2/utils.{assert, manager_auth_an}
+use lb_v2/utils.{manager_auth_an}
 use lb_v2/validation
 
 // Spending Manager for:
@@ -39,117 +40,76 @@ validator(
       ..
     } = transaction
     let mint_value = value.from_minted_value(mint)
-    let ManagerDatum { order_hash, factory_policy_id, .. } = manager_in_datum
-    expect [] =
-      validation.get_order_inputs(
-        inputs: inputs,
-        factory_policy_id: factory_policy_id,
-        order_hash: order_hash,
-      )
+    let ManagerDatum { factory_policy_id, .. } = manager_in_datum
     when redeemer is {
       ManageSeller -> {
-        expect Some(Input {
+        expect Some(manager_input) =
+          list.find(
+            inputs,
+            fn(input) {
+              let Input { output_reference: out_ref, .. } = input
+              out_ref == manager_out_ref
+            },
+          )
+        // Extract some necessary data.
+        expect Input {
           output: Output {
             address: Address {
               payment_credential: ScriptCredential(manager_hash),
               ..
             },
+            value: manager_in_value,
             ..
           },
           ..
-        }) =
-          list.find(
-            inputs,
-            fn(input) {
-              let Input {
-                output_reference: out_ref,
-                output: Output { value: sm_in_value, .. },
-              } = input
-              and {
-                out_ref == manager_out_ref,
-                assert(
-                  value.quantity_of(
-                    sm_in_value,
-                    factory_policy_id,
-                    manager_auth_an,
-                  ) == 1,
-                  @"Manager input dont have manager token",
-                ),
-              }
-            },
-          )
-        expect [_] =
-          list.filter(
-            inputs,
-            fn(input) {
-              let Input {
-                output: Output {
-                  address: Address { payment_credential, .. },
-                  ..
-                },
-                ..
-              } = input
-              payment_credential == ScriptCredential(manager_hash)
-            },
-          )
-        expect [manager_out] =
-          list.filter(
-            outputs,
-            fn(output) {
-              let Output {
-                address: Address { payment_credential, .. },
-                value: sm_in_value,
-                ..
-              } = output
-              payment_credential == ScriptCredential(manager_hash) && value.quantity_of(
-                sm_in_value,
-                factory_policy_id,
-                manager_auth_an,
-              ) == 1
-            },
-          )
+        } = manager_input
         expect [treasury_ref_input] =
           validation.get_treasury_ref_inputs(
             ref_inputs: reference_inputs,
             factory_policy_id: factory_policy_id,
             treasury_hash: treasury_hash,
           )
-
         expect Input {
           output: Output { datum: InlineDatum(raw_treasury_datum), .. },
           ..
         } = treasury_ref_input
         expect treasury_datum: TreasuryDatum = raw_treasury_datum
-        let TreasuryDatum { seller_hash, base_asset, raise_asset, .. } =
-          treasury_datum
+        let TreasuryDatum { seller_hash, .. } = treasury_datum
         let seller_inputs =
           validation.get_seller_inputs(
             inputs: inputs,
             factory_policy_id: factory_policy_id,
             seller_hash: seller_hash,
           )
-        let seller_outputs =
-          validation.get_seller_outputs(
-            outputs: outputs,
-            factory_policy_id: factory_policy_id,
-            seller_hash: seller_hash,
-            seller_datum: SellerDatum {
+        expect and {
+            value.quantity_of(
+              manager_in_value,
               factory_policy_id,
-              base_asset,
-              raise_asset,
-              amount: 0,
-              penalty_amount: 0,
-            },
-          )
-        validation.validate_manage_seller(
+              manager_auth_an,
+            ) == 1,
+            list.filter(
+              inputs,
+              fn(input) {
+                let Input {
+                  output: Output {
+                    address: Address { payment_credential, .. },
+                    ..
+                  },
+                  ..
+                } = input
+                payment_credential == ScriptCredential(manager_hash)
+              },
+            ) == [manager_input],
+          }
+        validate_manage_seller(
+          outputs: outputs,
           factory_policy_id: factory_policy_id,
           manager_in_datum: manager_in_datum,
-          manager_out: manager_out,
+          manager_in_value: manager_in_value,
           validity_range: validity_range,
           mint_value: mint_value,
           treasury_datum: treasury_datum,
           seller_inputs: seller_inputs,
-          seller_outputs: seller_outputs,
         )
       }
       // Collect Manager Transaction note:

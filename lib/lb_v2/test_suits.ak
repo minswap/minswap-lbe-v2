@@ -7,12 +7,12 @@ use aiken/transaction.{
 }
 use aiken/transaction/credential.{Address, VerificationKeyCredential}
 use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
+use lb_v2/order_validation.{apply_collecting_orders}
 use lb_v2/types.{Asset, FactoryDatum, OrderDatum, PenaltyConfig, UsingSeller}
 use lb_v2/utils.{
   calculate_penalty, fee_ada, make_wrapper_redeemer, order_auth_an,
   order_minimum_ada, sort_two_consecutive_factory_datum,
 }
-use lb_v2/validation.{apply_collecting_orders}
 
 type DummyObject {
   owner: Address,
