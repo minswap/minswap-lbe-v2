@@ -98,6 +98,16 @@ validator(
           payment_credential == ScriptCredential(factory_hash)
         },
       )
+    // find all Factory Outputs
+    let factory_outputs =
+      list.filter(
+        outputs,
+        fn(output) {
+          let Output { address: Address { payment_credential, .. }, .. } =
+            output
+          payment_credential == ScriptCredential(factory_hash)
+        },
+      )
     // Extract some necessary data.
     expect Interval {
       upper_bound: IntervalBound {
@@ -134,15 +144,7 @@ validator(
         // finding exactly 1 Factory Input
         expect [factory_input] = factory_inputs
         // finding exactly 2 Factory Outputs
-        expect [f_out_head, f_out_tail] =
-          list.filter(
-            outputs,
-            fn(output) {
-              let Output { address: Address { payment_credential, .. }, .. } =
-                output
-              payment_credential == ScriptCredential(factory_hash)
-            },
-          )
+        expect [f_out_head, f_out_tail] = factory_outputs
         // finding exactly 1 Treasury Input
         let treasury_output =
           validation.get_treasury_output(
@@ -151,21 +153,33 @@ validator(
             treasury_hash: treasury_hash,
           )
         // finding exactly 1 Manager Output
-        let manager_out =
-          validation.get_manager_output(
-            outputs: outputs,
-            factory_policy_id: factory_hash,
-            manager_hash: manager_hash,
+        expect [manager_output] =
+          list.filter(
+            outputs,
+            fn(output) {
+              let Output { address: Address { payment_credential, .. }, .. } =
+                output
+              // output belongs Manager Address
+              payment_credential == ScriptCredential(manager_hash)
+            },
           )
         // Extract some necessary data.
         let Input { output: Output { value: factory_input_value, .. }, .. } =
           factory_input
-        let Output { datum: f_out_head_datum, value: f_out_head_value, .. } =
-          f_out_head
-        let Output { datum: f_out_tail_datum, value: f_out_tail_value, .. } =
-          f_out_tail
+        let Output {
+          datum: f_out_head_datum,
+          value: f_out_head_value,
+          reference_script: f_out_head_ref_script,
+          ..
+        } = f_out_head
+        let Output {
+          datum: f_out_tail_datum,
+          value: f_out_tail_value,
+          reference_script: f_out_tail_ref_script,
+          ..
+        } = f_out_tail
         // finding Manager Address
-        let Output { address: manager_address, .. } = manager_out
+        let Output { address: manager_address, .. } = manager_output
         // finding Seller Address
         expect Some(Output { address: seller_address, .. }) =
           list.find(
@@ -214,6 +228,9 @@ validator(
               // Factory Output must contains 1 Factory Token
               value.quantity_of(f_out_head_value, factory_hash, factory_auth_an) == 1,
               value.quantity_of(f_out_tail_value, factory_hash, factory_auth_an) == 1,
+              // Factory Output must contains only ADA and Factory Token
+              list.length(value.flatten(f_out_head_value)) == 2,
+              list.length(value.flatten(f_out_tail_value)) == 2,
               // Head Factory Datum must be correct!
               f_out_head_datum == InlineDatum(
                 FactoryDatum { head: current_head, tail: lp_asset_name },
@@ -222,11 +239,14 @@ validator(
               f_out_tail_datum == InlineDatum(
                 FactoryDatum { head: lp_asset_name, tail: current_tail },
               ),
+              // Prevent Factory Output becoming heavy!
+              f_out_head_ref_script == None,
+              f_out_tail_ref_script == None,
             }, @"2 Factory Outputs must pay correctly!")
         // Assertions:
         and {
           assert(
-            manager_out == default_manager_output,
+            manager_output == default_manager_output,
             @"Manager Output must pay correctly!",
           ),
           assert(
@@ -258,15 +278,7 @@ validator(
         // finding exactly 2 Factory Inputs
         expect [factory_input_1, factory_input_2] = factory_inputs
         // finding exactly 1 Factory Output
-        expect [factory_output] =
-          list.filter(
-            outputs,
-            fn(output) {
-              let Output { address: Address { payment_credential, .. }, .. } =
-                output
-              payment_credential == ScriptCredential(factory_hash)
-            },
-          )
+        expect [factory_output] = factory_outputs
         // finding exactly 1 Treasury Input
         expect [treasury_input] =
           list.filter(
@@ -302,6 +314,7 @@ validator(
         expect Output {
           value: factory_out_value,
           datum: InlineDatum(factory_out_datum),
+          reference_script: factory_out_ref_script,
           ..
         } = factory_output
         expect Input {
@@ -347,6 +360,8 @@ validator(
             ),
             @"Remove Factory Linked List must be correct!",
           ),
+          list.length(value.flatten(factory_out_value)) == 2,
+          factory_out_ref_script == None,
           // LBE ID Assertions
           t_base_asset == base_asset,
           t_raise_asset == raise_asset,
@@ -452,7 +467,14 @@ fn validate_initialization(
   mint_value: Value,
 ) -> Bool {
   // Ensure transaction's outptus contain exactly 1 Factory Output 
-  expect [Output { value: out_value, datum, .. }] =
+  expect [
+    Output {
+      value: out_value,
+      datum,
+      reference_script: factory_reference_script,
+      ..
+    },
+  ] =
     list.filter(
       outputs,
       fn(output) {
@@ -461,6 +483,8 @@ fn validate_initialization(
       },
     )
   and {
+    factory_reference_script == None,
+    list.length(value.flatten(out_value)) == 2,
     assert(
       list.any(
         inputs,
