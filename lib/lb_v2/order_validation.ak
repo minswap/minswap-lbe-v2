@@ -225,6 +225,8 @@ pub fn validate_redeem(
       acc_raise: 0,
     )
   and {
+    // Check AMM Pool create successfully!
+    total_liquidity > 0,
     // Paying Treasury Output correctly!
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
