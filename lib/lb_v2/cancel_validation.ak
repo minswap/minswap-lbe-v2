@@ -112,6 +112,7 @@ fn cancel_by_owner(
 // - The LBE has not cancelled yet.
 // - Paying Treasury Output correctly!
 // - Validate cancel base on reason
+// - Ensure there's no cancellation after successfully creating an AMM Pool with LBE.
 pub fn validate_cancel_lbe(
   treasury_in_datum: TreasuryDatum,
   treasury_in_value: Value,
@@ -124,7 +125,7 @@ pub fn validate_cancel_lbe(
   mint_value: Value,
 ) -> Bool {
   // Extract some necessary data.
-  let TreasuryDatum { is_cancelled, .. } = treasury_in_datum
+  let TreasuryDatum { is_cancelled, total_liquidity, .. } = treasury_in_datum
   expect Output {
     value: treasury_out_value,
     datum: InlineDatum(raw_treasury_out_datum),
@@ -151,6 +152,8 @@ pub fn validate_cancel_lbe(
     },
     // Paying Treasury Output correctly!
     is_cancelled == False,
+    // Ensure there's no cancellation after successfully creating an AMM Pool with LBE.
+    total_liquidity == 0,
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
       is_cancelled: True,
