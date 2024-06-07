@@ -30,12 +30,17 @@ Validation:
 import * as T from "@minswap/translucent";
 import type { FeedTypeAmmPool } from "../../plutus";
 import { WarehouseBuilder, type BuildCreateAmmPoolOptions } from "../build-tx";
-import { TREASURY_MIN_ADA } from "../constants";
+import { LP_COLATERAL, TREASURY_MIN_ADA } from "../constants";
 import type { TreasuryDatum, UTxO } from "../types";
-import { calculateInitialLiquidity, toUnit } from "../utils";
+import {
+  calculateInitialLiquidity,
+  plutusAddress2Address,
+  toUnit,
+} from "../utils";
 import { assertValidatorFail, genWarehouseOptions, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
 import { FactoryValidatorValidateFactory } from "../../amm-plutus";
+import invariant from "@minswap/tiny-invariant";
 
 let utxoIndex = 0;
 
@@ -135,7 +140,7 @@ test("Create AMM Pool | PASS | Happy case", async () => {
 });
 
 async function buildTxWithStupidTreasuryDatum(
-  treasuryDatum: TreasuryDatum,
+  treasuryDatum: TreasuryDatum
 ): Promise<void> {
   const { options, builder } = warehouse;
   const { collectedFund, baseAsset } = treasuryDatum;
@@ -184,9 +189,58 @@ test("Create AMM Pool | FAIL | manager is collected", async () => {
     isManagerCollected: false,
   });
 });
-/*
-TODO: 
-  - Outputs:
-    + 1 Treasury output contain remaining raise asset and lp asset
-    + sum owner outputs = owner lp asset
-*/
+
+test("Create AMM Pool | FAIL | Invalid Treasury out value", async () => {
+  const { builder, options, treasuryDatum } = warehouse;
+  builder.buildCreateAmmPool(options);
+  const projectOwnerLp = (options.totalLiquidity - LP_COLATERAL) / 2n;
+  const treasuryOutDatum: TreasuryDatum = {
+    ...treasuryDatum,
+    totalLiquidity: options.totalLiquidity - LP_COLATERAL - projectOwnerLp,
+  };
+  builder.tasks[3] = () => {
+    const createPoolAssets = () => {
+      invariant(builder.ammLpToken);
+      const assets = {
+        lovelace: TREASURY_MIN_ADA,
+        [builder.treasuryToken]: 1n,
+        [builder.ammLpToken]: treasuryOutDatum.totalLiquidity + 1n,
+      };
+      const raiseAsset = toUnit(
+        treasuryOutDatum.raiseAsset.policyId,
+        treasuryOutDatum.raiseAsset.assetName
+      );
+      assets[raiseAsset] =
+        (assets[raiseAsset] ?? 0n) +
+        (treasuryOutDatum.collectedFund -
+          builder.calFinalReserveRaise(treasuryOutDatum));
+      return assets;
+    };
+    builder.tx.payToAddressWithData(
+      builder.treasuryAddress,
+      {
+        inline: builder.toDatumTreasury(treasuryOutDatum),
+      },
+      createPoolAssets()
+    );
+  };
+  assertValidatorFail(builder);
+});
+test("Create AMM Pool | FAIL | Invalid Treasury out value", async () => {
+  const { builder, options, treasuryDatum } = warehouse;
+  builder.buildCreateAmmPool(options);
+  const projectOwnerLp = (options.totalLiquidity - LP_COLATERAL) / 2n;
+  builder.tasks[4] = () => {
+    invariant(builder.ammLpToken);
+    const projectOwner = plutusAddress2Address(
+      builder.t.network,
+      treasuryDatum.owner
+    );
+    builder.tx.payToAddress(projectOwner, {
+      [builder.ammLpToken]: projectOwnerLp - 1n,
+    });
+    // just ensure 1LP not pay to project owner
+    builder.tx.payToAddress(builder.orderAddress, { [builder.ammLpToken]: 1n });
+  };
+  assertValidatorFail(builder);
+});
