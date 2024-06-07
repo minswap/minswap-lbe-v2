@@ -28,107 +28,82 @@ Validation:
           if this LBE is cancelled after collect all fund(only beacause of created pool), so this Tx failed too by AMM contract validator
   - 
 */
-import type { FeedTypeOrder } from "../../plutus";
-import { WarehouseBuilder } from "../build-tx";
+import * as T from "@minswap/translucent";
+import type { FeedTypeAmmPool } from "../../plutus";
+import { WarehouseBuilder, type BuildCreateAmmPoolOptions } from "../build-tx";
 import { TREASURY_MIN_ADA } from "../constants";
-import { plutusAddress2Address } from "../utils";
+import type { TreasuryDatum, UTxO } from "../types";
+import { calculateInitialLiquidity, toUnit } from "../utils";
 import { genWarehouseOptions, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
+import { FactoryValidatorValidateFactory } from "../../amm-plutus";
 
-beforeAll(async () => {
-  await loadModule();
-});
 let utxoIndex = 0;
 
 let warehouse: Awaited<ReturnType<typeof genTestWarehouse>>;
 
 async function genTestWarehouse() {
-  const {
-    t,
-    minswapToken,
-    defaultTreasuryDatum,
-    defaultSellerDatum,
-    defaultOrderDatum,
-  } = await genWarehouse();
+  const { t, minswapToken, defaultTreasuryDatum, ammPoolDatum } =
+    await genWarehouse();
   utxoIndex = 0;
   const baseAsset = minswapToken;
   const warehouseOptions = await genWarehouseOptions(t);
-
   const builder = new WarehouseBuilder(warehouseOptions);
-  const treasuryDatum = {
+  const reserveRaise = 100_000_000_000n;
+  const totalPenalty = 10_000_000_000n;
+  const collectedFund = reserveRaise + totalPenalty;
+  const treasuryDatum: TreasuryDatum = {
     ...defaultTreasuryDatum,
-    penaltyConfig: {
-      penaltyStartTime: defaultTreasuryDatum.endTime - 5000n,
-      percent: 25n,
-    },
+    collectedFund,
+    totalPenalty,
+    reserveRaise,
+    isManagerCollected: true,
   };
   const treasuryUTxO = {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
     outputIndex: ++utxoIndex,
     assets: {
-      lovelace: TREASURY_MIN_ADA,
+      lovelace: TREASURY_MIN_ADA + collectedFund,
       [builder.treasuryToken]: 1n,
-      [T.toUnit(baseAsset.policyId, baseAsset.assetName)]:
+      [toUnit(baseAsset.policyId, baseAsset.assetName)]:
         treasuryDatum.reserveBase,
     },
     address: builder.treasuryAddress,
     datum: builder.toDatumTreasury(treasuryDatum),
   };
-  const sellerDatum = {
-    ...defaultSellerDatum,
-    amount: -1000n,
-    penaltyAmount: 10n,
+
+  const ammFactoryDatum: FactoryValidatorValidateFactory["datum"] = {
+    head: "00",
+    tail: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
   };
-  const sellerUTxO = {
+  const ammFactoryUTxO: UTxO = {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
     outputIndex: ++utxoIndex,
+    address: builder.ammFactoryAddress,
+    datum: T.Data.to(ammFactoryDatum, FactoryValidatorValidateFactory.datum),
     assets: {
-      [builder.sellerToken]: 1n,
+      lovelace: 10_000_000n,
+      [toUnit(builder.ammAuthenHash, "4d5346")]: 1n,
     },
-    address: builder.sellerAddress,
-    datum: builder.toDatumSeller(sellerDatum),
   };
-  const orderInDatums: FeedTypeOrder["_datum"][] = [
-    {
-      ...defaultOrderDatum,
-      amount: 12n,
-      penaltyAmount: 0n,
-    },
-    {
-      ...defaultOrderDatum,
-      amount: 33n,
-      penaltyAmount: 0n,
-    },
-    {
-      ...defaultOrderDatum,
-      amount: 1000n,
-      penaltyAmount: 0n,
-    },
-  ];
-  const orderOutDatums: FeedTypeOrder["_datum"][] = [
-    {
-      ...defaultOrderDatum,
-      amount: 100n,
-      penaltyAmount: 0n,
-    },
-    {
-      ...defaultOrderDatum,
-      amount: 200n,
-      penaltyAmount: 0n,
-    },
-  ];
-  const orderInputUTxOs = orderInDatums.map((datum) =>
-    genOrderUTxO(datum, builder),
-  );
-  const owner = plutusAddress2Address(t.network, treasuryDatum.owner);
-  const options: BuildUsingSellerOptions = {
-    treasuryRefInput: treasuryUTxO,
-    sellerUtxo: sellerUTxO,
-    validFrom: Number(treasuryDatum.startTime) + 1000,
-    validTo: Number(treasuryDatum.startTime) + 2000,
-    owners: [owner],
-    orderInputs: orderInputUTxOs,
-    orderOutputDatums: orderOutDatums,
+
+  const reserveA = treasuryDatum.collectedFund;
+  const reserveB = treasuryDatum.reserveBase;
+  const totalLiquidity = calculateInitialLiquidity(reserveA, reserveB);
+
+  const poolDatum: FeedTypeAmmPool["_datum"] = {
+    ...ammPoolDatum,
+    totalLiquidity: totalLiquidity,
+    reserveA: reserveA,
+    reserveB: reserveB,
+  };
+  const options: BuildCreateAmmPoolOptions = {
+    treasuryInput: treasuryUTxO,
+    ammFactoryInput: ammFactoryUTxO,
+    ammPoolDatum: poolDatum,
+    validFrom: Number(treasuryDatum.endTime + 1000n),
+    validTo: Number(treasuryDatum.endTime + 1100n),
+    totalLiquidity: totalLiquidity,
   };
   return {
     builder,
@@ -138,33 +113,24 @@ async function genTestWarehouse() {
     t,
     treasuryDatum,
     treasuryUTxO,
-    sellerDatum,
-    sellerUTxO,
-    orderInDatums,
-    orderOutDatums,
-    owner,
-    penaltyTimeRange: {
-      validFrom: Number(treasuryDatum.endTime - 3000n),
-      validTo: Number(treasuryDatum.endTime - 2000n),
-    },
+    // AMM Info
+    ammFactoryDatum,
+    ammFactoryUTxO,
+    poolDatum,
   };
 }
 
-function genOrderUTxO(
-  datum: FeedTypeOrder["_datum"],
-  builder: WarehouseBuilder,
-): UTxO {
-  return {
-    txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
-    outputIndex: ++utxoIndex,
-    assets: {
-      [builder.orderToken]: 1n,
-      lovelace: 5_000_000n + datum.amount + datum.penaltyAmount,
-    },
-    address: builder.orderAddress,
-    datum: builder.toDatumOrder(datum),
-  };
-}
+beforeAll(async () => {
+  await loadModule();
+});
+
 beforeEach(async () => {
   warehouse = await genTestWarehouse();
+});
+
+test("Create AMM Pool | PASS | Happy case", async () => {
+  const { builder, options } = warehouse;
+  builder.buildCreateAmmPool(options);
+  const tx = builder.complete();
+  await tx.complete();
 });
