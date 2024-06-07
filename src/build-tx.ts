@@ -721,7 +721,84 @@ export class WarehouseBuilder {
         this.payingTreasuryOutput({
           treasuryOutDatum,
           deltaLp: totalLiquidity,
-          deltaBonusRaise: totalBonusRaise,
+          deltaRaise: totalBonusRaise,
+        });
+      },
+      () => {
+        this.mintingOrderToken(-1n * BigInt(orderInputs.length));
+      },
+      () => {
+        this.tx.validFrom(validFrom).validTo(validTo);
+      },
+      () => {
+        this.withdrawFromFactory();
+      },
+    );
+    return this;
+  }
+  public buildRefundOrders(
+    options: BuildRedeemOrdersOptions,
+  ): WarehouseBuilder {
+    const { treasuryInput, orderInputs, validFrom, validTo } = options;
+    invariant(treasuryInput.datum);
+    const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
+    this.setInnerAssets(treasuryInDatum.baseAsset, treasuryInDatum.raiseAsset);
+    invariant(this.ammLpToken);
+    const sortedOrders = sortUTxOs(orderInputs);
+    let totalRaise = 0n;
+    let totalPenalty = 0n;
+    const userOutputs: { address: Address; assets: Assets }[] = [];
+    const raiseAsset = toUnit(
+      this.raiseAsset!.policyId,
+      this.raiseAsset!.assetName,
+    );
+    for (const order of sortedOrders) {
+      invariant(order.datum);
+      const { penaltyAmount, amount, owner } = this.fromDatumOrder(order.datum);
+      const assets: Record<string, bigint> = {
+        lovelace: ORDER_MIN_ADA,
+      };
+      assets[raiseAsset] = assets[raiseAsset]
+        ? assets[raiseAsset] + amount + penaltyAmount
+        : amount + penaltyAmount;
+      const output: { address: Address; assets: Assets } = {
+        address: plutusAddress2Address(this.t.network, owner),
+        assets,
+      };
+      totalRaise += amount;
+      totalPenalty += penaltyAmount;
+      userOutputs.push(output);
+    }
+    const treasuryOutDatum: TreasuryDatum = {
+      ...treasuryInDatum,
+      collectedFund: treasuryInDatum.collectedFund - totalRaise - totalPenalty,
+      reserveRaise: treasuryInDatum.reserveRaise - totalRaise,
+      totalPenalty: treasuryInDatum.totalPenalty - totalPenalty,
+    };
+    this.tasks.push(
+      () => {
+        this.treasuryInputs = [treasuryInput];
+        this.treasuryRedeemer = "RedeemOrders";
+        this.orderInputs = orderInputs;
+        this.orderRedeemer = "RedeemOrder";
+        this.mintRedeemer = "MintRedeemOrders";
+      },
+      () => {
+        for (const output of userOutputs) {
+          this.tx.payToAddress(output.address, output.assets);
+        }
+      },
+      () => {
+        this.spendingTreasuryInput();
+      },
+      () => {
+        this.spendingOrderInput();
+      },
+      () => {
+        this.payingTreasuryOutput({
+          treasuryOutDatum,
+          deltaLp: 0n,
+          deltaRaise: totalRaise + totalPenalty,
         });
       },
       () => {
@@ -1076,9 +1153,9 @@ export class WarehouseBuilder {
     treasuryOutDatum: TreasuryDatum;
     deltaCollectedFund?: bigint;
     deltaLp?: bigint;
-    deltaBonusRaise?: bigint;
+    deltaRaise?: bigint;
   }) {
-    const { treasuryOutDatum, deltaCollectedFund, deltaLp, deltaBonusRaise } =
+    const { treasuryOutDatum, deltaCollectedFund, deltaLp, deltaRaise } =
       options;
     const innerPay = (assets: Assets) => {
       this.tx.payToAddressWithData(
@@ -1123,15 +1200,15 @@ export class WarehouseBuilder {
     const redeemAssets = () => {
       invariant(this.treasuryInputs.length > 0);
       invariant(this.ammLpToken);
-      invariant(deltaLp);
-      invariant(deltaBonusRaise);
+      invariant(deltaLp !== undefined);
+      invariant(deltaRaise !== undefined);
       const assets = { ...this.treasuryInputs[0].assets };
-      assets[this.ammLpToken] -= deltaLp;
+      assets[this.ammLpToken] = (assets[this.ammLpToken] ?? 0n) - deltaLp;
       const raiseAsset = toUnit(
         treasuryOutDatum.raiseAsset.policyId,
         treasuryOutDatum.raiseAsset.assetName,
       );
-      assets[raiseAsset] -= deltaBonusRaise;
+      assets[raiseAsset] -= deltaRaise;
       if (assets[this.ammLpToken] === 0n) {
         delete assets[this.ammLpToken];
       }

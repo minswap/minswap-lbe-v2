@@ -38,6 +38,7 @@ async function genTestWarehouse() {
     reserveRaise,
     totalPenalty,
     isCancelled: true,
+    isManagerCollected: true,
   };
   builder.setInnerAssets(treasuryDatum.baseAsset, treasuryDatum.raiseAsset);
   const baseAsset = minswapToken;
@@ -117,9 +118,9 @@ function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): UTxO {
   };
 }
 
-test("Redeem LP | PASS | update orders: success", async () => {
+test("Refund | PASS | update orders: success", async () => {
   const { builder, options } = warehouse;
-  builder.buildRedeemOrders(options);
+  builder.buildRefundOrders(options);
   const tx = builder.complete();
   await tx.complete();
 });
