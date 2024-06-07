@@ -551,11 +551,11 @@ export class WarehouseBuilder {
     } = options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
-    invariant(
-      treasuryInDatum.collectedFund ==
-        treasuryInDatum.reserveRaise + treasuryInDatum.totalPenalty,
-      "Please collect all orders!",
-    );
+    // invariant(
+    //   treasuryInDatum.collectedFund ==
+    //     treasuryInDatum.reserveRaise + treasuryInDatum.totalPenalty,
+    //   "Please collect all orders!",
+    // );
     const projectOwnerLp = (totalLiquidity - LP_COLATERAL) / 2n;
     const treasuryOutDatum: TreasuryDatum = {
       ...treasuryInDatum,
@@ -656,22 +656,42 @@ export class WarehouseBuilder {
     const sortedOrders = sortUTxOs(orderInputs);
     let totalFund = 0n;
     let totalLiquidity = 0n;
+    let totalBonusRaise = 0n;
     const userOutputs: { address: Address; assets: Assets }[] = [];
+    const totalBonusRaiseAsset =
+      treasuryInDatum.maximumRaise &&
+      treasuryInDatum.reserveRaise + treasuryInDatum.totalPenalty >
+        treasuryInDatum.maximumRaise
+        ? treasuryInDatum.reserveRaise +
+          treasuryInDatum.totalPenalty -
+          treasuryInDatum.maximumRaise
+        : 0n;
+    const raiseAsset = toUnit(
+      this.raiseAsset!.policyId,
+      this.raiseAsset!.assetName,
+    );
     for (const order of sortedOrders) {
       invariant(order.datum);
       const datum = this.fromDatumOrder(order.datum);
       const lpAmount =
         (datum.amount * treasuryInDatum.totalLiquidity) /
         treasuryInDatum.reserveRaise;
+      const bonusRaise =
+        (datum.amount * totalBonusRaiseAsset) / treasuryInDatum.reserveRaise;
+      const assets = {
+        lovelace: ORDER_MIN_ADA,
+        [this.ammLpToken]: lpAmount,
+      };
+      assets[raiseAsset] = assets[raiseAsset]
+        ? assets[raiseAsset] + bonusRaise
+        : bonusRaise;
       const output: { address: Address; assets: Assets } = {
         address: plutusAddress2Address(this.t.network, datum.owner),
-        assets: {
-          lovelace: ORDER_MIN_ADA,
-          [this.ammLpToken]: lpAmount,
-        },
+        assets,
       };
       totalFund += datum.amount + datum.penaltyAmount;
       totalLiquidity += lpAmount;
+      totalBonusRaise += bonusRaise;
       userOutputs.push(output);
     }
     const treasuryOutDatum: TreasuryDatum = {
@@ -701,6 +721,7 @@ export class WarehouseBuilder {
         this.payingTreasuryOutput({
           treasuryOutDatum,
           deltaLp: totalLiquidity,
+          deltaBonusRaise: totalBonusRaise,
         });
       },
       () => {
@@ -1055,8 +1076,10 @@ export class WarehouseBuilder {
     treasuryOutDatum: TreasuryDatum;
     deltaCollectedFund?: bigint;
     deltaLp?: bigint;
+    deltaBonusRaise?: bigint;
   }) {
-    const { treasuryOutDatum, deltaCollectedFund, deltaLp } = options;
+    const { treasuryOutDatum, deltaCollectedFund, deltaLp, deltaBonusRaise } =
+      options;
     const innerPay = (assets: Assets) => {
       this.tx.payToAddressWithData(
         this.treasuryAddress,
@@ -1101,8 +1124,14 @@ export class WarehouseBuilder {
       invariant(this.treasuryInputs.length > 0);
       invariant(this.ammLpToken);
       invariant(deltaLp);
+      invariant(deltaBonusRaise);
       const assets = { ...this.treasuryInputs[0].assets };
       assets[this.ammLpToken] -= deltaLp;
+      const raiseAsset = toUnit(
+        treasuryOutDatum.raiseAsset.policyId,
+        treasuryOutDatum.raiseAsset.assetName,
+      );
+      assets[raiseAsset] -= deltaBonusRaise;
       if (assets[this.ammLpToken] === 0n) {
         delete assets[this.ammLpToken];
       }
