@@ -110,11 +110,22 @@ validator {
             factory_policy_id,
             treasury_hash,
           )
+        expect Output { datum: InlineDatum(treasury_out_raw_datum), .. } =
+          treasury_output
+        expect treasury_out_datum: TreasuryDatum = treasury_out_raw_datum
+        let TreasuryDatum {
+          base_asset: out_base_asset,
+          raise_asset: out_raise_asset,
+          ..
+        } = treasury_out_datum
         and {
           // before discovery phase
           end_valid_time_range < start_time,
           // prevent updating the LBE when it has been cancelled.
           is_cancelled == False,
+          // prevent updating the LBE ID.
+          base_asset == out_base_asset,
+          raise_asset == out_raise_asset,
           // Authorize by owner
           validation.validate_authorize_by_owner(
             owner_payment_credential: owner_payment_credential,
