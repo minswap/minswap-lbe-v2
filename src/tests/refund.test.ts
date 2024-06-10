@@ -1,4 +1,5 @@
 /*
+Refund Tx
 Input:
   - 1 Treasury input
   - n order inputs
@@ -8,7 +9,13 @@ Output:
 Minting:
   - Burn n order asset
 Validation:
-  - 
+  - Collected all manager
+  - Collected all orders
+  - LBE is cancelled
+  - Treasury out:
+    - Datum: reduce collected_fund, reserve_raise, total_penalty
+    - Value: remove collected_fund raise asset
+  - Users' Value
 */
 import { WarehouseBuilder, type BuildRedeemOrdersOptions } from "../build-tx";
 import { LBE_FEE, ORDER_MIN_ADA, TREASURY_MIN_ADA } from "../constants";
@@ -76,7 +83,7 @@ async function genTestWarehouse() {
     },
   ];
   const orderInputUTxOs = orderInDatums.map((datum) =>
-    genOrderUTxO(datum, builder),
+    genOrderUTxO(datum, builder)
   );
   const owner = plutusAddress2Address(t.network, treasuryDatum.owner);
   const options: BuildRedeemOrdersOptions = {

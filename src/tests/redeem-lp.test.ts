@@ -1,4 +1,5 @@
 /*
+Redeem LP Tx
 Input:
   - 1 Treasury input
   - n order inputs
@@ -8,7 +9,11 @@ Output:
 Minting:
   - Burn n order asset
 Validation:
-  - 
+  - Created pool success
+  - Treasury out:
+    - Datum: reduce collected_fund
+    - Value: remove lp asset, bonus raise asset
+  - Users' Value
 */
 import { WarehouseBuilder, type BuildRedeemOrdersOptions } from "../build-tx";
 import {
@@ -84,7 +89,7 @@ async function genTestWarehouse() {
     },
   ];
   const orderInputUTxOs = orderInDatums.map((datum) =>
-    genOrderUTxO(datum, builder),
+    genOrderUTxO(datum, builder)
   );
   const owner = plutusAddress2Address(t.network, treasuryDatum.owner);
   const options: BuildRedeemOrdersOptions = {
