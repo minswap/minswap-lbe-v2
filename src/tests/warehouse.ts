@@ -99,7 +99,7 @@ export const genWarehouse = async () => {
     isCancelled: false,
     minimumOrderRaise: null,
     isManagerCollected: false,
-    isCancelable: false,
+    revocable: false,
   };
   const defaultManagerDatum: ManagerDatum = {
     factoryPolicyId: builder.factoryHash,

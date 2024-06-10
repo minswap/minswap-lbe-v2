@@ -42,12 +42,16 @@ pub const fee_ada = 1_000_000
 
 pub const penalty_fee = 2_000_000
 
+// the ADA amount store in Treasury UTxO
 pub const treasury_minimum_ada = 3_000_000
 
+// the ADA amount store in Manager UTxO
 pub const manager_minimum_ada = 2_000_000
 
+// the ADA amount store in Seller UTxO
 pub const seller_minimum_ada = 2_000_000
 
+// the ADA amount store in Order UTxO
 pub const order_minimum_ada = 2_000_000
 
 // sort 2 assets in bytearray ascending
