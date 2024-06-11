@@ -133,15 +133,22 @@ pub type ManagerRedeemer {
 }
 
 pub type SellerDatum {
+  // ValidatorHash of Factory Validator
   factory_policy_id: PolicyId,
+  // Asset aims to list
   base_asset: Asset,
+  // Asset aims to raise
   raise_asset: Asset,
+  // Total amount this seller manage. It can be negative
   amount: Int,
+  // Total penalty amount this seller manage. It can be negative
   penalty_amount: Int,
 }
 
 pub type SellerRedeemer {
+  // use a seller for create | update orders
   UsingSeller
+  // Collect Seller UTxOs
   CountingSeller
 }
 
