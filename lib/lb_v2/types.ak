@@ -30,6 +30,7 @@ pub type FactoryRedeemer {
   CloseTreasury { base_asset: Asset, raise_asset: Asset }
   MintManager
   MintSeller
+  BurnSeller
   MintOrder
   MintRedeemOrders
   // Withdrawal 
@@ -108,11 +109,8 @@ pub type ManagerDatum {
 }
 
 pub type ManagerRedeemer {
-  // ManageSeller = AddSeller | CollectSeller 
-  // depend the time range
-  //    - AddSeller before end discovery
-  //    - CollectSeller after end discovery
-  ManageSeller
+  AddSellers
+  CollectSellers
   SpendManager
 }
 

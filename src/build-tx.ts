@@ -420,7 +420,7 @@ export class WarehouseBuilder {
     this.tasks.push(
       () => {
         this.managerInputs = [managerUtxo];
-        this.managerRedeemer = "ManageSeller";
+        this.managerRedeemer = "AddSellers";
         this.mintRedeemer = "MintSeller";
       },
       () => {
@@ -906,12 +906,12 @@ export class WarehouseBuilder {
     const mintSellerCount = -1n * BigInt(sellerInputs.length);
     this.tasks.push(
       () => {
-        this.managerRedeemer = "ManageSeller";
+        this.managerRedeemer = "CollectSellers";
         this.managerInputs = [managerInput];
         this.treasuryRefInput = treasuryRefInput;
         this.sellerInputs = sellerInputs;
         this.sellerRedeemer = "CountingSeller";
-        this.mintRedeemer = "MintSeller";
+        this.mintRedeemer = "BurnSeller";
       },
       () => {
         this.spendingManagerInput();

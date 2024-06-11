@@ -1,7 +1,7 @@
 use aiken/transaction.{ScriptContext, Spend, Transaction}
 use aiken/transaction/value
 use lb_v2/types.{
-  CountingSeller, ManageSeller, SellerDatum, SellerRedeemer, UsingSeller,
+  CollectSellers, CountingSeller, SellerDatum, SellerRedeemer, UsingSeller,
   ValidatorHash,
 }
 use lb_v2/validation
@@ -23,7 +23,7 @@ validator(treasury_hash: ValidatorHash, manager_hash: ValidatorHash) {
           factory_policy_id: factory_policy_id,
           manager_hash: manager_hash,
           redeemers: redeemers,
-          expected_redeemer: ManageSeller,
+          expected_redeemer: CollectSellers,
         )
       UsingSeller -> {
         let Transaction {
