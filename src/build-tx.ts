@@ -143,7 +143,7 @@ export type BuildUpdateLBEOptions = {
   minimumRaise?: bigint;
   maximumRaise?: bigint;
   reserveBase?: bigint;
-  isCancelable?: boolean;
+  revocable?: boolean;
   penaltyConfig?: { penaltyStartTime: bigint; percent: bigint };
 };
 
@@ -530,7 +530,7 @@ export class WarehouseBuilder {
       minimumRaise,
       maximumRaise,
       reserveBase,
-      isCancelable,
+      revocable,
       penaltyConfig,
     } = options;
     invariant(treasuryInput.datum);
@@ -544,7 +544,7 @@ export class WarehouseBuilder {
       minimumRaise: minimumRaise ?? inDatum.minimumRaise,
       maximumRaise: maximumRaise ?? inDatum.maximumRaise,
       reserveBase: reserveBase ?? inDatum.reserveBase,
-      isCancelable: isCancelable ?? inDatum.isCancelable,
+      revocable: revocable ?? inDatum.revocable,
       penaltyConfig: penaltyConfig ?? inDatum.penaltyConfig,
     };
     this.tasks.push(
