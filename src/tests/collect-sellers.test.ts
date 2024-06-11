@@ -217,7 +217,7 @@ test("collect sellers | FAIL | Before end of discovery phase", async () => {
   });
   // Manager is determining whether the action is collect sellers
   //  or add sellers through valid time range and is_cancelled field, so...
-  assertValidator(builder, "Unable to determine action");
+  assertValidatorFail(builder);
 });
 
 test("collect sellers | FAIL | invalid minting", async () => {
@@ -421,7 +421,7 @@ test("collect sellers | FAIL | More than 1 manager input", async () => {
             outputIndex: ++utxoIndex,
           },
         ],
-        T.Data.to("ManageSeller", ManagerValidateManagerSpending.redeemer),
+        T.Data.to("CollectSellers", ManagerValidateManagerSpending.redeemer),
       );
   });
   assertValidatorFail(builder);
