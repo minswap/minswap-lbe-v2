@@ -3,8 +3,8 @@ import type {
   FactoryValidateFactory,
   FactoryValidateFactoryMinting,
   FeedTypeAmmPool,
-  FeedTypeOrder,
   ManagerValidateManagerSpending,
+  OrderValidateOrder,
   SellerValidateSellerSpending,
   TreasuryValidateTreasurySpending,
 } from "../plutus";
@@ -32,13 +32,13 @@ export type UTxO = T.UTxO;
 export type AmmPoolDatum = FeedTypeAmmPool["_datum"];
 export type FactoryDatum = FactoryValidateFactory["datum"];
 export type ManagerDatum = ManagerValidateManagerSpending["managerInDatum"];
-export type OrderDatum = FeedTypeOrder["_datum"];
+export type OrderDatum = OrderValidateOrder["datum"];
 export type SellerDatum = SellerValidateSellerSpending["sellerInDatum"];
 export type TreasuryDatum = TreasuryValidateTreasurySpending["treasuryInDatum"];
 
 export type FactoryRedeemer = FactoryValidateFactory["redeemer"];
 export type ManagerRedeemer = ManagerValidateManagerSpending["redeemer"];
 export type MintRedeemer = FactoryValidateFactoryMinting["redeemer"];
-export type OrderRedeemer = FeedTypeOrder["_redeemer"];
+export type OrderRedeemer = OrderValidateOrder["redeemer"];
 export type SellerRedeemer = SellerValidateSellerSpending["redeemer"];
 export type TreasuryRedeemer = TreasuryValidateTreasurySpending["redeemer"];

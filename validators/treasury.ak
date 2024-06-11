@@ -100,6 +100,7 @@ validator {
           owner,
           start_time,
           seller_hash,
+          is_cancelled,
           ..
         } = treasury_in_datum
         let Address { payment_credential: owner_payment_credential, .. } = owner
@@ -112,6 +113,8 @@ validator {
         and {
           // before discovery phase
           end_valid_time_range < start_time,
+          // prevent updating the LBE when it has been cancelled.
+          is_cancelled == False,
           // Authorize by owner
           validation.validate_authorize_by_owner(
             owner_payment_credential: owner_payment_credential,

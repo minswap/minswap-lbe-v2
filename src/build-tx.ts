@@ -8,8 +8,8 @@ import {
   FactoryValidateFactory,
   FactoryValidateFactoryMinting,
   FeedTypeAmmPool,
-  FeedTypeOrder,
   ManagerValidateManagerSpending,
+  OrderValidateOrder,
   SellerValidateSellerSpending,
   TreasuryValidateTreasurySpending,
 } from "../plutus";
@@ -62,6 +62,7 @@ import type {
   UnixTime,
 } from "./types";
 import {
+  address2PlutusAddress,
   calculateInitialLiquidity,
   computeLPAssetName,
   plutusAddress2Address,
@@ -128,6 +129,22 @@ export type BuildCollectOrdersOptions = {
   orderInputs: UTxO[];
   validFrom: UnixTime;
   validTo: UnixTime;
+};
+
+export type BuildUpdateLBEOptions = {
+  treasuryInput: UTxO;
+  validFrom: UnixTime;
+  validTo: UnixTime;
+  // updatable fields
+  startTime?: bigint;
+  endTime?: bigint;
+  owner?: Address;
+  minimumOrderRaise?: bigint;
+  minimumRaise?: bigint;
+  maximumRaise?: bigint;
+  reserveBase?: bigint;
+  isCancelable?: boolean;
+  penaltyConfig?: { penaltyStartTime: bigint; percent: bigint };
 };
 
 export type BuildCancelLBEOptions = {
@@ -446,7 +463,7 @@ export class WarehouseBuilder {
     let outputPenaltyAmount = 0n;
     for (const o of orderInputs) {
       invariant(o.datum);
-      const datum = T.Data.from(o.datum, FeedTypeOrder._datum);
+      const datum = this.fromDatumOrder(o.datum);
       inputAmount += datum.amount;
       inputPenaltyAmount += datum.penaltyAmount;
     }
@@ -493,6 +510,56 @@ export class WarehouseBuilder {
       },
       () => {
         this.payingOrderOutput(...orderOutputDatums);
+      },
+      () => {
+        this.tx.validFrom(validFrom).validTo(validTo);
+      },
+    );
+    return this;
+  }
+
+  public buildUpdateLBE(options: BuildUpdateLBEOptions): WarehouseBuilder {
+    const {
+      treasuryInput,
+      validFrom,
+      validTo,
+      startTime,
+      endTime,
+      owner,
+      minimumOrderRaise,
+      minimumRaise,
+      maximumRaise,
+      reserveBase,
+      isCancelable,
+      penaltyConfig,
+    } = options;
+    invariant(treasuryInput.datum);
+    const inDatum = this.fromDatumTreasury(treasuryInput.datum);
+    const treasuryOutDatum: TreasuryDatum = {
+      ...inDatum,
+      startTime: startTime ?? inDatum.startTime,
+      endTime: endTime ?? inDatum.endTime,
+      owner: owner ? address2PlutusAddress(owner) : inDatum.owner,
+      minimumOrderRaise: minimumOrderRaise ?? inDatum.minimumOrderRaise,
+      minimumRaise: minimumRaise ?? inDatum.minimumRaise,
+      maximumRaise: maximumRaise ?? inDatum.maximumRaise,
+      reserveBase: reserveBase ?? inDatum.reserveBase,
+      isCancelable: isCancelable ?? inDatum.isCancelable,
+      penaltyConfig: penaltyConfig ?? inDatum.penaltyConfig,
+    };
+    this.tasks.push(
+      () => {
+        this.treasuryInputs = [treasuryInput];
+        this.treasuryRedeemer = "UpdateLBE";
+      },
+      () => {
+        this.spendingTreasuryInput();
+      },
+      () => {
+        this.tx.addSigner(plutusAddress2Address(this.t.network, inDatum.owner));
+      },
+      () => {
+        this.payingTreasuryOutput({ treasuryOutDatum });
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
@@ -894,11 +961,11 @@ export class WarehouseBuilder {
   }
 
   fromDatumOrder(rawDatum: string): OrderDatum {
-    return T.Data.from(rawDatum, FeedTypeOrder._datum);
+    return T.Data.from(rawDatum, OrderValidateOrder.datum);
   }
 
   toDatumOrder(datum: OrderDatum): string {
-    return T.Data.to(datum, FeedTypeOrder._datum);
+    return T.Data.to(datum, OrderValidateOrder.datum);
   }
 
   fromDatumManager(rawDatum: string): ManagerDatum {
@@ -907,6 +974,18 @@ export class WarehouseBuilder {
 
   toDatumManager(datum: ManagerDatum): string {
     return T.Data.to(datum, ManagerValidateManagerSpending.managerInDatum);
+  }
+
+  toRedeemerOrder(redeemer: OrderRedeemer): string {
+    return T.Data.to(redeemer, OrderValidateOrder.redeemer);
+  }
+
+  toRedeemerTreasury(redeemer: TreasuryRedeemer): string {
+    return T.Data.to(redeemer, TreasuryValidateTreasurySpending.redeemer);
+  }
+
+  toRedeemerManager(redeemer: ManagerRedeemer): string {
+    return T.Data.to(redeemer, ManagerValidateManagerSpending.redeemer);
   }
 
   toRedeemerSellerSpend(redeemer: SellerRedeemer): string {
@@ -976,10 +1055,7 @@ export class WarehouseBuilder {
       .readFrom([this.deployedValidators["managerValidator"]])
       .collectFrom(
         this.managerInputs,
-        T.Data.to(
-          this.managerRedeemer,
-          ManagerValidateManagerSpending.redeemer,
-        ),
+        this.toRedeemerManager(this.managerRedeemer),
       );
   }
 
@@ -1016,22 +1092,9 @@ export class WarehouseBuilder {
       return;
     }
     invariant(this.orderRedeemer);
-    // const cases: Record<OrderRedeemer, () => void> = {
-    //   UpdateOrder: () => {
-    //     this.withdrawFromSeller();
-    //   },
-    //   CollectOrder: () => {
-    //     this.withdrawFromTreasury();
-    //   },
-    //   RedeemOrder: () => { },
-    // };
-    // cases[this.orderRedeemer]();
     this.tx
       .readFrom([this.deployedValidators["orderValidator"]])
-      .collectFrom(
-        this.orderInputs,
-        T.Data.to(this.orderRedeemer, FeedTypeOrder._redeemer),
-      );
+      .collectFrom(this.orderInputs, this.toRedeemerOrder(this.orderRedeemer));
   }
 
   spendingTreasuryInput() {
@@ -1043,10 +1106,7 @@ export class WarehouseBuilder {
       .readFrom([this.deployedValidators["treasuryValidator"]])
       .collectFrom(
         this.treasuryInputs,
-        T.Data.to(
-          this.treasuryRedeemer,
-          TreasuryValidateTreasurySpending.redeemer,
-        ),
+        this.toRedeemerTreasury(this.treasuryRedeemer),
       );
   }
 
@@ -1139,7 +1199,7 @@ export class WarehouseBuilder {
         throw Error("not implement!");
       },
       CancelLBE: defaultAssets,
-      UpdateLBE: defaultAssets,
+      UpdateLBE: createTreasury,
       CreateAmmPool: createPoolAssets,
       CollectOrders: collectOrders,
     };

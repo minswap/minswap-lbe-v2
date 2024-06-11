@@ -4,7 +4,6 @@ import { beforeEach, expect, test } from "bun:test";
 import { FactoryValidatorValidateFactory as AmmValidateFactory } from "../../amm-plutus";
 import {
   FeedTypeAmmPool,
-  FeedTypeOrder,
   TreasuryValidateTreasurySpending,
 } from "../../plutus";
 import {
@@ -425,7 +424,7 @@ test("example flow", async () => {
     )
       .filter((u) => !u.scriptRef)
       .filter((u) => {
-        const datum = T.Data.from(u.datum!, FeedTypeOrder._datum);
+        const datum = builder.fromDatumOrder(u.datum!);
         return datum.isCollected == false;
       }) as UTxO[];
     maxCount = maxCount ?? orderUtxos.length;
