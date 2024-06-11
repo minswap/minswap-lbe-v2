@@ -9,10 +9,10 @@ use aiken/transaction/credential.{Address, Inline, ScriptCredential}
 use aiken/transaction/value.{AssetName, PolicyId, Value}
 use lb_v2/treasury_validation.{validate_creating_treasury_out}
 use lb_v2/types.{
-  Asset, CloseTreasury, CollectManager, CollectOrders, CreateTreasury,
-  FactoryDatum, FactoryRedeemer, Initialization, ManageOrder, ManageSeller,
-  ManagerDatum, MintManager, MintOrder, MintRedeemOrders, MintSeller,
-  RedeemOrders, TreasuryDatum, UsingSeller, ValidatorHash,
+  AddSellers, Asset, BurnSeller, CloseTreasury, CollectManager, CollectOrders,
+  CollectSellers, CreateTreasury, FactoryDatum, FactoryRedeemer, Initialization,
+  ManageOrder, ManagerDatum, MintManager, MintOrder, MintRedeemOrders,
+  MintSeller, RedeemOrders, TreasuryDatum, UsingSeller, ValidatorHash,
 }
 use lb_v2/utils.{
   assert, compute_lp_asset_name, default_number_seller, factory_auth_an,
@@ -434,7 +434,15 @@ validator(
               factory_policy_id: factory_policy_id,
               manager_hash: manager_hash,
               redeemers: redeemers,
-              expected_redeemer: ManageSeller,
+              expected_redeemer: AddSellers,
+            )
+          BurnSeller ->
+            validation.has_spend_manager(
+              inputs: inputs,
+              factory_policy_id: factory_policy_id,
+              manager_hash: manager_hash,
+              redeemers: redeemers,
+              expected_redeemer: CollectSellers,
             )
           MintOrder ->
             assert(

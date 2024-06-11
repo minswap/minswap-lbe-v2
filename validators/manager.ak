@@ -6,8 +6,8 @@ use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value
 use lb_v2/manager_validation.{validate_manage_seller}
 use lb_v2/types.{
-  CollectManager, ManageSeller, ManagerDatum, ManagerRedeemer, SpendManager,
-  TreasuryDatum, ValidatorHash,
+  CollectManager, ManagerDatum, ManagerRedeemer, SpendManager, TreasuryDatum,
+  ValidatorHash,
 }
 use lb_v2/utils.{manager_auth_an}
 use lb_v2/validation
@@ -42,7 +42,21 @@ validator(
     let mint_value = value.from_minted_value(mint)
     let ManagerDatum { factory_policy_id, .. } = manager_in_datum
     when redeemer is {
-      ManageSeller -> {
+      // Collect Manager Transaction note:
+      //   1 Manager Token needs to be burned (trigger Factory Minting)
+      //   1 Manager Input needs to be spent
+      //   1 Treasury Input needs to be spent
+      //   1 Treasury Output needs to be paid
+      SpendManager ->
+        // Delegate validation logic to the Treasury Validator.
+        validation.has_spend_treasury(
+          inputs: inputs,
+          factory_policy_id: factory_policy_id,
+          treasury_hash: treasury_hash,
+          redeemers: redeemers,
+          expected_redeemer: CollectManager,
+        )
+      _ -> {
         expect Some(manager_input) =
           list.find(
             inputs,
@@ -74,13 +88,6 @@ validator(
           ..
         } = treasury_ref_input
         expect treasury_datum: TreasuryDatum = raw_treasury_datum
-        let TreasuryDatum { seller_hash, .. } = treasury_datum
-        let seller_inputs =
-          validation.get_seller_inputs(
-            inputs: inputs,
-            factory_policy_id: factory_policy_id,
-            seller_hash: seller_hash,
-          )
         expect and {
             value.quantity_of(
               manager_in_value,
@@ -103,29 +110,16 @@ validator(
           }
         validate_manage_seller(
           outputs: outputs,
+          inputs: inputs,
           factory_policy_id: factory_policy_id,
           manager_in_datum: manager_in_datum,
           manager_in_value: manager_in_value,
           validity_range: validity_range,
           mint_value: mint_value,
           treasury_datum: treasury_datum,
-          seller_inputs: seller_inputs,
+          redeemer: redeemer,
         )
       }
-      // Collect Manager Transaction note:
-      //   1 Manager Token needs to be burned (trigger Factory Minting)
-      //   1 Manager Input needs to be spent
-      //   1 Treasury Input needs to be spent
-      //   1 Treasury Output needs to be paid
-      SpendManager ->
-        // Delegate validation logic to the Treasury Validator.
-        validation.has_spend_treasury(
-          inputs: inputs,
-          factory_policy_id: factory_policy_id,
-          treasury_hash: treasury_hash,
-          redeemers: redeemers,
-          expected_redeemer: CollectManager,
-        )
     }
   }
 }
