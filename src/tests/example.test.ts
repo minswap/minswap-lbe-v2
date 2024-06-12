@@ -202,6 +202,9 @@ test("example flow", async () => {
     startTime: BigInt(t.utils.slotToUnixTime(discoveryStartSlot)),
     endTime: BigInt(t.utils.slotToUnixTime(discoveryEndSlot)),
     owner: address2PlutusAddress(ACCOUNT_0.address),
+    receiver: address2PlutusAddress(ACCOUNT_0.address),
+    receiverDatum: "NoDatum",
+    poolAllocation: 100n,
     minimumRaise: null,
     maximumRaise: null,
     reserveBase: 69000000000000n,
@@ -452,7 +455,6 @@ test("example flow", async () => {
   await collectingOrders(15);
   await collectingOrders(15);
   await collectingOrders(15);
-
   const creatingPool = async () => {
     const ammFactoryInput: UTxO = (
       await emulator.getUtxos(ammFactoryAddress)
@@ -467,8 +469,15 @@ test("example flow", async () => {
       treasuryUtxo.datum,
       TreasuryValidateTreasurySpending.treasuryInDatum,
     );
-    const reserveA = treasuryDatum.reserveBase;
-    const reserveB = treasuryDatum.reserveRaise + treasuryDatum.totalPenalty;
+    const reserveA =
+      (treasuryDatum.reserveBase * treasuryDatum.poolAllocation) / 100n;
+    const reserveB =
+      ((treasuryDatum.reserveRaise + treasuryDatum.totalPenalty) *
+        treasuryDatum.poolAllocation) /
+      100n;
+    const receiverA = treasuryDatum.reserveBase - reserveA;
+    const receiverB =
+      treasuryDatum.reserveRaise + treasuryDatum.totalPenalty - reserveB;
     const totalLiquidity = calculateInitialLiquidity(reserveA, reserveB);
     const poolDatum: FeedTypeAmmPool["_datum"] = {
       poolBatchingStakeCredential: {
@@ -500,6 +509,8 @@ test("example flow", async () => {
       validFrom: t.utils.slotToUnixTime(emulator.slot),
       validTo: t.utils.slotToUnixTime(emulator.slot + 100),
       totalLiquidity,
+      receiverA,
+      receiverB,
     };
     builder = new WarehouseBuilder(warehouseOptions);
     builder.buildCreateAmmPool(options);

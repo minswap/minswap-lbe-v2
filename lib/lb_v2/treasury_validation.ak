@@ -1,4 +1,4 @@
-use aiken/list
+use aiken/builtin
 use aiken/transaction.{InlineDatum, Output}
 use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
 use lb_v2/types.{Asset, PenaltyConfig, PoolDatum, TreasuryDatum, ValidatorHash}
@@ -33,6 +33,8 @@ pub fn validate_creating_treasury_out(
     raise_asset: t_raise_asset,
     start_time,
     end_time,
+    receiver_datum,
+    pool_allocation,
     minimum_order_raise,
     minimum_raise,
     maximum_raise,
@@ -65,6 +67,10 @@ pub fn validate_creating_treasury_out(
     t_raise_asset == raise_asset,
     start_time > end_valid_time_range,
     start_time < end_time,
+    //TODO: check datum length
+    builtin.length_of_bytearray(builtin.serialise_data(receiver_datum)) < 1_000_000,
+    pool_allocation >= 70,
+    pool_allocation <= 100,
     when minimum_order_raise is {
       Some(min_order) -> min_order > 0
       _ -> True
@@ -118,12 +124,15 @@ pub fn validate_create_dex_pool(
   mint_value: Value,
   amm_pool_datum: PoolDatum,
   factory_policy_id: PolicyId,
-  project_owner_outputs: List<Output>,
+  receiver_output: Output,
 ) -> Bool {
   let TreasuryDatum {
     collected_fund,
     base_asset,
     raise_asset,
+    receiver,
+    receiver_datum,
+    pool_allocation,
     minimum_raise,
     maximum_raise,
     reserve_base,
@@ -157,11 +166,13 @@ pub fn validate_create_dex_pool(
       },
     }
   let (asset_a, asset_b) = utils.sort_two_assets(base_asset, raise_asset)
-  let (datum_in_reserve_a, datum_in_reserve_b) =
+  let (lbe_reserve_a, lbe_reserve_b) =
     when asset_a == base_asset is {
       True -> (reserve_base, final_reserve_raise)
       False -> (final_reserve_raise, reserve_base)
     }
+  let datum_in_reserve_a = lbe_reserve_a * pool_allocation / 100
+  let datum_in_reserve_b = lbe_reserve_b * pool_allocation / 100
   let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
     asset_a
   let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
@@ -200,18 +211,24 @@ pub fn validate_create_dex_pool(
     ..
   } = treasury_output
   let total_lbe_lp = pool_total_liquidity - default_burn_liquidity
-  let expected_owner_lp_outputs = total_lbe_lp / 2
-  let treasury_lp_amount = total_lbe_lp - expected_owner_lp_outputs
+  let expected_receiver_lp_tokens =
+    total_lbe_lp * ( pool_allocation - 50 ) / pool_allocation
+  let treasury_lp_amount = total_lbe_lp - expected_receiver_lp_tokens
+  let expected_receiver_value =
+    utils.value_from_asset(asset_a, lbe_reserve_a - pool_reserve_a)
+      |> utils.value_add_asset(asset_b, lbe_reserve_b - pool_reserve_b)
+      |> value.add(
+          amm_authen_policy_id,
+          lp_asset_name,
+          expected_receiver_lp_tokens,
+        )
   expect treasury_out_datum: TreasuryDatum = treasury_out_datum_raw
-  let owner_lp_amount =
-    list.foldl(
-      project_owner_outputs,
-      0,
-      fn(output, acc) {
-        let Output { value, .. } = output
-        acc + value.quantity_of(value, amm_authen_policy_id, lp_asset_name)
-      },
-    )
+  let Output {
+    value: receiver_value,
+    datum: receiver_datum_out,
+    address: receiver_address_out,
+    ..
+  } = receiver_output
   and {
     treasury_out_value == (
       value.zero()
@@ -224,6 +241,13 @@ pub fn validate_create_dex_pool(
       ..treasury_in_datum,
       total_liquidity: treasury_lp_amount,
     },
-    owner_lp_amount == expected_owner_lp_outputs,
+    value.without_lovelace(expected_receiver_value) == value.without_lovelace(
+      receiver_value,
+    ),
+    value.lovelace_of(expected_receiver_value) <= value.lovelace_of(
+      receiver_value,
+    ),
+    receiver_datum_out == receiver_datum,
+    receiver_address_out == receiver,
   }
 }

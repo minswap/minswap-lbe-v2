@@ -51,6 +51,7 @@ import type {
   MintRedeemer,
   OrderDatum,
   OrderRedeemer,
+  OutputData,
   RewardAddress,
   SellerDatum,
   SellerRedeemer,
@@ -162,6 +163,8 @@ export type BuildCreateAmmPoolOptions = {
   validFrom: UnixTime;
   validTo: UnixTime;
   totalLiquidity: bigint;
+  receiverA: bigint;
+  receiverB: bigint;
 };
 
 export type BuildRedeemOrdersOptions = {
@@ -615,6 +618,8 @@ export class WarehouseBuilder {
       validFrom,
       validTo,
       totalLiquidity,
+      receiverA,
+      receiverB,
     } = options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
@@ -623,10 +628,13 @@ export class WarehouseBuilder {
         treasuryInDatum.reserveRaise + treasuryInDatum.totalPenalty,
       "Please collect all orders!",
     );
-    const projectOwnerLp = (totalLiquidity - LP_COLATERAL) / 2n;
+    const totalLbeLPs = totalLiquidity - LP_COLATERAL;
+    const receiverLP =
+      (totalLbeLPs * (treasuryInDatum.poolAllocation - 50n)) /
+      treasuryInDatum.poolAllocation;
     const treasuryOutDatum: TreasuryDatum = {
       ...treasuryInDatum,
-      totalLiquidity: totalLiquidity - LP_COLATERAL - projectOwnerLp,
+      totalLiquidity: totalLbeLPs - receiverLP,
     };
     this.tasks.push(
       () => {
@@ -636,6 +644,34 @@ export class WarehouseBuilder {
           treasuryInDatum.baseAsset,
           treasuryInDatum.raiseAsset,
         );
+      },
+      () => {
+        invariant(this.ammLpToken);
+        const projectOwner = plutusAddress2Address(
+          this.t.network,
+          treasuryInDatum.owner,
+        );
+        const receiverDatum = treasuryInDatum.receiverDatum;
+        const outData: OutputData =
+          receiverDatum === "NoDatum"
+            ? {}
+            : "DatumHash" in receiverDatum
+              ? { asHash: receiverDatum.DatumHash[0] }
+              : { inline: T.Data.to(receiverDatum.InlineDatum[0]) };
+        const assets: Assets = {
+          [this.ammLpToken]: receiverLP,
+        };
+        if (receiverA !== 0n) {
+          assets[
+            toUnit(ammPoolDatum.assetA.policyId, ammPoolDatum.assetA.assetName)
+          ] = receiverA;
+        }
+        if (receiverB !== 0n) {
+          assets[
+            toUnit(ammPoolDatum.assetB.policyId, ammPoolDatum.assetB.assetName)
+          ] = receiverB;
+        }
+        this.tx.payToAddressWithData(projectOwner, outData, assets);
       },
       () => {
         this.spendingTreasuryInput();
@@ -648,16 +684,6 @@ export class WarehouseBuilder {
       },
       () => {
         this.payingTreasuryOutput({ treasuryOutDatum });
-      },
-      () => {
-        invariant(this.ammLpToken);
-        const projectOwner = plutusAddress2Address(
-          this.t.network,
-          treasuryInDatum.owner,
-        );
-        this.tx.payToAddress(projectOwner, {
-          [this.ammLpToken]: projectOwnerLp,
-        });
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);

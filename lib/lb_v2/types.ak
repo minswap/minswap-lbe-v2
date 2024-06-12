@@ -1,5 +1,6 @@
 use aiken/dict.{Dict}
 use aiken/hash.{Blake2b_224, Blake2b_256, Hash}
+use aiken/transaction.{Datum}
 use aiken/transaction/credential.{
   Address, Script, StakeCredential, VerificationKey,
 }
@@ -66,6 +67,9 @@ pub type TreasuryDatum {
   end_time: Int,
   // Project Owner Address
   owner: Address,
+  receiver: Address,
+  receiver_datum: Datum,
+  pool_allocation: Int,
   // Minimum amount in a order.
   minimum_order_raise: Option<Int>,
   // The minimum amount expected to raise.
