@@ -197,7 +197,7 @@ test("using-seller | PASS | update orders: success", async () => {
   await tx.complete();
 });
 
-test("using-seller | PASS | concu create orders: success", async () => {
+test("using-seller | PASS | create orders: success", async () => {
   const { builder, options } = warehouse;
   builder.buildUsingSeller({ ...options, orderInputs: [] });
   assertValidator(builder, "");

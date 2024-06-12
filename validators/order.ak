@@ -2,7 +2,8 @@ use aiken/dict
 use aiken/transaction.{ScriptContext, Spend, Transaction}
 use aiken/transaction/credential.{Inline, ScriptCredential}
 use lb_v2/types.{
-  OrderDatum, OrderRedeemer, UpdateOrder, UsingSeller, ValidatorHash,
+  CollectOrder, OrderDatum, OrderRedeemer, RedeemOrder, UpdateOrder, UsingSeller,
+  ValidatorHash,
 }
 use lb_v2/utils.{assert}
 use lb_v2/validation
@@ -33,7 +34,10 @@ validator(
           ),
           @"Using-seller: Tx don't have any seller",
         )
-      _ ->
+      CollectOrder ->
+        // Delegate Logic of CollectOrder and RedeemOrder to Factory Withdrawal
+        dict.has_key(withdrawals, Inline(ScriptCredential(factory_policy_id)))
+      RedeemOrder ->
         // Delegate Logic of CollectOrder and RedeemOrder to Factory Withdrawal
         dict.has_key(withdrawals, Inline(ScriptCredential(factory_policy_id)))
     }

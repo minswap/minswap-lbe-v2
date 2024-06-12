@@ -30,6 +30,7 @@ pub type FactoryRedeemer {
   CloseTreasury { base_asset: Asset, raise_asset: Asset }
   MintManager
   MintSeller
+  BurnSeller
   MintOrder
   MintRedeemOrders
   // Withdrawal 
@@ -43,31 +44,51 @@ pub type PenaltyConfig {
 
 pub type TreasuryDatum {
   // Protocol Info
+  // ValidatorHash of Factory Validator 
   factory_policy_id: PolicyId,
+  // ValidatorHash of Manager Validator
   manager_hash: ValidatorHash,
+  // ValidatorHash of Seller Validator
   seller_hash: ValidatorHash,
+  // ValidatorHash of Order Validator
   order_hash: ValidatorHash,
-  // increase when collect orders, descrease when collect LP or refund
+  // Total fund accumulate by collecting orders (amount, penalty).
+  // It increases when collect orders, descreases when redeem LP or refund
   collected_fund: Int,
-  // LBE details
+  // LBE Parameters
+  // Asset aims to list
   base_asset: Asset,
+  // Asset aims to raise
   raise_asset: Asset,
+  // The start time of discovery phase
   start_time: Int,
+  // The end time of discovery phase
   end_time: Int,
+  // Project Owner Address
   owner: Address,
+  // Minimum amount in a order.
   minimum_order_raise: Option<Int>,
+  // The minimum amount expected to raise.
+  // If raised amount less than this threshold, the LBE will be cancelled.
   minimum_raise: Option<Int>,
-  // added when collect manager once, descrease when refund
+  // The maximum amount expected to raise.
+  // If raised amount exceed this threadhold, \
+  //   the excess amount should be returned to the users.
   maximum_raise: Option<Int>,
+  // Amont of Base Asset use to create Pool.
   reserve_base: Int,
-  reserve_raise: Int,
-  total_liquidity: Int,
   penalty_config: Option<PenaltyConfig>,
-  // added when collect manager once, descrease when refund
+  // Indicates whether project's owner can cancel LBE during discovery phase.
+  revocable: Bool,
+  // Total Order Amount. Increasing when collect orders.
+  reserve_raise: Int,
+  // Total Order's penalty amount. Increasing when collect orders.
   total_penalty: Int,
-  // is this LBE cancelled in discovery phase
-  is_cancelable: Bool,
+  // Amount LP Tokens will distribute to users.
+  total_liquidity: Int,
+  // Indicates whether the LBE has cancelled.
   is_cancelled: Bool,
+  // Indicates whether the manager has collected  
   is_manager_collected: Bool,
 }
 
@@ -79,22 +100,18 @@ pub type CancelReason {
 
 pub type TreasuryRedeemer {
   // collect manager to update reserve_raise and total_penalty
-  // or collect when cancelled
   CollectManager
-  // collect fund from orders
+  // collect amount, penalty_amount from orders
   CollectOrders
-  // create pool
+  // Create AMM Pool
   CreateAmmPool
-  // redeem LP or refund if cancel
+  // redeem LP Tokens or refund if cancel
   RedeemOrders
-  // Close event after refund by cancel or close LBE before discovery phase
+  // Close event when LBE is cancelled and finished couting, refund.
   CloseEvent
-  // change status to cancel 
-  // If Not enough fund 
-  //    or pool created 
-  // =>next step: CollectManager -> RedeemOrders(refund)
+  // Cancel the LBE base on reason
   CancelLBE { reason: CancelReason }
-  // update LBE before discovery phase
+  // update LBE Parameters before discovery phase
   UpdateLBE
 }
 
@@ -108,40 +125,56 @@ pub type ManagerDatum {
 }
 
 pub type ManagerRedeemer {
-  // ManageSeller = AddSeller | CollectSeller 
-  // depend the time range
-  //    - AddSeller before end discovery
-  //    - CollectSeller after end discovery
-  ManageSeller
+  AddSellers
+  CollectSellers
   SpendManager
 }
 
 pub type SellerDatum {
+  // ValidatorHash of Factory Validator
   factory_policy_id: PolicyId,
+  // Asset aims to list
   base_asset: Asset,
+  // Asset aims to raise
   raise_asset: Asset,
+  // Total amount this seller manage. It can be negative
   amount: Int,
+  // Total penalty amount this seller manage. It can be negative
   penalty_amount: Int,
 }
 
 pub type SellerRedeemer {
+  // use a seller for create | update orders
   UsingSeller
+  // Collect Seller UTxOs
   CountingSeller
 }
 
 pub type OrderDatum {
+  // ValidatorHash of Factory Validator
   factory_policy_id: PolicyId,
+  // Asset aims to list
   base_asset: Asset,
+  // Asset aims to raise
   raise_asset: Asset,
+  // Update order require owner authorize 
+  // System will redeem | refund to owner address
   owner: Address,
+  // Amount of Raise Asset
   amount: Int,
+  // Default is False. Become True after Order is collected by Treasury
   is_collected: Bool,
+  // Amout of Raise Asset being penalty.
+  // Default is zero.
   penalty_amount: Int,
 }
 
 pub type OrderRedeemer {
+  // Update Order Amount 
   UpdateOrder
+  // Feed Type
   CollectOrder
+  // Feed Type
   RedeemOrder
 }
 

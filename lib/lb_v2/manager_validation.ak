@@ -2,7 +2,10 @@ use aiken/list
 use aiken/transaction.{InlineDatum, Input, Output, ValidityRange}
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId, Value}
-use lb_v2/types.{Asset, ManagerDatum, SellerDatum, TreasuryDatum}
+use lb_v2/types.{
+  AddSellers, Asset, CollectSellers, ManagerDatum, ManagerRedeemer, SellerDatum,
+  TreasuryDatum,
+}
 use lb_v2/utils.{assert, must_get_start_end_validity, seller_auth_an}
 use lb_v2/validation.{build_default_seller_output}
 
@@ -22,13 +25,14 @@ use lb_v2/validation.{build_default_seller_output}
 //  + Spending Seller Inputs correctly!
 pub fn validate_manage_seller(
   outputs: List<Output>,
+  inputs: List<Input>,
   factory_policy_id: PolicyId,
   manager_in_datum: ManagerDatum,
   manager_in_value: Value,
   validity_range: ValidityRange,
   mint_value: Value,
   treasury_datum: TreasuryDatum,
-  seller_inputs: List<Input>,
+  redeemer: ManagerRedeemer,
 ) -> Bool {
   let (start_valid_time_range, end_valid_time_range) =
     must_get_start_end_validity(validity_range)
@@ -72,71 +76,77 @@ pub fn validate_manage_seller(
       manager_out_value == manager_in_value,
       manager_out_rs == None,
     }
-  if and {
-    end_valid_time_range < end_time,
-    is_cancelled == False,
-  } {
-    // Validate Add Sellers
-    let default_seller_output =
-      build_default_seller_output(
-        factory_policy_id: factory_policy_id,
-        base_asset: base_asset,
-        raise_asset: raise_asset,
-        seller_hash: seller_hash,
-      )
-    // Paying Seller Outputs correctly!
-    let seller_outputs =
-      list.filter(outputs, fn(output) { output == default_seller_output })
-    let seller_output_length = list.length(seller_outputs)
-    and {
-      // Mint should be correctly!
-      mint_value == value.from_asset(
-        factory_policy_id,
-        seller_auth_an,
-        seller_output_length,
-      ),
-      // No Seller Inputs
-      seller_inputs == [],
-      // Paying Manager Output correctly!
-      manager_out_datum == ManagerDatum {
-        ..manager_in_datum,
-        seller_count: seller_count + seller_output_length,
-      },
-    }
-  } else if or {
-    start_valid_time_range > end_time,
-    is_cancelled == True,
-  } {
-    // Validate collect sellers
-    let seller_input_count = list.length(seller_inputs)
-    let (total_reserve_raise, total_penalty_input) =
-      apply_collect_sellers(
-        seller_inputs: seller_inputs,
-        base_asset: base_asset,
-        raise_asset: raise_asset,
-        acc_raise: 0,
-        acc_penalty: 0,
-      )
-    and {
-      // Mint should be correctly!
-      mint_value == value.from_asset(
-        factory_policy_id,
-        seller_auth_an,
-        -seller_input_count,
-      ),
-      // Paying Manager Output correctly!
-      assert(
+  when redeemer is {
+    AddSellers -> {
+      // Validate Add Sellers
+      let default_seller_output =
+        build_default_seller_output(
+          factory_policy_id: factory_policy_id,
+          base_asset: base_asset,
+          raise_asset: raise_asset,
+          seller_hash: seller_hash,
+        )
+      // Paying Seller Outputs correctly!
+      let seller_outputs =
+        list.filter(outputs, fn(output) { output == default_seller_output })
+      let seller_output_length = list.length(seller_outputs)
+      and {
+        end_valid_time_range < end_time,
+        is_cancelled == False,
+        // Mint should be correctly!
+        mint_value == value.from_asset(
+          factory_policy_id,
+          seller_auth_an,
+          seller_output_length,
+        ),
+        // Paying Manager Output correctly!
         manager_out_datum == ManagerDatum {
           ..manager_in_datum,
-          seller_count: seller_count - seller_input_count,
-          reserve_raise: reserve_raise + total_reserve_raise,
-          total_penalty: total_penalty + total_penalty_input,
+          seller_count: seller_count + seller_output_length,
         },
-        @"Collect sellers: Invalid manager datum",
-      ),
+      }
     }
-  } else {
-    fail @"Unable to determine action"
+    CollectSellers -> {
+      let seller_inputs =
+        validation.get_seller_inputs(
+          inputs: inputs,
+          factory_policy_id: factory_policy_id,
+          seller_hash: seller_hash,
+        )
+      // Validate collect sellers
+      let seller_input_count = list.length(seller_inputs)
+      let (total_reserve_raise, total_penalty_input) =
+        apply_collect_sellers(
+          seller_inputs: seller_inputs,
+          base_asset: base_asset,
+          raise_asset: raise_asset,
+          acc_raise: 0,
+          acc_penalty: 0,
+        )
+      and {
+        or {
+          start_valid_time_range > end_time,
+          is_cancelled == True,
+        },
+        // Mint should be correctly!
+        mint_value == value.from_asset(
+          factory_policy_id,
+          seller_auth_an,
+          -seller_input_count,
+        ),
+        // Paying Manager Output correctly!
+        assert(
+          manager_out_datum == ManagerDatum {
+            ..manager_in_datum,
+            seller_count: seller_count - seller_input_count,
+            reserve_raise: reserve_raise + total_reserve_raise,
+            total_penalty: total_penalty + total_penalty_input,
+          },
+          @"Collect sellers: Invalid manager datum",
+        ),
+      }
+    }
+    _ -> False
   }
 }
 

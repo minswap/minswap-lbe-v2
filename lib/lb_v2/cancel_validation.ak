@@ -79,7 +79,7 @@ fn cancel_by_not_reach_minimum_raise(treasury_datum: TreasuryDatum) -> Bool {
 
 // Before discovery phase start:
 //  - Project Owner can cancel LBE if need.
-// After discovery phase start and `is_cancelable` truthy:
+// After discovery phase start and `revocable` truthy:
 //  - Project Owner can cancel LBE before discovery phase ended.
 fn cancel_by_owner(
   treasury_datum: TreasuryDatum,
@@ -87,12 +87,12 @@ fn cancel_by_owner(
   inputs: List<Input>,
   extra_signatories: List<PubKeyHash>,
 ) -> Bool {
-  let TreasuryDatum { is_cancelable, start_time, end_time, owner, .. } =
+  let TreasuryDatum { revocable, start_time, end_time, owner, .. } =
     treasury_datum
   let Address { payment_credential: owner_payment_credential, .. } = owner
   // get last time project owner can make cancel
   let last_time =
-    when is_cancelable is {
+    when revocable is {
       True -> start_time
       False -> end_time
     }
