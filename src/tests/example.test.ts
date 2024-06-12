@@ -467,8 +467,8 @@ test("example flow", async () => {
       treasuryUtxo.datum,
       TreasuryValidateTreasurySpending.treasuryInDatum,
     );
-    const reserveA = treasuryDatum.reserveBase;
-    const reserveB = treasuryDatum.reserveRaise + treasuryDatum.totalPenalty;
+    const reserveB = treasuryDatum.reserveBase;
+    const reserveA = treasuryDatum.reserveRaise + treasuryDatum.totalPenalty;
     const totalLiquidity = calculateInitialLiquidity(reserveA, reserveB);
     const poolDatum: FeedTypeAmmPool["_datum"] = {
       poolBatchingStakeCredential: {
@@ -485,8 +485,8 @@ test("example flow", async () => {
       assetA: treasuryDatum.raiseAsset,
       assetB: treasuryDatum.baseAsset,
       totalLiquidity: totalLiquidity,
-      reserveA: reserveB,
-      reserveB: reserveA,
+      reserveA: reserveA,
+      reserveB: reserveB,
       baseFeeANumerator: 30n,
       baseFeeBNumerator: 30n,
       feeSharingNumeratorOpt: null,
