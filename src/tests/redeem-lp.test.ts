@@ -89,7 +89,7 @@ async function genTestWarehouse() {
     },
   ];
   const orderInputUTxOs = orderInDatums.map((datum) =>
-    genOrderUTxO(datum, builder)
+    genOrderUTxO(datum, builder),
   );
   const owner = plutusAddress2Address(t.network, treasuryDatum.owner);
   const options: BuildRedeemOrdersOptions = {
