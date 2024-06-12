@@ -208,13 +208,3 @@ pub fn must_get_start_validity(validity_range: ValidityRange) -> Int {
   } = validity_range
   start
 }
-
-pub fn value_add_asset(self: Value, asset: Asset, quantity: Int) -> Value {
-  let Asset(pid, tn) = asset
-  value.add(self, pid, tn, quantity)
-}
-
-pub fn value_from_asset(asset: Asset, quantity: Int) -> Value {
-  let Asset(pid, tn) = asset
-  value.from_asset(pid, tn, quantity)
-}

@@ -214,9 +214,11 @@ pub fn validate_create_dex_pool(
   let expected_receiver_lp_tokens =
     total_lbe_lp * ( pool_allocation - 50 ) / pool_allocation
   let treasury_lp_amount = total_lbe_lp - expected_receiver_lp_tokens
+  let Asset(asset_a_pid, asset_a_tn) = asset_a
+  let Asset(asset_b_pid, asset_b_tn) = asset_b
   let expected_receiver_value =
-    utils.value_from_asset(asset_a, lbe_reserve_a - pool_reserve_a)
-      |> utils.value_add_asset(asset_b, lbe_reserve_b - pool_reserve_b)
+    value.from_asset(asset_a_pid, asset_a_tn, lbe_reserve_a - pool_reserve_a)
+      |> value.add(asset_b_pid, asset_b_tn, lbe_reserve_b - pool_reserve_b)
       |> value.add(
           amm_authen_policy_id,
           lp_asset_name,
