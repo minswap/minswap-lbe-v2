@@ -1,10 +1,12 @@
 use aiken/dict.{Dict}
 use aiken/hash.{Blake2b_224, Blake2b_256, Hash}
-use aiken/transaction.{Datum}
 use aiken/transaction/credential.{
   Address, Script, StakeCredential, VerificationKey,
 }
 use aiken/transaction/value.{AssetName, PolicyId}
+
+pub type CustomDatumHash =
+  Hash<Blake2b_256, Data>
 
 pub type ValidatorHash =
   Hash<Blake2b_224, Script>
@@ -67,8 +69,10 @@ pub type TreasuryDatum {
   end_time: Int,
   // Project Owner Address
   owner: Address,
+  // Address for receiving the project's LP tokens.
   receiver: Address,
-  receiver_datum: Datum,
+  // The Datum Hash of the project's output
+  receiver_datum_hash: Option<CustomDatumHash>,
   pool_allocation: Int,
   // Minimum amount in a order.
   minimum_order_raise: Option<Int>,

@@ -56,17 +56,15 @@ validator(
     redeemer: FactoryRedeemer,
     context: ScriptContext,
   ) {
-    expect ScriptContext {
-      transaction: Transaction {
-        inputs,
-        mint,
-        outputs,
-        extra_signatories,
-        validity_range,
-        ..
-      },
-      purpose: Spend(factory_ref),
-    } = context
+    expect ScriptContext { transaction, purpose: Spend(factory_ref) } = context
+    let Transaction {
+      inputs,
+      mint,
+      outputs,
+      extra_signatories,
+      validity_range,
+      ..
+    } = transaction
     // find own's input to get `factory_hash`
     expect Some(Input {
       output: Output {
@@ -134,6 +132,7 @@ validator(
       )
     when redeemer is {
       CreateTreasury { .. } -> {
+        let Transaction { datums, .. } = transaction
         // finding exactly 1 Factory Input
         expect [factory_input] = factory_inputs
         // finding exactly 2 Factory Outputs
@@ -242,6 +241,7 @@ validator(
               order_hash: order_hash,
               factory_policy_id: factory_hash,
               end_valid_time_range: end_valid_time_range,
+              datums: datums,
             ),
             @"Treasury Output must pay correctly!",
           ),

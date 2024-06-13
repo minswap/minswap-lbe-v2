@@ -1,10 +1,16 @@
 use aiken/builtin
-use aiken/transaction.{InlineDatum, NoDatum, Output}
+use aiken/dict
+use aiken/hash
+use aiken/transaction.{InlineDatum, Output}
 use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
-use lb_v2/types.{Asset, PenaltyConfig, PoolDatum, TreasuryDatum, ValidatorHash}
+use lb_v2/types.{
+  Asset, CustomDatumHash, DatumMap, PenaltyConfig, PoolDatum, TreasuryDatum,
+  ValidatorHash,
+}
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
-  default_burn_liquidity, treasury_auth_an, treasury_minimum_ada, two_day_ms,
+  create_pool_comission, default_burn_liquidity, treasury_auth_an,
+  treasury_minimum_ada, two_day_ms,
 }
 
 pub fn validate_creating_treasury_out(
@@ -16,6 +22,7 @@ pub fn validate_creating_treasury_out(
   order_hash: ValidatorHash,
   factory_policy_id: PolicyId,
   end_valid_time_range: Int,
+  datums: DatumMap,
 ) -> Bool {
   expect Output {
     value: treasury_out_value,
@@ -33,7 +40,7 @@ pub fn validate_creating_treasury_out(
     raise_asset: t_raise_asset,
     start_time,
     end_time,
-    receiver_datum,
+    receiver_datum_hash,
     pool_allocation,
     minimum_order_raise,
     minimum_raise,
@@ -53,7 +60,11 @@ pub fn validate_creating_treasury_out(
     value.zero()
       |> value.add(factory_policy_id, treasury_auth_an, 1)
       |> value.add(base_asset_pid, base_asset_an, reserve_base)
-      |> value.add(ada_policy_id, ada_asset_name, treasury_minimum_ada)
+      |> value.add(
+          ada_policy_id,
+          ada_asset_name,
+          treasury_minimum_ada + create_pool_comission,
+        )
   and {
     // treasury datum
     base_asset != raise_asset,
@@ -67,8 +78,12 @@ pub fn validate_creating_treasury_out(
     t_raise_asset == raise_asset,
     start_time > end_valid_time_range,
     start_time < end_time,
-    //TODO: check datum length
-    builtin.length_of_bytearray(builtin.serialise_data(receiver_datum)) < 1_000_000,
+    // Make sure that datum with datum_hash has appeared on the blockchain, \
+    // later we can use methods such as db_sync, kupo to rebuild the datum.
+    when receiver_datum_hash is {
+      Some(datum_hash) -> dict.has_key(datums, datum_hash)
+      _ -> True
+    },
     pool_allocation >= 70,
     pool_allocation <= 100,
     when minimum_order_raise is {
@@ -131,7 +146,7 @@ pub fn validate_create_dex_pool(
     base_asset,
     raise_asset,
     receiver,
-    receiver_datum,
+    receiver_datum_hash,
     pool_allocation,
     minimum_raise,
     maximum_raise,
@@ -227,7 +242,7 @@ pub fn validate_create_dex_pool(
   expect treasury_out_datum: TreasuryDatum = treasury_out_datum_raw
   let Output {
     value: receiver_value,
-    datum: receiver_datum_out,
+    datum: receiver_datum,
     address: receiver_address_out,
     ..
   } = receiver_output
@@ -242,7 +257,6 @@ pub fn validate_create_dex_pool(
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
       total_liquidity: treasury_lp_amount,
-      receiver_datum: NoDatum,
     },
     value.without_lovelace(expected_receiver_value) == value.without_lovelace(
       receiver_value,
@@ -250,7 +264,17 @@ pub fn validate_create_dex_pool(
     value.lovelace_of(expected_receiver_value) <= value.lovelace_of(
       receiver_value,
     ),
-    receiver_datum_out == receiver_datum,
+    when receiver_datum_hash is {
+      Some(datum_hash) -> {
+        expect InlineDatum(receiver_datum_raw) = receiver_datum
+        let out_datum_hash: CustomDatumHash =
+          receiver_datum_raw
+            |> builtin.serialise_data
+            |> hash.blake2b_256
+        out_datum_hash == datum_hash
+      }
+      _ -> True
+    },
     receiver_address_out == receiver,
   }
 }

@@ -20,3 +20,4 @@ export const MANAGER_MIN_ADA = 2_000_000n;
 export const SELLER_MIN_ADA = 2_000_000n;
 export const ORDER_MIN_ADA = 2_000_000n;
 export const MAX_PENALTY_RATE = 25n;
+export const CREATE_POOL_COMMISION = 8_000_000n;

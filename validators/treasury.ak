@@ -111,6 +111,7 @@ validator {
             factory_policy_id,
             treasury_hash,
           )
+        let Transaction { datums, .. } = transaction
         and {
           // before discovery phase
           end_valid_time_range < start_time,
@@ -132,6 +133,7 @@ validator {
             order_hash: order_hash,
             factory_policy_id: factory_policy_id,
             end_valid_time_range: end_valid_time_range,
+            datums: datums,
           ),
           // mint nothing
           mint_value == value.zero(),
