@@ -108,6 +108,8 @@ async function genTestWarehouse() {
     validFrom: Number(treasuryDatum.endTime + 1000n),
     validTo: Number(treasuryDatum.endTime + 1100n),
     totalLiquidity: totalLiquidity,
+    receiverA: 0n,
+    receiverB: 0n,
   };
   return {
     builder,
@@ -140,7 +142,7 @@ test("Create AMM Pool | PASS | Happy case", async () => {
 });
 
 async function buildTxWithStupidTreasuryDatum(
-  treasuryDatum: TreasuryDatum,
+  treasuryDatum: TreasuryDatum
 ): Promise<void> {
   const { options, builder } = warehouse;
   const { collectedFund, baseAsset } = treasuryDatum;
@@ -208,7 +210,7 @@ test("Create AMM Pool | FAIL | Invalid Treasury out value", async () => {
       };
       const raiseAsset = toUnit(
         treasuryOutDatum.raiseAsset.policyId,
-        treasuryOutDatum.raiseAsset.assetName,
+        treasuryOutDatum.raiseAsset.assetName
       );
       assets[raiseAsset] =
         (assets[raiseAsset] ?? 0n) +
@@ -221,7 +223,7 @@ test("Create AMM Pool | FAIL | Invalid Treasury out value", async () => {
       {
         inline: builder.toDatumTreasury(treasuryOutDatum),
       },
-      createPoolAssets(),
+      createPoolAssets()
     );
   };
   assertValidatorFail(builder);
@@ -234,7 +236,7 @@ test("Create AMM Pool | FAIL | Invalid Treasury out value", async () => {
     invariant(builder.ammLpToken);
     const projectOwner = plutusAddress2Address(
       builder.t.network,
-      treasuryDatum.owner,
+      treasuryDatum.owner
     );
     builder.tx.payToAddress(projectOwner, {
       [builder.ammLpToken]: projectOwnerLp - 1n,
