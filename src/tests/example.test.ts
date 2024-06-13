@@ -469,15 +469,15 @@ test("example flow", async () => {
       treasuryUtxo.datum,
       TreasuryValidateTreasurySpending.treasuryInDatum,
     );
-    const reserveA =
-      (treasuryDatum.reserveBase * treasuryDatum.poolAllocation) / 100n;
     const reserveB =
+      (treasuryDatum.reserveBase * treasuryDatum.poolAllocation) / 100n;
+    const reserveA =
       ((treasuryDatum.reserveRaise + treasuryDatum.totalPenalty) *
         treasuryDatum.poolAllocation) /
       100n;
-    const receiverA = treasuryDatum.reserveBase - reserveA;
-    const receiverB =
-      treasuryDatum.reserveRaise + treasuryDatum.totalPenalty - reserveB;
+    const receiverB = treasuryDatum.reserveBase - reserveB;
+    const receiverA =
+      treasuryDatum.reserveRaise + treasuryDatum.totalPenalty - reserveA;
     const totalLiquidity = calculateInitialLiquidity(reserveA, reserveB);
     const poolDatum: FeedTypeAmmPool["_datum"] = {
       poolBatchingStakeCredential: {
