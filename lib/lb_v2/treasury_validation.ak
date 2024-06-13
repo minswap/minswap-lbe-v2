@@ -40,6 +40,7 @@ pub fn validate_creating_treasury_out(
     reserve_raise,
     total_liquidity,
     penalty_config,
+    pool_base_fee,
     total_penalty,
     is_cancelled,
     is_manager_collected,
@@ -96,6 +97,8 @@ pub fn validate_creating_treasury_out(
         }
       _ -> True
     },
+    5 <= pool_base_fee,
+    pool_base_fee <= 2000,
     total_penalty == 0,
     is_cancelled == False,
     is_manager_collected == False,
@@ -131,6 +134,7 @@ pub fn validate_create_dex_pool(
     total_penalty,
     is_cancelled,
     is_manager_collected,
+    pool_base_fee,
     ..
   } = treasury_in_datum
   let final_reserve_raise =
@@ -171,6 +175,7 @@ pub fn validate_create_dex_pool(
     asset_b: pool_asset_b,
     reserve_a: pool_reserve_a,
     reserve_b: pool_reserve_b,
+    base_fee_a_numerator,
     total_liquidity: pool_total_liquidity,
     ..
   } = amm_pool_datum
@@ -193,6 +198,7 @@ pub fn validate_create_dex_pool(
       asset_b == pool_asset_b,
       datum_in_reserve_a == pool_reserve_a,
       datum_in_reserve_b == pool_reserve_b,
+      pool_base_fee == base_fee_a_numerator,
     }
   expect Output {
     value: treasury_out_value,

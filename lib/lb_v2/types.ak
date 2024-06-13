@@ -78,6 +78,7 @@ pub type TreasuryDatum {
   // Amont of Base Asset use to create Pool.
   reserve_base: Int,
   penalty_config: Option<PenaltyConfig>,
+  pool_base_fee: Int,
   // Indicates whether project's owner can cancel LBE during discovery phase.
   revocable: Bool,
   // Total Order Amount. Increasing when collect orders.

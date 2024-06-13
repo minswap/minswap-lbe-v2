@@ -37,6 +37,13 @@ pub const amm_pool_validation_hash =
 
 pub const default_burn_liquidity = 10
 
+// Base Fee constraint
+// Max 20%
+pub const max_base_fee_numerator = 2000
+
+// Min 0.05%
+pub const min_base_fee_numerator = 5
+
 /// *******************************************
 pub const fee_ada = 1_000_000
 
