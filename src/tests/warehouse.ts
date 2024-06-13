@@ -131,15 +131,23 @@ export const genWarehouse = async () => {
 
   let ammPoolDatum: AmmPoolDatum = {
     poolBatchingStakeCredential: {
-      Inline: [{ ScriptCredential: [builder.ammPoolHash] }],
+      Inline: [
+        {
+          ScriptCredential: [
+            t.utils.validatorToScriptHash(
+              builder.ammValidators.poolBatchingValidator,
+            ),
+          ],
+        },
+      ],
     },
     assetA: adaToken,
     assetB: minswapToken,
     totalLiquidity: 0n,
     reserveA: 0n,
     reserveB: 0n,
-    baseFeeANumerator: 0n,
-    baseFeeBNumerator: 0n,
+    baseFeeANumerator: 30n,
+    baseFeeBNumerator: 30n,
     feeSharingNumeratorOpt: null,
     allowDynamicFee: false,
   };
@@ -173,5 +181,6 @@ export const genWarehouse = async () => {
     defaultOrderDatum,
     ammPoolInput,
     findTreasuryInput,
+    ammPoolDatum,
   };
 };
