@@ -66,6 +66,7 @@ let raiseAsset: {
   assetName: string;
 };
 let ammFactoryAddress: string;
+let extraDatum: string;
 
 beforeEach(async () => {
   await T.loadModule();
@@ -188,6 +189,8 @@ test("example flow", async () => {
   // create treasury
   const discoveryStartSlot = emulator.slot + 60 * 60;
   const discoveryEndSlot = discoveryStartSlot + 60 * 60 * 24 * 2; // 2 days
+  extraDatum = builder.toDatumFactory({ head: "00", tail: "ff" }); // dummy
+  let extraDatumHash = t.utils.datumToHash(extraDatum);
   const treasuryDatum: TreasuryDatum = {
     factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
     sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
@@ -203,9 +206,7 @@ test("example flow", async () => {
     endTime: BigInt(t.utils.slotToUnixTime(discoveryEndSlot)),
     owner: address2PlutusAddress(ACCOUNT_0.address),
     receiver: address2PlutusAddress(ACCOUNT_0.address),
-    receiverDatum: {
-      InlineDatum: [new T.Constr(0, ["0".repeat(100)])],
-    },
+    receiverDatumHash: extraDatumHash,
     poolAllocation: 100n,
     minimumRaise: null,
     maximumRaise: null,
@@ -231,6 +232,7 @@ test("example flow", async () => {
     treasuryDatum,
     validFrom: t.utils.slotToUnixTime(emulator.slot),
     validTo: t.utils.slotToUnixTime(emulator.slot + 60),
+    extraDatum,
   });
   const createTreasuryTx = await quickSubmitBuilder(emulator)({
     txBuilder: builder.complete(),
@@ -514,6 +516,7 @@ test("example flow", async () => {
       totalLiquidity,
       receiverA,
       receiverB,
+      extraDatum,
     };
     builder = new WarehouseBuilder(warehouseOptions);
     builder.buildCreateAmmPool(options);

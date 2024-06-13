@@ -6,7 +6,7 @@ import {
   MAX_PENALTY_RATE,
   TREASURY_MIN_ADA,
 } from "../constants";
-import type { Assets, UTxO } from "../types";
+import type { Assets, TreasuryDatum, UTxO } from "../types";
 import { assertValidator, assertValidatorFail, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
 
@@ -79,6 +79,28 @@ test("create-treasury | PASS | Penalty Config", async () => {
     percent: MAX_PENALTY_RATE,
   };
   assertValidator(remixTreasuryDatum({ penaltyConfig }), "");
+});
+
+test("create-treasury | PASS | concu Receiver Datum Hash", async () => {
+  let { defaultTreasuryDatum, options } = W;
+  let builder: WarehouseBuilder = W.builder;
+  let extraDatum = builder.toDatumFactory({ head: "00", tail: "ff" });
+  let extraDatumHash = builder.t.utils.datumToHash(extraDatum);
+  let treasuryDatum: TreasuryDatum = {
+    ...defaultTreasuryDatum,
+    receiverDatumHash: extraDatumHash,
+  };
+  options = {
+    ...options,
+    treasuryDatum,
+    extraDatum,
+  };
+  builder = builder.buildCreateTreasury(options);
+  assertValidator(builder, "");
+  // let tx = builder.complete();
+  // let finalTx = await tx.complete();
+  // let a = finalTx.txComplete.to_json();
+  // console.log(a);
 });
 
 test("create-treasury | FAIL | missing Factory Token", async () => {

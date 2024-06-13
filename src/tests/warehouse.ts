@@ -90,7 +90,7 @@ export const genWarehouse = async () => {
     endTime: BigInt(t.utils.slotToUnixTime(emulator.slot + 60 * 60 * 24 * 5)),
     owner: address2PlutusAddress(ACCOUNT_0.address),
     receiver: address2PlutusAddress(ACCOUNT_0.address),
-    receiverDatum: "NoDatum",
+    receiverDatumHash: null,
     poolAllocation: 100n,
     minimumRaise: null,
     maximumRaise: null,
