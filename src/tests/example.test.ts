@@ -203,7 +203,9 @@ test("example flow", async () => {
     endTime: BigInt(t.utils.slotToUnixTime(discoveryEndSlot)),
     owner: address2PlutusAddress(ACCOUNT_0.address),
     receiver: address2PlutusAddress(ACCOUNT_0.address),
-    receiverDatum: "NoDatum",
+    receiverDatum: {
+      InlineDatum: [new T.Constr(0, ["0".repeat(100)])],
+    },
     poolAllocation: 100n,
     minimumRaise: null,
     maximumRaise: null,
