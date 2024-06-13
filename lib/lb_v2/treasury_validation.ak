@@ -1,5 +1,5 @@
 use aiken/builtin
-use aiken/transaction.{InlineDatum, Output}
+use aiken/transaction.{InlineDatum, NoDatum, Output}
 use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
 use lb_v2/types.{Asset, PenaltyConfig, PoolDatum, TreasuryDatum, ValidatorHash}
 use lb_v2/utils.{
@@ -242,6 +242,7 @@ pub fn validate_create_dex_pool(
     treasury_out_datum == TreasuryDatum {
       ..treasury_in_datum,
       total_liquidity: treasury_lp_amount,
+      receiver_datum: NoDatum,
     },
     value.without_lovelace(expected_receiver_value) == value.without_lovelace(
       receiver_value,

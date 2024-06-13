@@ -630,6 +630,7 @@ export class WarehouseBuilder {
     const treasuryOutDatum: TreasuryDatum = {
       ...treasuryInDatum,
       totalLiquidity: totalLbeLPs - receiverLP,
+      receiverDatum: "NoDatum",
     };
     this.tasks.push(
       () => {
