@@ -213,6 +213,7 @@ test("example flow", async () => {
     reserveRaise: 0n,
     totalLiquidity: 0n,
     penaltyConfig: null,
+    poolBaseFee: 30n,
     totalPenalty: 0n,
     revocable: false,
     isCancelled: false,
@@ -498,8 +499,8 @@ test("example flow", async () => {
       totalLiquidity: totalLiquidity,
       reserveA: reserveA,
       reserveB: reserveB,
-      baseFeeANumerator: 30n,
-      baseFeeBNumerator: 30n,
+      baseFeeANumerator: treasuryDatum.poolBaseFee,
+      baseFeeBNumerator: treasuryDatum.poolBaseFee,
       feeSharingNumeratorOpt: null,
       allowDynamicFee: false,
     };

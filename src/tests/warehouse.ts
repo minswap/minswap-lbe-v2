@@ -98,6 +98,7 @@ export const genWarehouse = async () => {
     reserveRaise: 0n,
     totalLiquidity: 0n,
     penaltyConfig: null,
+    poolBaseFee: 30n,
     totalPenalty: 0n,
     isCancelled: false,
     minimumOrderRaise: null,
