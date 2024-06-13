@@ -54,6 +54,9 @@ pub const seller_minimum_ada = 2_000_000
 // the ADA amount store in Order UTxO
 pub const order_minimum_ada = 2_000_000
 
+// the ADA amount to honour the pool creator
+pub const create_pool_comission = 8_000_000
+
 // sort 2 assets in bytearray ascending
 pub fn sort_two_assets(asset_a: Asset, asset_b: Asset) -> (Asset, Asset) {
   let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =

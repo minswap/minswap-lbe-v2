@@ -4,7 +4,8 @@ use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
 use lb_v2/types.{Asset, PenaltyConfig, PoolDatum, TreasuryDatum, ValidatorHash}
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
-  default_burn_liquidity, treasury_auth_an, treasury_minimum_ada, two_day_ms,
+  create_pool_comission, default_burn_liquidity, treasury_auth_an,
+  treasury_minimum_ada, two_day_ms,
 }
 
 pub fn validate_creating_treasury_out(
@@ -51,7 +52,11 @@ pub fn validate_creating_treasury_out(
     value.zero()
       |> value.add(factory_policy_id, treasury_auth_an, 1)
       |> value.add(base_asset_pid, base_asset_an, reserve_base)
-      |> value.add(ada_policy_id, ada_asset_name, treasury_minimum_ada)
+      |> value.add(
+          ada_policy_id,
+          ada_asset_name,
+          treasury_minimum_ada + create_pool_comission,
+        )
   and {
     // treasury datum
     base_asset != raise_asset,
