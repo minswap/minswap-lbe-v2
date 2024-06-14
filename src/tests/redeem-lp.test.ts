@@ -61,7 +61,7 @@ async function genTestWarehouse() {
     outputIndex: ++utxoIndex,
     assets: {
       // remaining raise asset
-      lovelace: TREASURY_MIN_ADA + collectedFund - maximumRaise,
+      lovelace: TREASURY_MIN_ADA + 100_000_000_000n,
       [builder.treasuryToken]: 1n,
       [builder.ammLpToken!]: totalLiquidity,
     },
