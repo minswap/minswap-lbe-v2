@@ -219,17 +219,20 @@ pub fn validate_create_dex_pool(
       amm_authen_policy_id: amm_authen_policy_id,
     )
   expect and {
-      // check mint value of this redeemer to make sure tx not burn manager token or mint/burn order tokens,...
+      // only mint AMM tokens related.
       mint_value == (
         value.zero()
           |> value.add(amm_authen_policy_id, amm_factory_auth_asset_name, 1)
           |> value.add(amm_authen_policy_id, amm_pool_auth_asset_name, 1)
           |> value.add(amm_authen_policy_id, lp_asset_name, 9223372036854775807)
       ),
+      // create pool with correct asset_a, asset_b
       asset_a == pool_asset_a,
       asset_b == pool_asset_b,
-      expected_datum_reserve_a == pool_reserve_a,
-      expected_datum_reserve_b == pool_reserve_b,
+      // create pool with correct reserve
+      pool_reserve_a == expected_datum_reserve_a,
+      pool_reserve_b == expected_datum_reserve_b,
+      // create pool with Base Fee correctly!
       pool_base_fee == base_fee_a_numerator,
     }
   expect Output {
