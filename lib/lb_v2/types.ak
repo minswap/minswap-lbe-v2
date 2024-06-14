@@ -86,6 +86,11 @@ pub type TreasuryDatum {
   // Amont of Base Asset use to create Pool.
   reserve_base: Int,
   penalty_config: Option<PenaltyConfig>,
+  // POOL DATUM
+  // - asset_a, asset_b, reserve_a, reserve_b will be validated by treasury depend \
+  //    how much fund it raise and treasury config
+  // - pool_batching_stake_credential, total_liquidity, fee_sharing_numerator_opt, allow_dynamic_fee will be validated by AMM Factory. 
+  // =>  we just need 1 base_fee for base_fee_a_numerator and base_fee_b_numerator because AMM Factory will validate 2 base fee must be the same.
   pool_base_fee: Int,
   // Indicates whether project's owner can cancel LBE during discovery phase.
   revocable: Bool,
