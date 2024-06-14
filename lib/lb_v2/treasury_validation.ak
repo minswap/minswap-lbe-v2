@@ -9,7 +9,8 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
-  create_pool_comission, default_burn_liquidity, treasury_auth_an,
+  create_pool_comission, default_burn_liquidity, max_base_fee_numerator,
+  max_penalty, min_base_fee_numerator, min_pool_allocation, treasury_auth_an,
   treasury_minimum_ada, two_day_ms,
 }
 
@@ -85,7 +86,7 @@ pub fn validate_creating_treasury_out(
       Some(datum_hash) -> dict.has_key(datums, datum_hash)
       _ -> True
     },
-    pool_allocation >= 70,
+    pool_allocation >= min_pool_allocation,
     pool_allocation <= 100,
     when minimum_order_raise is {
       Some(min_order) -> min_order > 0
@@ -114,12 +115,12 @@ pub fn validate_creating_treasury_out(
           penalty_start_time >= end_time - two_day_ms,
           percent > 0,
           // Business requires maximum penalty rate is 25 percent
-          percent <= 25,
+          percent <= max_penalty,
         }
       _ -> True
     },
-    5 <= pool_base_fee,
-    pool_base_fee <= 2000,
+    min_base_fee_numerator <= pool_base_fee,
+    pool_base_fee <= max_base_fee_numerator,
     total_penalty == 0,
     is_cancelled == False,
     is_manager_collected == False,

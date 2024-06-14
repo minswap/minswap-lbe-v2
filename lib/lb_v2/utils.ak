@@ -45,6 +45,10 @@ pub const max_base_fee_numerator = 2000
 pub const min_base_fee_numerator = 5
 
 /// *******************************************
+pub const min_pool_allocation = 70
+
+pub const max_penalty = 25
+
 pub const fee_ada = 1_000_000
 
 pub const penalty_fee = 2_000_000
