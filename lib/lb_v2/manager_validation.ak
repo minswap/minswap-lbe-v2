@@ -6,7 +6,9 @@ use lb_v2/types.{
   AddSellers, Asset, CollectSellers, ManagerDatum, ManagerRedeemer, SellerDatum,
   TreasuryDatum,
 }
-use lb_v2/utils.{assert, must_get_start_end_validity, seller_auth_an}
+use lb_v2/utils.{
+  assert, minimum_seller_collected, must_get_start_end_validity, seller_auth_an,
+}
 use lb_v2/validation.{build_default_seller_output}
 
 // Assertions:
@@ -144,6 +146,13 @@ pub fn validate_manage_seller(
           },
           @"Collect sellers: Invalid manager datum",
         ),
+        or {
+          // prevent spamming by setting minimum for seller collected 
+          //  if this tx is not the last collect action
+          minimum_seller_collected <= seller_input_count,
+          // the last collecting
+          seller_count == seller_input_count,
+        },
       }
     }
     _ -> False

@@ -3,7 +3,12 @@ import {
   type BuildCancelLBEOptions,
   type BuildCollectOrdersOptions,
 } from "../build-tx";
-import { LBE_FEE, ORDER_MIN_ADA, TREASURY_MIN_ADA } from "../constants";
+import {
+  LBE_FEE,
+  MINIMUM_ORDER_COLLECTED,
+  ORDER_MIN_ADA,
+  TREASURY_MIN_ADA,
+} from "../constants";
 import type { OrderDatum, TreasuryDatum, UTxO } from "../types";
 import { assertValidator, loadModule, quickSubmitBuilder } from "./utils";
 import { genWarehouse } from "./warehouse";
@@ -25,6 +30,7 @@ async function genTestWarehouse() {
     ...warehouse.defaultTreasuryDatum,
     isManagerCollected: true,
     reserveRaise: orderAmount,
+    totalPenalty: 20_000_000n,
   };
   const treasuryInput: UTxO = {
     txHash: "00".repeat(32),
@@ -122,7 +128,10 @@ test(`collect-orders | PASS | collect ${MAX_SIZE} orders`, async () => {
     orderInputs.push(orderInput);
   }
   let options = remixOptions({
-    treasuryDatum: { reserveRaise: W.orderAmount * BigInt(MAX_SIZE) },
+    treasuryDatum: {
+      reserveRaise: W.orderAmount * BigInt(MAX_SIZE),
+      totalPenalty: W.orderDatum.penaltyAmount * BigInt(MAX_SIZE),
+    },
   });
   options = { ...options, orderInputs };
   assertValidator(W.builder.buildCollectOrders(options), "");
@@ -131,7 +140,7 @@ test(`collect-orders | PASS | collect ${MAX_SIZE} orders`, async () => {
 test(`collect-orders | PASS | collect orders many times`, async () => {
   let { builder } = W;
   let orderInputs: UTxO[] = [];
-  for (let i = 0; i < MAX_SIZE; i++) {
+  for (let i = 0; i < Number(MINIMUM_ORDER_COLLECTED) + 10; i++) {
     let orderInput: UTxO = {
       ...W.orderInput,
       outputIndex: i * 10,
@@ -139,14 +148,21 @@ test(`collect-orders | PASS | collect orders many times`, async () => {
     orderInputs.push(orderInput);
   }
   let options = remixOptions({
-    treasuryDatum: { reserveRaise: W.orderAmount * BigInt(MAX_SIZE) },
+    treasuryDatum: {
+      reserveRaise: W.orderAmount * (MINIMUM_ORDER_COLLECTED + 10n),
+      totalPenalty:
+        W.orderDatum.penaltyAmount * (MINIMUM_ORDER_COLLECTED + 10n),
+    },
   });
   W.emulator.addUTxO(options.treasuryInput);
   for (let o of orderInputs) {
     W.emulator.addUTxO(o);
   }
 
-  options = { ...options, orderInputs: orderInputs.slice(0, 3) };
+  options = {
+    ...options,
+    orderInputs: orderInputs.slice(0, Number(MINIMUM_ORDER_COLLECTED)),
+  };
   builder.buildCollectOrders(options);
   const tx1 = await quickSubmitBuilder(W.emulator)({
     txBuilder: builder.complete(),
@@ -154,7 +170,11 @@ test(`collect-orders | PASS | collect orders many times`, async () => {
   expect(tx1).toBeTruthy();
 
   let treasuryInput = await W.findTreasuryInput();
-  options = { ...options, orderInputs: orderInputs.slice(3), treasuryInput };
+  options = {
+    ...options,
+    orderInputs: orderInputs.slice(Number(MINIMUM_ORDER_COLLECTED)),
+    treasuryInput,
+  };
   // restart builder
   builder = new WarehouseBuilder(W.warehouseOptions);
   builder.buildCollectOrders(options);
@@ -165,9 +185,9 @@ test(`collect-orders | PASS | collect orders many times`, async () => {
 });
 
 test(`collect-orders | PASS | collect -> cancel -> collect`, async () => {
-  let { builder } = W;
+  let { builder, orderDatum } = W;
   let orderInputs: UTxO[] = [];
-  for (let i = 0; i < MAX_SIZE; i++) {
+  for (let i = 0; i < Number(MINIMUM_ORDER_COLLECTED) + 10; i++) {
     let orderInput: UTxO = {
       ...W.orderInput,
       outputIndex: i * 10,
@@ -175,7 +195,10 @@ test(`collect-orders | PASS | collect -> cancel -> collect`, async () => {
     orderInputs.push(orderInput);
   }
   let options = remixOptions({
-    treasuryDatum: { reserveRaise: W.orderAmount * BigInt(MAX_SIZE) },
+    treasuryDatum: {
+      reserveRaise: W.orderAmount * (MINIMUM_ORDER_COLLECTED + 10n),
+      totalPenalty: orderDatum.penaltyAmount * (MINIMUM_ORDER_COLLECTED + 10n),
+    },
   });
   W.emulator.addUTxO(options.treasuryInput);
   for (let o of orderInputs) {
@@ -183,7 +206,10 @@ test(`collect-orders | PASS | collect -> cancel -> collect`, async () => {
   }
 
   // 1. Collect Orders
-  options = { ...options, orderInputs: orderInputs.slice(0, 3) };
+  options = {
+    ...options,
+    orderInputs: orderInputs.slice(0, Number(MINIMUM_ORDER_COLLECTED)),
+  };
   builder.buildCollectOrders(options);
   const tx1 = await quickSubmitBuilder(W.emulator)({
     txBuilder: builder.complete(),
@@ -210,7 +236,11 @@ test(`collect-orders | PASS | collect -> cancel -> collect`, async () => {
 
   // 3. Continue Collect Orders
   treasuryInput = await W.findTreasuryInput();
-  options = { ...options, orderInputs: orderInputs.slice(3), treasuryInput };
+  options = {
+    ...options,
+    orderInputs: orderInputs.slice(Number(MINIMUM_ORDER_COLLECTED)),
+    treasuryInput,
+  };
   // restart builder
   builder = new WarehouseBuilder(W.warehouseOptions);
   builder.buildCollectOrders(options);

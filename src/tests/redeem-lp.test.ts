@@ -41,7 +41,7 @@ async function genTestWarehouse() {
   const builder = new WarehouseBuilder(warehouseOptions);
   const reserveRaise = 1000_000_000_000n;
   const totalPenalty = 100_000_000_000n;
-  const collectedFund = reserveRaise + totalPenalty;
+  const collectedFund = 12n + 33n + 1000n;
   const maximumRaise = 1000_000_000_000n;
   const initLiquidity =
     calculateInitialLiquidity(maximumRaise, defaultTreasuryDatum.reserveBase) -

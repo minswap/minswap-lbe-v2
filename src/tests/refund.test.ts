@@ -36,8 +36,8 @@ async function genTestWarehouse() {
   const warehouseOptions = await genWarehouseOptions(t);
 
   const builder = new WarehouseBuilder(warehouseOptions);
-  const reserveRaise = 1000_000_000_000n;
-  const totalPenalty = 100_000_000_000n;
+  const reserveRaise = 12n + 33n + 1000n;
+  const totalPenalty = 0n;
   const collectedFund = reserveRaise + totalPenalty;
   const treasuryDatum: TreasuryDatum = {
     ...defaultTreasuryDatum,

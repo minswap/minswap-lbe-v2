@@ -90,6 +90,7 @@ async function genTestWarehouse() {
   };
   const managerDatum: ManagerDatum = {
     ...defaultManagerDatum,
+    sellerCount: 3n,
   };
   const managerUTxO = {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
@@ -192,17 +193,21 @@ test("collect sellers | PASS | happy case 1", async () => {
 });
 
 test("collect sellers | PASS | happy case 2", async () => {
-  const { defaultSellerDatum, builder } = warehouse;
+  const { defaultSellerDatum, builder, managerDatum } = warehouse;
   warehouse.options.sellerInputs.push(
     genSellerUTxO(
       { ...defaultSellerDatum, amount: 1000n, penaltyAmount: 20_000n },
       builder,
     ),
   );
+  warehouse.options.managerInput = {
+    ...warehouse.options.managerInput,
+    datum: builder.toDatumManager({ ...managerDatum, sellerCount: 4n }),
+  };
   const builder1 = stupidManagerDatumOut({
     reserveRaise: warehouse.expectedManagerDatumOut.reserveRaise + 1000n,
     totalPenalty: warehouse.expectedManagerDatumOut.totalPenalty + 20_000n,
-    sellerCount: warehouse.expectedManagerDatumOut.sellerCount - 1n,
+    sellerCount: warehouse.expectedManagerDatumOut.sellerCount,
   });
   const tx = builder1.complete();
   await tx.complete();

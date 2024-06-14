@@ -20,6 +20,12 @@ pub const manager_auth_an = #"4d616e61676572"
 
 pub const default_number_seller = 20
 
+pub const minimum_seller_collected = 15
+
+pub const minimum_order_collected = 20
+
+pub const minimum_order_redeemed = 20
+
 // 2 days in milliseconds = 2 * 24 * 60 * 60 * 1000
 pub const two_day_ms = 172800000
 

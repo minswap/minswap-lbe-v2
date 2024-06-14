@@ -456,9 +456,8 @@ test("example flow", async () => {
     });
     console.info(`collect order ${maxCount} done.`);
   };
-  await collectingOrders(30);
-  await collectingOrders(15);
-  await collectingOrders(15);
+  await collectingOrders(25);
+  await collectingOrders(25);
   await collectingOrders(15);
   const creatingPool = async () => {
     const ammFactoryInput: UTxO = (
@@ -560,8 +559,8 @@ test("example flow", async () => {
     });
     console.info(`Redeem order ${maxCount} done.`);
   };
+  await redeemingOrders(20);
+  await redeemingOrders(20);
+  await redeemingOrders(20);
   await redeemingOrders(1);
-  await redeemingOrders(15);
-  await redeemingOrders(15);
-  await redeemingOrders(15);
 });
