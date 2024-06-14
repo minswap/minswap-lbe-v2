@@ -81,7 +81,7 @@ test("create-treasury | PASS | Penalty Config", async () => {
   assertValidator(remixTreasuryDatum({ penaltyConfig }), "");
 });
 
-test("create-treasury | PASS | concu Receiver Datum Hash", async () => {
+test("create-treasury | PASS | Receiver Datum Hash", async () => {
   let { defaultTreasuryDatum, options } = W;
   let builder: WarehouseBuilder = W.builder;
   let extraDatum = builder.toDatumFactory({ head: "00", tail: "ff" });
@@ -97,10 +97,6 @@ test("create-treasury | PASS | concu Receiver Datum Hash", async () => {
   };
   builder = builder.buildCreateTreasury(options);
   assertValidator(builder, "");
-  // let tx = builder.complete();
-  // let finalTx = await tx.complete();
-  // let a = finalTx.txComplete.to_json();
-  // console.log(a);
 });
 
 test("create-treasury | FAIL | missing Factory Token", async () => {
