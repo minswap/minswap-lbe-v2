@@ -2,7 +2,9 @@ use aiken/builtin
 use aiken/dict
 use aiken/hash
 use aiken/transaction.{InlineDatum, Output}
-use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
+use aiken/transaction/value.{
+  AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
+}
 use lb_v2/types.{
   Asset, CustomDatumHash, DatumMap, PenaltyConfig, PoolDatum, TreasuryDatum,
   ValidatorHash,
@@ -191,12 +193,6 @@ pub fn validate_create_dex_pool(
       True -> (reserve_base, final_reserve_raise)
       False -> (final_reserve_raise, reserve_base)
     }
-  let datum_in_reserve_a = lbe_reserve_a * pool_allocation / 100
-  let datum_in_reserve_b = lbe_reserve_b * pool_allocation / 100
-  let Asset { policy_id: asset_a_policy_id, asset_name: asset_a_asset_name } =
-    asset_a
-  let Asset { policy_id: asset_b_policy_id, asset_name: asset_b_asset_name } =
-    asset_b
   let PoolDatum {
     asset_a: pool_asset_a,
     asset_b: pool_asset_b,
@@ -206,12 +202,21 @@ pub fn validate_create_dex_pool(
     total_liquidity: pool_total_liquidity,
     ..
   } = amm_pool_datum
-  let lp_asset_name =
-    utils.compute_lp_asset_name(
-      asset_a_policy_id,
-      asset_a_asset_name,
-      asset_b_policy_id,
-      asset_b_asset_name,
+  let (
+    expected_datum_reserve_a,
+    expected_datum_reserve_b,
+    treasury_lp_amount,
+    expected_receiver_value,
+    lp_asset_name,
+  ) =
+    calculate_allocation(
+      lbe_reserve_a: lbe_reserve_a,
+      lbe_reserve_b: lbe_reserve_b,
+      pool_allocation: pool_allocation,
+      pool_total_liquidity: pool_total_liquidity,
+      asset_a: asset_a,
+      asset_b: asset_b,
+      amm_authen_policy_id: amm_authen_policy_id,
     )
   expect and {
       // check mint value of this redeemer to make sure tx not burn manager token or mint/burn order tokens,...
@@ -223,8 +228,8 @@ pub fn validate_create_dex_pool(
       ),
       asset_a == pool_asset_a,
       asset_b == pool_asset_b,
-      datum_in_reserve_a == pool_reserve_a,
-      datum_in_reserve_b == pool_reserve_b,
+      expected_datum_reserve_a == pool_reserve_a,
+      expected_datum_reserve_b == pool_reserve_b,
       pool_base_fee == base_fee_a_numerator,
     }
   expect Output {
@@ -232,20 +237,6 @@ pub fn validate_create_dex_pool(
     datum: InlineDatum(treasury_out_datum_raw),
     ..
   } = treasury_output
-  let total_lbe_lp = pool_total_liquidity - default_burn_liquidity
-  let expected_receiver_lp_tokens =
-    total_lbe_lp * ( pool_allocation - 50 ) / pool_allocation
-  let treasury_lp_amount = total_lbe_lp - expected_receiver_lp_tokens
-  let Asset(asset_a_pid, asset_a_tn) = asset_a
-  let Asset(asset_b_pid, asset_b_tn) = asset_b
-  let expected_receiver_value =
-    value.from_asset(asset_a_pid, asset_a_tn, lbe_reserve_a - pool_reserve_a)
-      |> value.add(asset_b_pid, asset_b_tn, lbe_reserve_b - pool_reserve_b)
-      |> value.add(
-          amm_authen_policy_id,
-          lp_asset_name,
-          expected_receiver_lp_tokens,
-        )
   expect treasury_out_datum: TreasuryDatum = treasury_out_datum_raw
   let Output {
     value: receiver_value,
@@ -284,4 +275,57 @@ pub fn validate_create_dex_pool(
     },
     receiver_address_out == receiver,
   }
+}
+
+// return (
+//   Allocation Data:
+//   - pool datum reserve a 
+//   - pool datum reserve b
+//   - lp asset amount for treasury(to distrubute to users)
+//   - receiver value
+//   Bonus data
+//   - lp asset name(calculating lp an in this function is more convenient)
+// )
+pub fn calculate_allocation(
+  lbe_reserve_a: Int,
+  lbe_reserve_b: Int,
+  pool_allocation: Int,
+  pool_total_liquidity: Int,
+  asset_a: Asset,
+  asset_b: Asset,
+  amm_authen_policy_id: PolicyId,
+) -> (Int, Int, Int, Value, AssetName) {
+  let datum_reserve_a = lbe_reserve_a * pool_allocation / 100
+  let datum_reserve_b = lbe_reserve_b * pool_allocation / 100
+
+  let Asset(asset_a_pid, asset_a_tn) = asset_a
+  let Asset(asset_b_pid, asset_b_tn) = asset_b
+
+  let lp_asset_name =
+    utils.compute_lp_asset_name(
+      asset_a_pid,
+      asset_a_tn,
+      asset_b_pid,
+      asset_b_tn,
+    )
+  let total_lbe_lp = pool_total_liquidity - default_burn_liquidity
+  let expected_receiver_lp_tokens =
+    total_lbe_lp * ( pool_allocation - 50 ) / pool_allocation
+  let treasury_lp_amount = total_lbe_lp - expected_receiver_lp_tokens
+
+  let expected_receiver_value =
+    value.from_asset(asset_a_pid, asset_a_tn, lbe_reserve_a - datum_reserve_a)
+      |> value.add(asset_b_pid, asset_b_tn, lbe_reserve_b - datum_reserve_b)
+      |> value.add(
+          amm_authen_policy_id,
+          lp_asset_name,
+          expected_receiver_lp_tokens,
+        )
+  (
+    datum_reserve_a,
+    datum_reserve_b,
+    treasury_lp_amount,
+    expected_receiver_value,
+    lp_asset_name,
+  )
 }
