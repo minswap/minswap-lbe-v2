@@ -1,13 +1,13 @@
 use aiken/builtin
 use aiken/dict
 use aiken/hash
-use aiken/transaction.{InlineDatum, Output}
+use aiken/transaction.{DatumHash, InlineDatum, NoDatum, Output}
 use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
 use lb_v2/types.{
-  Asset, CustomDatumHash, DatumMap, PenaltyConfig, PoolDatum, TreasuryDatum,
-  ValidatorHash,
+  Asset, CustomDatumHash, DatumMap, PenaltyConfig, PoolDatum, RDatumHash,
+  RInlineDatum, RNoDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
@@ -43,7 +43,7 @@ pub fn validate_creating_treasury_out(
     raise_asset: t_raise_asset,
     start_time,
     end_time,
-    receiver_datum_hash,
+    receiver_datum,
     pool_allocation,
     minimum_order_raise,
     minimum_raise,
@@ -84,9 +84,10 @@ pub fn validate_creating_treasury_out(
     start_time < end_time,
     // Make sure that datum with datum_hash has appeared on the blockchain, \
     // later we can use methods such as db_sync, kupo to rebuild the datum.
-    when receiver_datum_hash is {
-      Some(datum_hash) -> dict.has_key(datums, datum_hash)
-      _ -> True
+    when receiver_datum is {
+      RNoDatum -> True
+      RDatumHash { hash: datum_hash } -> dict.has_key(datums, datum_hash)
+      RInlineDatum { hash: datum_hash } -> dict.has_key(datums, datum_hash)
     },
     pool_allocation >= min_pool_allocation,
     pool_allocation <= 100,
@@ -152,7 +153,7 @@ pub fn validate_create_dex_pool(
     base_asset,
     raise_asset,
     receiver,
-    receiver_datum_hash,
+    receiver_datum,
     pool_allocation,
     minimum_raise,
     maximum_raise,
@@ -243,7 +244,7 @@ pub fn validate_create_dex_pool(
   expect treasury_out_datum: TreasuryDatum = treasury_out_datum_raw
   let Output {
     value: receiver_value,
-    datum: receiver_datum,
+    datum: receiver_datum_out,
     address: receiver_address_out,
     ..
   } = receiver_output
@@ -265,16 +266,18 @@ pub fn validate_create_dex_pool(
     value.lovelace_of(expected_receiver_value) <= value.lovelace_of(
       receiver_value,
     ),
-    when receiver_datum_hash is {
-      Some(datum_hash) -> {
-        expect InlineDatum(receiver_datum_raw) = receiver_datum
+    when receiver_datum is {
+      RNoDatum -> receiver_datum_out == NoDatum
+      RDatumHash { hash: datum_hash } ->
+        receiver_datum_out == DatumHash(datum_hash)
+      RInlineDatum { hash: datum_hash } -> {
+        expect InlineDatum(receiver_datum_raw) = receiver_datum_out
         let out_datum_hash: CustomDatumHash =
           receiver_datum_raw
             |> builtin.serialise_data
             |> hash.blake2b_256
         out_datum_hash == datum_hash
       }
-      _ -> True
     },
     receiver_address_out == receiver,
   }

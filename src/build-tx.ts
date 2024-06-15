@@ -89,7 +89,7 @@ export type BuildCreateTreasuryOptions = {
   treasuryDatum: TreasuryDatum;
   validFrom: UnixTime;
   validTo: UnixTime;
-  extraDatum?: Datum; // the datum of treasuryDatum.receiverDatumHash
+  extraDatum?: Datum; // the datum of treasuryDatum.receiverDatum
 };
 
 export type BuildAddSellersOptions = {
@@ -167,7 +167,7 @@ export type BuildCreateAmmPoolOptions = {
   totalLiquidity: bigint;
   receiverA: bigint;
   receiverB: bigint;
-  extraDatum?: Datum; // Datum of TreasuryDatum.receiverDatumHash
+  extraDatum?: Datum; // Datum of TreasuryDatum.receiverDatum
 };
 
 export type BuildRedeemOrdersOptions = {
@@ -411,7 +411,7 @@ export class WarehouseBuilder {
         this.tx.validFrom(validFrom).validTo(validTo);
       },
       () => {
-        if (treasuryDatum.receiverDatumHash !== null) {
+        if (treasuryDatum.receiverDatum !== "RNoDatum") {
           invariant(extraDatum);
           this.tx.payToAddressWithData(
             plutusAddress2Address(this.t.network, treasuryDatum.owner),
@@ -674,13 +674,21 @@ export class WarehouseBuilder {
             toUnit(ammPoolDatum.assetB.policyId, ammPoolDatum.assetB.assetName)
           ] = receiverB;
         }
-        if (treasuryInDatum.receiverDatumHash) {
+        if (treasuryInDatum.receiverDatum !== "RNoDatum") {
           invariant(extraDatum);
-          this.tx.payToAddressWithData(
-            receiver,
-            { inline: extraDatum },
-            assets,
-          );
+          if ("RInlineDatum" in treasuryInDatum.receiverDatum) {
+            this.tx.payToAddressWithData(
+              receiver,
+              { inline: extraDatum },
+              assets,
+            );
+          } else if ("RDatumHash" in treasuryInDatum.receiverDatum) {
+            this.tx.payToAddressWithData(
+              receiver,
+              { asHash: extraDatum },
+              assets,
+            );
+          }
         } else {
           this.tx.payToAddress(receiver, assets);
         }

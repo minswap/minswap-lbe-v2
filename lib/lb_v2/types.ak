@@ -45,6 +45,12 @@ pub type PenaltyConfig {
   percent: Int,
 }
 
+pub type ReceiverDatum {
+  RNoDatum
+  RDatumHash { hash: CustomDatumHash }
+  RInlineDatum { hash: CustomDatumHash }
+}
+
 pub type TreasuryDatum {
   // Protocol Info
   // ValidatorHash of Factory Validator 
@@ -71,8 +77,8 @@ pub type TreasuryDatum {
   owner: Address,
   // Address for receiving the project's LP tokens.
   receiver: Address,
-  // The Datum Hash of the project's output
-  receiver_datum_hash: Option<CustomDatumHash>,
+  // The Datum of the receiver's output
+  receiver_datum: ReceiverDatum,
   pool_allocation: Int,
   // Minimum amount in a order.
   minimum_order_raise: Option<Int>,

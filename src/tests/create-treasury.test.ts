@@ -81,14 +81,32 @@ test("create-treasury | PASS | Penalty Config", async () => {
   assertValidator(remixTreasuryDatum({ penaltyConfig }), "");
 });
 
-test("create-treasury | PASS | Receiver Datum Hash", async () => {
+test("create-treasury | PASS | Receiver Datum: DatumHash", async () => {
   let { defaultTreasuryDatum, options } = W;
   let builder: WarehouseBuilder = W.builder;
   let extraDatum = builder.toDatumFactory({ head: "00", tail: "ff" });
   let extraDatumHash = builder.t.utils.datumToHash(extraDatum);
   let treasuryDatum: TreasuryDatum = {
     ...defaultTreasuryDatum,
-    receiverDatumHash: extraDatumHash,
+    receiverDatum: { RDatumHash: { hash: extraDatumHash } },
+  };
+  options = {
+    ...options,
+    treasuryDatum,
+    extraDatum,
+  };
+  builder = builder.buildCreateTreasury(options);
+  assertValidator(builder, "");
+});
+
+test("create-treasury | PASS | Receiver Datum: InlineDatum", async () => {
+  let { defaultTreasuryDatum, options } = W;
+  let builder: WarehouseBuilder = W.builder;
+  let extraDatum = builder.toDatumFactory({ head: "00", tail: "ff" });
+  let extraDatumHash = builder.t.utils.datumToHash(extraDatum);
+  let treasuryDatum: TreasuryDatum = {
+    ...defaultTreasuryDatum,
+    receiverDatum: { RInlineDatum: { hash: extraDatumHash } },
   };
   options = {
     ...options,
