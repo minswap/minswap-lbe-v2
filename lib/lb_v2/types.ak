@@ -5,6 +5,9 @@ use aiken/transaction/credential.{
 }
 use aiken/transaction/value.{AssetName, PolicyId}
 
+pub type CustomDatumHash =
+  Hash<Blake2b_256, Data>
+
 pub type ValidatorHash =
   Hash<Blake2b_224, Script>
 
@@ -42,6 +45,12 @@ pub type PenaltyConfig {
   percent: Int,
 }
 
+pub type ReceiverDatum {
+  RNoDatum
+  RDatumHash { hash: CustomDatumHash }
+  RInlineDatum { hash: CustomDatumHash }
+}
+
 pub type TreasuryDatum {
   // Protocol Info
   // ValidatorHash of Factory Validator 
@@ -66,6 +75,11 @@ pub type TreasuryDatum {
   end_time: Int,
   // Project Owner Address
   owner: Address,
+  // Address for receiving the project's LP tokens.
+  receiver: Address,
+  // The Datum of the receiver's output
+  receiver_datum: ReceiverDatum,
+  pool_allocation: Int,
   // Minimum amount in a order.
   minimum_order_raise: Option<Int>,
   // The minimum amount expected to raise.
@@ -78,6 +92,12 @@ pub type TreasuryDatum {
   // Amont of Base Asset use to create Pool.
   reserve_base: Int,
   penalty_config: Option<PenaltyConfig>,
+  // POOL DATUM
+  // - asset_a, asset_b, reserve_a, reserve_b will be validated by treasury depend \
+  //    how much fund it raise and treasury config
+  // - pool_batching_stake_credential, total_liquidity, fee_sharing_numerator_opt, allow_dynamic_fee will be validated by AMM Factory. 
+  // =>  we just need 1 base_fee for base_fee_a_numerator and base_fee_b_numerator because AMM Factory will validate 2 base fee must be the same.
+  pool_base_fee: Int,
   // Indicates whether project's owner can cancel LBE during discovery phase.
   revocable: Bool,
   // Total Order Amount. Increasing when collect orders.

@@ -6,7 +6,8 @@ use aiken/transaction/value.{
 use lb_v2/types.{Asset, OrderDatum, TreasuryDatum, ValidatorHash}
 use lb_v2/utils.{
   amm_authen_policy_id, compute_asset_name_from_base_and_raise, fee_ada,
-  order_auth_an, order_minimum_ada,
+  minimum_order_collected, minimum_order_redeemed, order_auth_an,
+  order_minimum_ada,
 }
 use lb_v2/validation.{get_order_inputs, get_order_outputs, get_treasury_output}
 
@@ -37,6 +38,8 @@ pub fn validate_collect_orders(
     collected_fund,
     base_asset,
     raise_asset,
+    reserve_raise,
+    total_penalty,
     is_manager_collected,
     ..
   } = treasury_in_datum
@@ -81,6 +84,13 @@ pub fn validate_collect_orders(
     value.flatten(mint_value) == [],
     // All Sellers, Manager have been collected.
     is_manager_collected == True,
+    or {
+      // prevent spamming by setting minimum for orders collected 
+      //  if this tx is not the last collect action
+      list.length(order_inputs) >= minimum_order_collected,
+      // the last collecting
+      collected_fund + collect_amount == reserve_raise + total_penalty,
+    },
   }
 }
 
@@ -231,6 +241,13 @@ pub fn validate_redeem(
     value.flatten(mint_value) == [
       (factory_policy_id, order_auth_an, -list.length(order_inputs)),
     ],
+    or {
+      // prevent spamming by setting minimum for orders redeemed 
+      //  if this tx is not the last redeemed action
+      list.length(order_inputs) >= minimum_order_redeemed,
+      // the last redeeming
+      collected_fund == total_fund,
+    },
   }
 }
 
@@ -382,6 +399,13 @@ pub fn validate_refund(
     value.flatten(mint_value) == [
       (factory_policy_id, order_auth_an, -list.length(order_inputs)),
     ],
+    or {
+      // prevent spamming by setting minimum for orders redeemed 
+      //  if this tx is not the last redeemed action
+      list.length(order_inputs) >= minimum_order_redeemed,
+      // the last redeeming
+      collected_fund == refund_amount,
+    },
   }
 }
 

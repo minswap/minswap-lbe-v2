@@ -12,6 +12,7 @@ import type {
 export type Address = T.Address;
 export type Assets = T.Assets;
 export type BluePrintAsset = { policyId: string; assetName: string };
+export type Datum = T.Datum;
 export type Emulator = T.Emulator;
 export type Network = T.Network;
 export type OutputData = T.OutputData;

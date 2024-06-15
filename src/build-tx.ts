@@ -14,6 +14,7 @@ import {
   TreasuryValidateTreasurySpending,
 } from "../plutus";
 import {
+  CREATE_POOL_COMMISION,
   DEFAULT_NUMBER_SELLER,
   DUMMY_REDEEMER,
   FACTORY_AUTH_AN,
@@ -44,6 +45,7 @@ import type {
   AmmPoolDatum,
   Assets,
   BluePrintAsset,
+  Datum,
   FactoryDatum,
   FactoryRedeemer,
   ManagerDatum,
@@ -87,6 +89,7 @@ export type BuildCreateTreasuryOptions = {
   treasuryDatum: TreasuryDatum;
   validFrom: UnixTime;
   validTo: UnixTime;
+  extraDatum?: Datum; // the datum of treasuryDatum.receiverDatum
 };
 
 export type BuildAddSellersOptions = {
@@ -162,6 +165,9 @@ export type BuildCreateAmmPoolOptions = {
   validFrom: UnixTime;
   validTo: UnixTime;
   totalLiquidity: bigint;
+  receiverA: bigint;
+  receiverB: bigint;
+  extraDatum?: Datum; // Datum of TreasuryDatum.receiverDatum
 };
 
 export type BuildRedeemOrdersOptions = {
@@ -351,7 +357,8 @@ export class WarehouseBuilder {
   public buildCreateTreasury(
     options: BuildCreateTreasuryOptions,
   ): WarehouseBuilder {
-    const { factoryUtxo, treasuryDatum, validFrom, validTo } = options;
+    const { factoryUtxo, treasuryDatum, validFrom, validTo, extraDatum } =
+      options;
     const managerDatum: ManagerDatum = {
       factoryPolicyId: this.factoryHash,
       baseAsset: treasuryDatum.baseAsset,
@@ -402,6 +409,16 @@ export class WarehouseBuilder {
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
+      },
+      () => {
+        if (treasuryDatum.receiverDatum !== "RNoDatum") {
+          invariant(extraDatum);
+          this.tx.payToAddressWithData(
+            plutusAddress2Address(this.t.network, treasuryDatum.owner),
+            { asHash: extraDatum },
+            {},
+          );
+        }
       },
     );
     return this;
@@ -615,18 +632,19 @@ export class WarehouseBuilder {
       validFrom,
       validTo,
       totalLiquidity,
+      receiverA,
+      receiverB,
+      extraDatum,
     } = options;
     invariant(treasuryInput.datum);
     const treasuryInDatum = this.fromDatumTreasury(treasuryInput.datum);
-    // invariant(
-    //   treasuryInDatum.collectedFund ==
-    //     treasuryInDatum.reserveRaise + treasuryInDatum.totalPenalty,
-    //   "Please collect all orders!",
-    // );
-    const projectOwnerLp = (totalLiquidity - LP_COLATERAL) / 2n;
+    const totalLbeLPs = totalLiquidity - LP_COLATERAL;
+    const receiverLP =
+      (totalLbeLPs * (treasuryInDatum.poolAllocation - 50n)) /
+      treasuryInDatum.poolAllocation;
     const treasuryOutDatum: TreasuryDatum = {
       ...treasuryInDatum,
-      totalLiquidity: totalLiquidity - LP_COLATERAL - projectOwnerLp,
+      totalLiquidity: totalLbeLPs - receiverLP,
     };
     this.tasks.push(
       () => {
@@ -636,6 +654,44 @@ export class WarehouseBuilder {
           treasuryInDatum.baseAsset,
           treasuryInDatum.raiseAsset,
         );
+      },
+      () => {
+        invariant(this.ammLpToken);
+        const receiver = plutusAddress2Address(
+          this.t.network,
+          treasuryInDatum.receiver,
+        );
+        const assets: Assets = {
+          [this.ammLpToken]: receiverLP,
+        };
+        if (receiverA !== 0n) {
+          assets[
+            toUnit(ammPoolDatum.assetA.policyId, ammPoolDatum.assetA.assetName)
+          ] = receiverA;
+        }
+        if (receiverB !== 0n) {
+          assets[
+            toUnit(ammPoolDatum.assetB.policyId, ammPoolDatum.assetB.assetName)
+          ] = receiverB;
+        }
+        if (treasuryInDatum.receiverDatum !== "RNoDatum") {
+          invariant(extraDatum);
+          if ("RInlineDatum" in treasuryInDatum.receiverDatum) {
+            this.tx.payToAddressWithData(
+              receiver,
+              { inline: extraDatum },
+              assets,
+            );
+          } else if ("RDatumHash" in treasuryInDatum.receiverDatum) {
+            this.tx.payToAddressWithData(
+              receiver,
+              { asHash: extraDatum },
+              assets,
+            );
+          }
+        } else {
+          this.tx.payToAddress(receiver, assets);
+        }
       },
       () => {
         this.spendingTreasuryInput();
@@ -648,16 +704,6 @@ export class WarehouseBuilder {
       },
       () => {
         this.payingTreasuryOutput({ treasuryOutDatum });
-      },
-      () => {
-        invariant(this.ammLpToken);
-        const projectOwner = plutusAddress2Address(
-          this.t.network,
-          treasuryInDatum.owner,
-        );
-        this.tx.payToAddress(projectOwner, {
-          [this.ammLpToken]: projectOwnerLp,
-        });
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
@@ -1293,7 +1339,7 @@ export class WarehouseBuilder {
       const assets = {
         [this.treasuryToken]: 1n,
         [baseAsset]: treasuryOutDatum.reserveBase,
-        lovelace: TREASURY_MIN_ADA,
+        lovelace: TREASURY_MIN_ADA + CREATE_POOL_COMMISION,
       };
       return assets;
     };

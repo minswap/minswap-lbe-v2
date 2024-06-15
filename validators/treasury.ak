@@ -1,3 +1,4 @@
+use aiken/builtin
 use aiken/list
 use aiken/transaction.{
   InlineDatum, Input, Output, ScriptContext, Spend, Transaction,
@@ -110,6 +111,7 @@ validator {
             factory_policy_id,
             treasury_hash,
           )
+        let Transaction { datums, .. } = transaction
         and {
           // before discovery phase
           end_valid_time_range < start_time,
@@ -131,6 +133,7 @@ validator {
             order_hash: order_hash,
             factory_policy_id: factory_policy_id,
             end_valid_time_range: end_valid_time_range,
+            datums: datums,
           ),
           // mint nothing
           mint_value == value.zero(),
@@ -188,22 +191,14 @@ validator {
         let pool_output = validation.get_amm_pool_output(outputs)
         expect Output { datum: InlineDatum(pool_raw_datum), .. } = pool_output
         expect amm_pool_datum: PoolDatum = pool_raw_datum
-        let TreasuryDatum { owner: project_owner, .. } = treasury_in_datum
-        let owner_outputs =
-          list.filter(
-            outputs,
-            fn(output) {
-              let Output { address, .. } = output
-              address == project_owner
-            },
-          )
+        let receiver_output = builtin.head_list(outputs)
         validate_create_dex_pool(
           treasury_in_datum: treasury_in_datum,
           treasury_output: treasury_output,
           mint_value: mint_value,
           amm_pool_datum: amm_pool_datum,
           factory_policy_id: factory_policy_id,
-          project_owner_outputs: owner_outputs,
+          receiver_output: receiver_output,
         )
       }
       RedeemOrders ->

@@ -22,9 +22,14 @@ import {
   ORDER_MIN_ADA,
   TREASURY_MIN_ADA,
 } from "../constants";
-import type { OrderDatum, UTxO } from "../types";
-import { calculateInitialLiquidity, plutusAddress2Address } from "../utils";
-import { genWarehouseOptions, loadModule } from "./utils";
+import type { Address, Assets, OrderDatum, UTxO } from "../types";
+import {
+  calculateInitialLiquidity,
+  plutusAddress2Address,
+  sortUTxOs,
+  toUnit,
+} from "../utils";
+import { assertValidatorFail, genWarehouseOptions, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
 
 let utxoIndex: number;
@@ -41,7 +46,7 @@ async function genTestWarehouse() {
   const builder = new WarehouseBuilder(warehouseOptions);
   const reserveRaise = 1000_000_000_000n;
   const totalPenalty = 100_000_000_000n;
-  const collectedFund = reserveRaise + totalPenalty;
+  const collectedFund = 12n + 33n + 1000n;
   const maximumRaise = 1000_000_000_000n;
   const initLiquidity =
     calculateInitialLiquidity(maximumRaise, defaultTreasuryDatum.reserveBase) -
@@ -61,7 +66,7 @@ async function genTestWarehouse() {
     outputIndex: ++utxoIndex,
     assets: {
       // remaining raise asset
-      lovelace: TREASURY_MIN_ADA + collectedFund - maximumRaise,
+      lovelace: TREASURY_MIN_ADA + 100_000_000_000n,
       [builder.treasuryToken]: 1n,
       [builder.ammLpToken!]: totalLiquidity,
     },
@@ -98,6 +103,38 @@ async function genTestWarehouse() {
     validFrom: Number(treasuryDatum.endTime) + 1000,
     validTo: Number(treasuryDatum.endTime) + 2000,
   };
+
+  const sortedOrders = sortUTxOs(orderInputUTxOs);
+  const userOutputs: { address: Address; assets: Assets }[] = [];
+  const totalBonusRaiseAsset =
+    treasuryDatum.maximumRaise &&
+    treasuryDatum.reserveRaise + treasuryDatum.totalPenalty >
+      treasuryDatum.maximumRaise
+      ? treasuryDatum.reserveRaise +
+        treasuryDatum.totalPenalty -
+        treasuryDatum.maximumRaise
+      : 0n;
+  const raiseAssetUnit = toUnit(raiseAsset.policyId, raiseAsset.assetName);
+  for (const order of sortedOrders) {
+    const datum = builder.fromDatumOrder(order.datum!);
+    const lpAmount =
+      (datum.amount * treasuryDatum.totalLiquidity) /
+      treasuryDatum.reserveRaise;
+    const bonusRaise =
+      (datum.amount * totalBonusRaiseAsset) / treasuryDatum.reserveRaise;
+    const assets = {
+      lovelace: ORDER_MIN_ADA,
+      [builder.ammLpToken!]: lpAmount,
+    };
+    assets[raiseAssetUnit] = assets[raiseAssetUnit]
+      ? assets[raiseAssetUnit] + bonusRaise
+      : bonusRaise;
+    const output: { address: Address; assets: Assets } = {
+      address: plutusAddress2Address(t.network, datum.owner),
+      assets,
+    };
+    userOutputs.push(output);
+  }
   return {
     builder,
     options,
@@ -108,6 +145,7 @@ async function genTestWarehouse() {
     treasuryUTxO,
     orderInDatums,
     owner,
+    userOutputs,
   };
 }
 beforeAll(async () => {
@@ -137,3 +175,61 @@ test("Redeem LP | PASS | update orders: success", async () => {
   const tx = builder.complete();
   await tx.complete();
 });
+function attachValueToInput(value: Assets): void {
+  const { builder, owner } = warehouse;
+  builder.tasks.push(() => {
+    // 1 UTxO contain 1 seller tokens for tx value balance
+    builder.tx.collectFrom([
+      {
+        txHash:
+          "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
+        outputIndex: ++utxoIndex,
+        assets: value,
+        address: owner,
+      },
+    ]);
+  });
+}
+test("Redeem LP | FAIL | No treasury input", async () => {
+  const { builder, options, treasuryUTxO } = warehouse;
+  builder.buildRedeemOrders(options);
+  builder.tasks[2] = () => {};
+  attachValueToInput(treasuryUTxO.assets);
+  assertValidatorFail(builder);
+});
+test("Redeem LP | FAIL | Invalid user out value", async () => {
+  const { builder, options, userOutputs } = warehouse;
+  builder.buildRefundOrders(options);
+  builder.tasks[1] = () => {
+    for (let i = 0; i < userOutputs.length - 1; ++i) {
+      const output = userOutputs[i];
+      builder.tx.payToAddress(output.address, output.assets);
+    }
+    const output = userOutputs[userOutputs.length - 1];
+    builder.tx.payToAddress(output.address, {});
+  };
+  assertValidatorFail(builder);
+});
+test("Redeem LP | FAIL | not burn exactly n order asset", async () => {
+  const { builder, options, orderInDatums } = warehouse;
+  builder.buildRefundOrders(options);
+  builder.tasks[5] = () => {
+    builder.mintingOrderToken(-1n * BigInt(orderInDatums.length - 1));
+  };
+  assertValidatorFail(builder);
+});
+test("Redeem LP | FAIL | Not created pool yet", async () => {
+  const { builder, options, treasuryDatum } = warehouse;
+  options.treasuryInput = {
+    ...options.treasuryInput,
+    assets: { ...options.treasuryInput.assets, [builder.ammLpToken!]: 0n },
+    datum: builder.toDatumTreasury({ ...treasuryDatum, totalLiquidity: 0n }),
+  };
+  builder.buildRefundOrders(options);
+  assertValidatorFail(builder);
+});
+/*
+Test case:
+  - Invalid pool out value
+  - Invalid pool out datum
+*/

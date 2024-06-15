@@ -66,6 +66,7 @@ let raiseAsset: {
   assetName: string;
 };
 let ammFactoryAddress: string;
+let extraDatum: string;
 
 beforeEach(async () => {
   await T.loadModule();
@@ -188,6 +189,8 @@ test("example flow", async () => {
   // create treasury
   const discoveryStartSlot = emulator.slot + 60 * 60;
   const discoveryEndSlot = discoveryStartSlot + 60 * 60 * 24 * 2; // 2 days
+  extraDatum = builder.toDatumFactory({ head: "00", tail: "ff" }); // dummy
+  let extraDatumHash = t.utils.datumToHash(extraDatum);
   const treasuryDatum: TreasuryDatum = {
     factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
     sellerHash: t.utils.validatorToScriptHash(validators.sellerValidator),
@@ -202,12 +205,16 @@ test("example flow", async () => {
     startTime: BigInt(t.utils.slotToUnixTime(discoveryStartSlot)),
     endTime: BigInt(t.utils.slotToUnixTime(discoveryEndSlot)),
     owner: address2PlutusAddress(ACCOUNT_0.address),
+    receiver: address2PlutusAddress(ACCOUNT_0.address),
+    receiverDatum: { RInlineDatum: { hash: extraDatumHash } },
+    poolAllocation: 100n,
     minimumRaise: null,
     maximumRaise: null,
     reserveBase: 69000000000000n,
     reserveRaise: 0n,
     totalLiquidity: 0n,
     penaltyConfig: null,
+    poolBaseFee: 30n,
     totalPenalty: 0n,
     revocable: false,
     isCancelled: false,
@@ -225,6 +232,7 @@ test("example flow", async () => {
     treasuryDatum,
     validFrom: t.utils.slotToUnixTime(emulator.slot),
     validTo: t.utils.slotToUnixTime(emulator.slot + 60),
+    extraDatum,
   });
   const createTreasuryTx = await quickSubmitBuilder(emulator)({
     txBuilder: builder.complete(),
@@ -448,11 +456,9 @@ test("example flow", async () => {
     });
     console.info(`collect order ${maxCount} done.`);
   };
-  await collectingOrders(30);
+  await collectingOrders(25);
+  await collectingOrders(25);
   await collectingOrders(15);
-  await collectingOrders(15);
-  await collectingOrders(15);
-
   const creatingPool = async () => {
     const ammFactoryInput: UTxO = (
       await emulator.getUtxos(ammFactoryAddress)
@@ -467,8 +473,15 @@ test("example flow", async () => {
       treasuryUtxo.datum,
       TreasuryValidateTreasurySpending.treasuryInDatum,
     );
-    const reserveB = treasuryDatum.reserveBase;
-    const reserveA = treasuryDatum.reserveRaise + treasuryDatum.totalPenalty;
+    const reserveB =
+      (treasuryDatum.reserveBase * treasuryDatum.poolAllocation) / 100n;
+    const reserveA =
+      ((treasuryDatum.reserveRaise + treasuryDatum.totalPenalty) *
+        treasuryDatum.poolAllocation) /
+      100n;
+    const receiverB = treasuryDatum.reserveBase - reserveB;
+    const receiverA =
+      treasuryDatum.reserveRaise + treasuryDatum.totalPenalty - reserveA;
     const totalLiquidity = calculateInitialLiquidity(reserveA, reserveB);
     const poolDatum: FeedTypeAmmPool["_datum"] = {
       poolBatchingStakeCredential: {
@@ -487,8 +500,8 @@ test("example flow", async () => {
       totalLiquidity: totalLiquidity,
       reserveA: reserveA,
       reserveB: reserveB,
-      baseFeeANumerator: 30n,
-      baseFeeBNumerator: 30n,
+      baseFeeANumerator: treasuryDatum.poolBaseFee,
+      baseFeeBNumerator: treasuryDatum.poolBaseFee,
       feeSharingNumeratorOpt: null,
       allowDynamicFee: false,
     };
@@ -500,6 +513,9 @@ test("example flow", async () => {
       validFrom: t.utils.slotToUnixTime(emulator.slot),
       validTo: t.utils.slotToUnixTime(emulator.slot + 100),
       totalLiquidity,
+      receiverA,
+      receiverB,
+      extraDatum,
     };
     builder = new WarehouseBuilder(warehouseOptions);
     builder.buildCreateAmmPool(options);
@@ -543,8 +559,8 @@ test("example flow", async () => {
     });
     console.info(`Redeem order ${maxCount} done.`);
   };
+  await redeemingOrders(20);
+  await redeemingOrders(20);
+  await redeemingOrders(20);
   await redeemingOrders(1);
-  await redeemingOrders(15);
-  await redeemingOrders(15);
-  await redeemingOrders(15);
 });

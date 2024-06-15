@@ -1,11 +1,12 @@
 import { WarehouseBuilder, type BuildCreateTreasuryOptions } from "../build-tx";
 import {
+  CREATE_POOL_COMMISION,
   DEFAULT_NUMBER_SELLER,
   MANAGER_MIN_ADA,
   MAX_PENALTY_RATE,
   TREASURY_MIN_ADA,
 } from "../constants";
-import type { Assets, UTxO } from "../types";
+import type { Assets, TreasuryDatum, UTxO } from "../types";
 import { assertValidator, assertValidatorFail, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
 
@@ -54,7 +55,7 @@ beforeEach(async () => {
   let treasuryOutValue = {
     [builder.treasuryToken]: 1n,
     [minswapTokenRaw]: defaultTreasuryDatum.reserveBase,
-    lovelace: TREASURY_MIN_ADA,
+    lovelace: TREASURY_MIN_ADA + CREATE_POOL_COMMISION,
   };
   W = {
     ...W,
@@ -78,6 +79,42 @@ test("create-treasury | PASS | Penalty Config", async () => {
     percent: MAX_PENALTY_RATE,
   };
   assertValidator(remixTreasuryDatum({ penaltyConfig }), "");
+});
+
+test("create-treasury | PASS | Receiver Datum: DatumHash", async () => {
+  let { defaultTreasuryDatum, options } = W;
+  let builder: WarehouseBuilder = W.builder;
+  let extraDatum = builder.toDatumFactory({ head: "00", tail: "ff" });
+  let extraDatumHash = builder.t.utils.datumToHash(extraDatum);
+  let treasuryDatum: TreasuryDatum = {
+    ...defaultTreasuryDatum,
+    receiverDatum: { RDatumHash: { hash: extraDatumHash } },
+  };
+  options = {
+    ...options,
+    treasuryDatum,
+    extraDatum,
+  };
+  builder = builder.buildCreateTreasury(options);
+  assertValidator(builder, "");
+});
+
+test("create-treasury | PASS | Receiver Datum: InlineDatum", async () => {
+  let { defaultTreasuryDatum, options } = W;
+  let builder: WarehouseBuilder = W.builder;
+  let extraDatum = builder.toDatumFactory({ head: "00", tail: "ff" });
+  let extraDatumHash = builder.t.utils.datumToHash(extraDatum);
+  let treasuryDatum: TreasuryDatum = {
+    ...defaultTreasuryDatum,
+    receiverDatum: { RInlineDatum: { hash: extraDatumHash } },
+  };
+  options = {
+    ...options,
+    treasuryDatum,
+    extraDatum,
+  };
+  builder = builder.buildCreateTreasury(options);
+  assertValidator(builder, "");
 });
 
 test("create-treasury | FAIL | missing Factory Token", async () => {

@@ -108,6 +108,8 @@ async function genTestWarehouse() {
     validFrom: Number(treasuryDatum.endTime + 1000n),
     validTo: Number(treasuryDatum.endTime + 1100n),
     totalLiquidity: totalLiquidity,
+    receiverA: 0n,
+    receiverB: 0n,
   };
   return {
     builder,

@@ -20,6 +20,12 @@ pub const manager_auth_an = #"4d616e61676572"
 
 pub const default_number_seller = 20
 
+pub const minimum_seller_collected = 15
+
+pub const minimum_order_collected = 20
+
+pub const minimum_order_redeemed = 20
+
 // 2 days in milliseconds = 2 * 24 * 60 * 60 * 1000
 pub const two_day_ms = 172800000
 
@@ -37,7 +43,18 @@ pub const amm_pool_validation_hash =
 
 pub const default_burn_liquidity = 10
 
+// Base Fee constraint
+// Max 20%
+pub const max_base_fee_numerator = 2000
+
+// Min 0.05%
+pub const min_base_fee_numerator = 5
+
 /// *******************************************
+pub const min_pool_allocation = 70
+
+pub const max_penalty = 25
+
 pub const fee_ada = 1_000_000
 
 pub const penalty_fee = 2_000_000
@@ -53,6 +70,9 @@ pub const seller_minimum_ada = 2_000_000
 
 // the ADA amount store in Order UTxO
 pub const order_minimum_ada = 2_000_000
+
+// The ADA amount to reward the pool creator
+pub const create_pool_comission = 8_000_000
 
 // sort 2 assets in bytearray ascending
 pub fn sort_two_assets(asset_a: Asset, asset_b: Asset) -> (Asset, Asset) {
