@@ -53,7 +53,6 @@ import type {
   MintRedeemer,
   OrderDatum,
   OrderRedeemer,
-  OutputData,
   RewardAddress,
   SellerDatum,
   SellerRedeemer,
