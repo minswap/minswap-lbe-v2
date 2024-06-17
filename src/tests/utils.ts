@@ -123,7 +123,6 @@ const genValidators = async (t: Translucent) => {
       txHash: DUMMY_SEED_UTXO.txHash,
       outputIndex: DUMMY_SEED_UTXO.outputIndex,
     },
-    dry: true,
   });
   return validators;
 };
@@ -146,10 +145,7 @@ export type GenWarehouseOptions = ReturnType<typeof genWarehouseOptions>;
 export const genWarehouseOptions = async (t: Translucent) => {
   let validators = await genValidators(t);
   let ammValidators: MinswapValidators = await genAmmValidators(t);
-  let deployedValidators: DeployedValidators = await genDeployValidators(
-    t,
-    validators,
-  );
+  let deployedValidators = await genDeployValidators(t, validators);
   let ammDeployedValidators: DeployedValidators =
     await genDeployMinswapValidators(t, ammValidators);
   const options: WarehouseBuilderOptions = {

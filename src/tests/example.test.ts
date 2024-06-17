@@ -25,6 +25,7 @@ import {
   type DeployedValidators,
   type MinswapValidators,
   type Validators,
+  type DeployMinswapValidators,
 } from "../deploy-validators";
 import type {
   Address,
@@ -55,7 +56,7 @@ let t: Translucent;
 let validators: Validators;
 let ammValidators: MinswapValidators;
 let deployedValidators: DeployedValidators;
-let ammDeployedValidators: DeployedValidators;
+let ammDeployedValidators: DeployMinswapValidators;
 let seedUtxo: UTxO;
 let baseAsset: {
   policyId: string;
@@ -143,7 +144,6 @@ beforeEach(async () => {
       txHash: seedUtxo.txHash,
       outputIndex: seedUtxo.outputIndex,
     },
-    dry: true,
   });
   deployedValidators = await deployValidators(t, validators);
   emulator.awaitBlock(10);
