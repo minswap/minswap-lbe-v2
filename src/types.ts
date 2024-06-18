@@ -29,6 +29,8 @@ export type Tx = T.Tx;
 export type Unit = T.Unit;
 export type UnixTime = T.UnixTime;
 export type UTxO = T.UTxO;
+export type MaestroSupportedNetworks = T.MaestroSupportedNetworks;
+export type Maestro = T.Maestro;
 
 export type AmmPoolDatum = FeedTypeAmmPool["_datum"];
 export type FactoryDatum = FactoryValidateFactory["datum"];
