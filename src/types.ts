@@ -46,3 +46,42 @@ export type MintRedeemer = FactoryValidateFactoryMinting["redeemer"];
 export type OrderRedeemer = OrderValidateOrder["redeemer"];
 export type SellerRedeemer = SellerValidateSellerSpending["redeemer"];
 export type TreasuryRedeemer = TreasuryValidateTreasurySpending["redeemer"];
+
+export type LbeScript = {
+  factoryRefInput: string;
+  treasuryRefInput: string;
+  managerRefInput: string;
+  sellerRefInput: string;
+  orderRefInput: string;
+
+  factoryAddress: string;
+  treasuryAddress: string;
+  managerAddress: string;
+  sellerAddress: string;
+  orderAddress: string;
+
+  factoryHash: string;
+  treasuryHash: string;
+  managerHash: string;
+  sellerHash: string;
+  orderHash: string;
+
+  seedOutRef: OutRef;
+  factoryOutRef: OutRef;
+  treasuryOutRef: OutRef;
+  managerOutRef: OutRef;
+  sellerOutRef: OutRef;
+  orderOutRef: OutRef;
+
+  // Minswap AMM
+  ammAuthenRefInput: string;
+  ammFactoryRefInput: string;
+  ammPoolRefInput: string;
+
+  ammSeedOutRef: OutRef;
+  ammPoolStakeCredential: Credential;
+  ammAuthenHash: string;
+  ammFactoryHash: string;
+  ammPoolHash: string;
+  ammPoolBatchingHash: string;
+};

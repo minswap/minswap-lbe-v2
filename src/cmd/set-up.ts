@@ -12,6 +12,7 @@ import {
 import type {
   Address,
   Credential,
+  LbeScript,
   MaestroSupportedNetworks,
   OutRef,
   Script,
@@ -33,45 +34,6 @@ type LbeParams = {
     poolBatchingRef: OutRef;
   };
   seedOutRef: OutRef;
-};
-
-type LbeScript = {
-  factoryRefInput: string; // hex<UTxO>
-  treasuryRefInput: string; // hex<UTxO>
-  managerRefInput: string; // hex<UTxO>
-  sellerRefInput: string; // hex<UTxO>
-  orderRefInput: string; // hex<UTxO>
-
-  factoryAddress: string;
-  treasuryAddress: string;
-  managerAddress: string;
-  sellerAddress: string;
-  orderAddress: string;
-
-  factoryHash: string;
-  treasuryHash: string;
-  managerHash: string;
-  sellerHash: string;
-  orderHash: string;
-
-  seedOutRef: OutRef;
-  factoryOutRef: OutRef;
-  treasuryOutRef: OutRef;
-  managerOutRef: OutRef;
-  sellerOutRef: OutRef;
-  orderOutRef: OutRef;
-
-  // Minswap AMM
-  ammAuthenRefInput: string;
-  ammFactoryRefInput: string;
-  ammPoolRefInput: string;
-
-  ammSeedOutRef: OutRef;
-  ammPoolStakeCredential: Credential;
-  ammAuthenHash: string;
-  ammFactoryHash: string;
-  ammPoolHash: string;
-  ammPoolBatchingHash: string;
 };
 
 const getParams = () => {
