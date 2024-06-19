@@ -9,7 +9,8 @@
     "collect-validators": "bun run src/setup.ts collect-validators",
     "check": "aiken build && bun gen-plutus && bun init-params && bun collect-validators && bun test",
     "format": "bun prettier --w src/* --print-width 80",
-    "test:init-factory": "aiken build -t verbose && bun gen-plutus && bun test init-factory"
+    "test:init-factory": "aiken build -t verbose && bun gen-plutus && bun test init-factory",
+    "setup-testnet": "aiken build && bun gen-plutus && bun run src/cmd/set-up.ts"
   },
   "main": "./build/index.js",
   "module": "./build/index.es.js",

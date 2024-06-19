@@ -37,6 +37,7 @@ import {
   TREASURY_MIN_ADA,
 } from "./constants";
 import type {
+  DeployMinswapValidators,
   DeployedValidators,
   MinswapValidators,
   Validators,
@@ -78,7 +79,7 @@ export type WarehouseBuilderOptions = {
   validators: Validators;
   deployedValidators: DeployedValidators;
   ammValidators: MinswapValidators;
-  ammDeployedValidators: DeployedValidators;
+  ammDeployedValidators: DeployMinswapValidators;
 };
 
 export type BuildInitFactoryOptions = {
@@ -236,7 +237,7 @@ export class WarehouseBuilder {
 
   // AMM
   ammValidators: MinswapValidators;
-  ammDeployedValidators: DeployedValidators;
+  ammDeployedValidators: DeployMinswapValidators;
   ammFactoryAddress: Address;
   ammPoolAddress: Address;
   ammAuthenHash: string;
@@ -308,9 +309,7 @@ export class WarehouseBuilder {
     this.ammFactoryAddress = t.utils.validatorToAddress(
       ammValidators.factoryValidator,
     );
-    this.ammPoolAddress = t.utils.validatorToAddress(
-      ammValidators.poolValidator,
-    );
+    this.ammPoolAddress = ammValidators.poolAddress;
     this.ammDeployedValidators = ammDeployedValidators;
     this.ammAuthenHash = t.utils.validatorToScriptHash(
       ammValidators.authenValidator,

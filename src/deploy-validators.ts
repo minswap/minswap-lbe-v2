@@ -1,7 +1,15 @@
 import * as fs from "fs";
 import path from "path";
 import * as T from "@minswap/translucent";
-import type { OutRef, Script, Translucent, Tx, UTxO } from "./types";
+import type {
+  Address,
+  Credential,
+  OutRef,
+  Script,
+  Translucent,
+  Tx,
+  UTxO,
+} from "./types";
 import {
   FactoryValidateFactory,
   TreasuryValidateTreasurySpending,
@@ -31,13 +39,15 @@ export type MinswapValidators = {
   factoryValidator: Script;
   poolValidator: Script;
   poolBatchingValidator: Script;
+  poolAddress: Address;
 };
 
 export function collectMinswapValidators(options: {
   t: Translucent;
   seedOutRef: OutRef;
+  poolStakeCredential: Credential;
 }): MinswapValidators {
-  const { t, seedOutRef } = options;
+  const { t, seedOutRef, poolStakeCredential } = options;
 
   const authenValidator = new MinswapAuthen({
     transactionId: { hash: seedOutRef.txHash },
@@ -53,7 +63,10 @@ export function collectMinswapValidators(options: {
   const poolBatchingValidatorHash = t.utils.validatorToScriptHash(
     poolBatchingValidator,
   );
-  const poolAddress = t.utils.validatorToAddress(poolValidator);
+  const poolAddress = t.utils.validatorToAddress(
+    poolValidator,
+    poolStakeCredential,
+  );
   const plutusPoolAddress = address2PlutusAddress(poolAddress);
   const factoryValidator = new MinswapFactory(
     authenValidatorHash,
@@ -67,15 +80,15 @@ export function collectMinswapValidators(options: {
     factoryValidator,
     poolValidator,
     poolBatchingValidator,
+    poolAddress,
   };
 }
 
 export function collectValidators(options: {
   t: Translucent;
   seedOutRef?: OutRef;
-  dry: boolean;
 }): Validators {
-  let { t, seedOutRef, dry } = options;
+  let { t, seedOutRef } = options;
   if (seedOutRef === undefined) {
     const fileContent = fs.readFileSync(path.resolve("params.json"), "utf-8");
     seedOutRef = JSON.parse(fileContent).seedOutRef;
@@ -112,24 +125,17 @@ export function collectValidators(options: {
     managerValidator,
   };
 
-  if (!dry) {
-    const jsonData = JSON.stringify(validators, null, 2);
-    fs.writeFile("validators.json", jsonData, "utf8", (err) => {
-      if (err) {
-        console.error("Error writing JSON file:", err);
-        return;
-      }
-      console.log("validators.json file has been saved.");
-    });
-  }
-
   return validators;
 }
 
-function buildDeployValidator(t: Translucent, validator: Script): Tx {
-  const validatorAddress = t.utils.validatorToAddress(validator);
-  const tx = t.newTx().payToContract(
-    validatorAddress,
+function buildDeployValidator(
+  t: Translucent,
+  validator: Script,
+  deployTo?: Address,
+): Tx {
+  const deployAddress = deployTo ?? t.utils.validatorToAddress(validator);
+  const tx = t.newTx().payToAddressWithData(
+    deployAddress,
     {
       inline: "d87980", // 121([])
       scriptRef: validator,
@@ -147,8 +153,9 @@ async function processElement(
   t: Translucent,
   key: string,
   validator: Script,
+  deployTo?: Address,
 ): Promise<DeployedValidator> {
-  const validatorTx = buildDeployValidator(t, validator);
+  const validatorTx = buildDeployValidator(t, validator, deployTo);
   const completedTx = await validatorTx.complete();
   const finalOutputs = completedTx.txComplete.to_js_value().body.outputs;
   const scriptV2 = (
@@ -191,20 +198,46 @@ async function executePromiseFunctions<T>(
   return resultsObject;
 }
 
-export type DeployedValidators = Record<string, UTxO>;
+export type DeployedValidators = Awaited<ReturnType<typeof deployValidators>>;
 
 export async function deployValidators(
   t: Translucent,
   validators: Validators,
-): Promise<DeployedValidators> {
+  deployTo?: Address,
+) {
   const deploymentsChain = [
-    () => processElement(t, "treasuryValidator", validators.treasuryValidator),
-    () => processElement(t, "managerValidator", validators.managerValidator),
-    () => processElement(t, "sellerValidator", validators.sellerValidator),
-    () => processElement(t, "orderValidator", validators.orderValidator),
-    () => processElement(t, "factoryValidator", validators.factoryValidator),
+    () =>
+      processElement(
+        t,
+        "treasuryValidator",
+        validators.treasuryValidator,
+        deployTo,
+      ),
+    () =>
+      processElement(
+        t,
+        "managerValidator",
+        validators.managerValidator,
+        deployTo,
+      ),
+    () =>
+      processElement(
+        t,
+        "sellerValidator",
+        validators.sellerValidator,
+        deployTo,
+      ),
+    () =>
+      processElement(t, "orderValidator", validators.orderValidator, deployTo),
+    () =>
+      processElement(
+        t,
+        "factoryValidator",
+        validators.factoryValidator,
+        deployTo,
+      ),
   ];
-  let res: DeployedValidators = {};
+  let res: Record<string, UTxO> = {};
 
   await executePromiseFunctions(deploymentsChain)
     .then((deployments) => {
@@ -214,17 +247,41 @@ export async function deployValidators(
       throw new Error(err);
     });
 
-  return res;
+  return res as {
+    treasuryValidator: UTxO;
+    managerValidator: UTxO;
+    sellerValidator: UTxO;
+    orderValidator: UTxO;
+    factoryValidator: UTxO;
+  };
 }
+
+export type DeployMinswapValidators = Awaited<
+  ReturnType<typeof deployMinswapValidators>
+>;
 
 export async function deployMinswapValidators(
   t: Translucent,
   validators: MinswapValidators,
-): Promise<DeployedValidators> {
+  deployTo?: Address,
+) {
   const deploymentsChain = [
-    () => processElement(t, "authenValidator", validators.authenValidator),
-    () => processElement(t, "poolValidator", validators.poolValidator),
-    () => processElement(t, "factoryValidator", validators.factoryValidator),
+    () =>
+      processElement(
+        t,
+        "authenValidator",
+        validators.authenValidator,
+        deployTo,
+      ),
+    () =>
+      processElement(t, "poolValidator", validators.poolValidator, deployTo),
+    () =>
+      processElement(
+        t,
+        "factoryValidator",
+        validators.factoryValidator,
+        deployTo,
+      ),
     () =>
       processElement(
         t,
@@ -232,7 +289,7 @@ export async function deployMinswapValidators(
         validators.poolBatchingValidator,
       ),
   ];
-  let res: DeployedValidators = {};
+  let res: Record<string, UTxO> = {};
 
   await executePromiseFunctions(deploymentsChain)
     .then((deployments) => {
@@ -242,5 +299,9 @@ export async function deployMinswapValidators(
       throw new Error(err);
     });
 
-  return res;
+  return res as {
+    authenValidator: UTxO;
+    poolValidator: UTxO;
+    factoryValidator: UTxO;
+  };
 }

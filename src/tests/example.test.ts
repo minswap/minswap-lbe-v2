@@ -17,11 +17,13 @@ import {
   type BuildUsingSellerOptions,
   type WarehouseBuilderOptions,
 } from "../build-tx";
+import { MINIMUM_ORDER_REDEEMED, MINIMUM_SELLER_COLLECTED } from "../constants";
 import {
   collectMinswapValidators,
   collectValidators,
   deployMinswapValidators,
   deployValidators,
+  type DeployMinswapValidators,
   type DeployedValidators,
   type MinswapValidators,
   type Validators,
@@ -29,6 +31,7 @@ import {
 import type {
   Address,
   Assets,
+  Credential,
   Emulator,
   OrderDatum,
   OutputData,
@@ -42,12 +45,12 @@ import {
   calculateInitialLiquidity,
   toUnit,
 } from "../utils";
+import params from "./../../params.json";
 import {
   generateAccount,
   quickSubmitBuilder,
   type GeneratedAccount,
 } from "./utils";
-import { MINIMUM_ORDER_REDEEMED, MINIMUM_SELLER_COLLECTED } from "../constants";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -56,7 +59,7 @@ let t: Translucent;
 let validators: Validators;
 let ammValidators: MinswapValidators;
 let deployedValidators: DeployedValidators;
-let ammDeployedValidators: DeployedValidators;
+let ammDeployedValidators: DeployMinswapValidators;
 let seedUtxo: UTxO;
 let baseAsset: {
   policyId: string;
@@ -80,11 +83,8 @@ beforeEach(async () => {
   t = await T.Translucent.new(emulator);
   ammValidators = collectMinswapValidators({
     t,
-    seedOutRef: {
-      txHash:
-        "5428517bd92102ce1af705f8b66560d445e620aead488b47fb824426484912f8", // dummy
-      outputIndex: 0,
-    },
+    seedOutRef: params.minswap.seedOutRef,
+    poolStakeCredential: params.minswap.poolStakeCredential as Credential,
   });
   // console.log("AMM Authen Policy Id", t.utils.validatorToScriptHash(ammValidators.authenValidator));
   // console.log("AMM Pool Validator Hash", t.utils.validatorToScriptHash(ammValidators.poolValidator));
@@ -144,7 +144,6 @@ beforeEach(async () => {
       txHash: seedUtxo.txHash,
       outputIndex: seedUtxo.outputIndex,
     },
-    dry: true,
   });
   deployedValidators = await deployValidators(t, validators);
   emulator.awaitBlock(10);
@@ -522,8 +521,9 @@ test("example flow", async () => {
     };
     builder = new WarehouseBuilder(warehouseOptions);
     builder.buildCreateAmmPool(options);
+    const txb = builder.complete();
     await quickSubmitBuilder(emulator)({
-      txBuilder: builder.complete(),
+      txBuilder: txb,
     });
     console.info(`create AMM pool done.`);
   };
