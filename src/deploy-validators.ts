@@ -39,6 +39,7 @@ export type MinswapValidators = {
   factoryValidator: Script;
   poolValidator: Script;
   poolBatchingValidator: Script;
+  poolAddress: Address;
 };
 
 export function collectMinswapValidators(options: {
@@ -79,6 +80,7 @@ export function collectMinswapValidators(options: {
     factoryValidator,
     poolValidator,
     poolBatchingValidator,
+    poolAddress,
   };
 }
 
