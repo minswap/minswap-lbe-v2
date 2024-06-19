@@ -429,11 +429,6 @@ pub fn apply_refund_orders(
   expect order_datum: OrderDatum = order_raw_datum
   let OrderDatum { owner, amount, penalty_amount, .. } = order_datum
   let Output { address: user_address, value: user_value, .. } = user_output
-  let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
-    raise_asset
-  let expect_user_out_value =
-    value.from_asset(raise_asset_pid, raise_asset_an, amount + penalty_amount)
-      |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada)
   expect and {
       // Order, Treasury must share the same LBE ID
       order_datum == OrderDatum {
@@ -443,7 +438,24 @@ pub fn apply_refund_orders(
       },
       // Paying User Output correctly!
       user_address == owner,
-      user_value == expect_user_out_value,
+      value.flatten(user_value) == if
+      raise_asset == Asset(ada_policy_id, ada_asset_name){
+      
+        [
+          (
+            ada_policy_id,
+            ada_asset_name,
+            order_minimum_ada + amount + penalty_amount,
+          ),
+        ]
+      } else {
+        let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
+          raise_asset
+        [
+          (ada_policy_id, ada_asset_name, order_minimum_ada),
+          (raise_asset_pid, raise_asset_an, amount + penalty_amount),
+        ]
+      },
     }
   let refund_amount = acc_amount + amount
   let refund_penalty = acc_penalty + penalty_amount
