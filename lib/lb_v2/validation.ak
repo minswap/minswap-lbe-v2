@@ -7,16 +7,16 @@ use aiken/transaction.{
 use aiken/transaction/credential.{
   Address, PaymentCredential, ScriptCredential, VerificationKeyCredential,
 }
-use aiken/transaction/value.{PolicyId, Value}
+use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
 use lb_v2/types.{
   Asset, ManagerDatum, ManagerRedeemer, OrderDatum, PenaltyConfig, PubKeyHash,
   SellerDatum, SellerRedeemer, TreasuryDatum, TreasuryRedeemer, ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  assert, calculate_penalty, get_order_value, manager_auth_an,
-  must_get_start_end_validity, order_auth_an, seller_auth_an, seller_minimum_ada,
-  treasury_auth_an,
+  assert, calculate_penalty, fee_ada, manager_auth_an,
+  must_get_start_end_validity, order_auth_an, order_minimum_ada, seller_auth_an,
+  seller_minimum_ada, treasury_auth_an,
 }
 
 pub fn has_spend_treasury(
@@ -628,12 +628,17 @@ pub fn apply_order(
           ..
         }: OrderDatum = raw_o_datum
         let expected_order =
-          get_order_value(
-            amount: amount,
-            penalty_amount: penalty_amount,
-            factory_policy_id: factory_policy_id,
-            raise_asset: raise_asset,
-          )
+          value.from_asset(factory_policy_id, order_auth_an, 1)
+            |> value.add(
+                raise_asset.policy_id,
+                raise_asset.asset_name,
+                amount + penalty_amount,
+              )
+            |> value.add(
+                ada_policy_id,
+                ada_asset_name,
+                order_minimum_ada + fee_ada * 2,
+              )
         let minimum_amount =
           when minimum_order_raise is {
             Some(minn) -> minn

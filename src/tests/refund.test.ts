@@ -151,7 +151,7 @@ function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): UTxO {
   };
 }
 
-test("Refund | PASS | update orders: success", async () => {
+test("Refund | PASS | success", async () => {
   const { builder, options } = warehouse;
   builder.buildRefundOrders(options);
   const tx = builder.complete();

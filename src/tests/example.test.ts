@@ -47,6 +47,7 @@ import {
   quickSubmitBuilder,
   type GeneratedAccount,
 } from "./utils";
+import { MINIMUM_ORDER_REDEEMED, MINIMUM_SELLER_COLLECTED } from "../constants";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -393,10 +394,10 @@ test("example flow", async () => {
     });
     console.info(`collect sellers ${maxCount} done.`);
   };
-  await collectingSeller(15);
-  await collectingSeller(15);
-  await collectingSeller(15);
-  await collectingSeller(15);
+  await collectingSeller(Number(MINIMUM_SELLER_COLLECTED));
+  await collectingSeller(Number(MINIMUM_SELLER_COLLECTED));
+  await collectingSeller(Number(MINIMUM_SELLER_COLLECTED));
+  await collectingSeller(Number(MINIMUM_SELLER_COLLECTED));
 
   const collectingManager = async () => {
     const managerUtxo: UTxO = (
@@ -456,9 +457,11 @@ test("example flow", async () => {
     });
     console.info(`collect order ${maxCount} done.`);
   };
-  await collectingOrders(25);
-  await collectingOrders(25);
-  await collectingOrders(15);
+
+  await collectingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await collectingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await collectingOrders(Number(MINIMUM_ORDER_REDEEMED));
+
   const creatingPool = async () => {
     const ammFactoryInput: UTxO = (
       await emulator.getUtxos(ammFactoryAddress)
@@ -559,8 +562,8 @@ test("example flow", async () => {
     });
     console.info(`Redeem order ${maxCount} done.`);
   };
-  await redeemingOrders(20);
-  await redeemingOrders(20);
-  await redeemingOrders(20);
-  await redeemingOrders(1);
+  await redeemingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await redeemingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await redeemingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await redeemingOrders(Number(MINIMUM_ORDER_REDEEMED));
 });

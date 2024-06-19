@@ -57,9 +57,18 @@ export function quickSubmitBuilder(emulator: Emulator) {
       console.log("debug", completedTx.txComplete.to_json());
     }
     if (stats) {
+      let maxTxMem = T.PROTOCOL_PARAMETERS_DEFAULT.maxTxExMem;
+      let maxTxCpu = T.PROTOCOL_PARAMETERS_DEFAULT.maxTxExSteps;
+      let maxTxSize = T.PROTOCOL_PARAMETERS_DEFAULT.maxTxSize;
+      let totalMem = completedTx.exUnits?.mem ?? 0;
+      let totalCpu = completedTx.exUnits?.cpu ?? 0;
+      let txSize = completedTx.txComplete.to_bytes().length;
+      let remainMem = (BigInt(100) * (maxTxMem - BigInt(totalMem))) / maxTxMem;
+      let remainCpu = (BigInt(100) * (maxTxCpu - BigInt(totalCpu))) / maxTxCpu;
+      let remainSize = (100 * (maxTxSize - txSize)) / maxTxSize;
+
       const body = completedTx.txComplete.body();
-      const txFee = body.fee().to_str();
-      let totalCoin = 0n;
+      let totalCoin = 0n; // total ADA in outputs validator
       for (let i = 0; i < body.outputs().len(); i++) {
         const output = body.outputs().get(i);
         const addressDetails = T.getAddressDetails(
@@ -71,7 +80,18 @@ export function quickSubmitBuilder(emulator: Emulator) {
         }
       }
       totalCoin /= 1_000_000n;
-      console.log("stats", { txFee, totalCoin });
+      let stats = {
+        totalCoin,
+        txFee: completedTx.fee,
+        totalMem,
+        totalCpu,
+        txSize,
+        // percent
+        remainMem,
+        remainCpu,
+        remainSize,
+      };
+      console.log("stats", stats);
     }
     const signedTx = completedTx.sign();
     for (const privateKey of extraSignatures || []) {

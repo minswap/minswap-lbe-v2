@@ -14,7 +14,6 @@ import { assertValidator, loadModule, quickSubmitBuilder } from "./utils";
 import { genWarehouse } from "./warehouse";
 
 let W: GenTestWarehouse;
-const MAX_SIZE = 15;
 
 beforeAll(async () => {
   await loadModule();
@@ -118,9 +117,9 @@ test("collect-orders | PASS | LBE was cancelled", async () => {
   assertValidator(builder.buildCollectOrders(options), "");
 });
 
-test(`collect-orders | PASS | collect ${MAX_SIZE} orders`, async () => {
+test(`collect-orders | PASS | collect ${MINIMUM_ORDER_COLLECTED} orders`, async () => {
   let orderInputs: UTxO[] = [];
-  for (let i = 0; i < MAX_SIZE; i++) {
+  for (let i = 0; i < MINIMUM_ORDER_COLLECTED; i++) {
     let orderInput: UTxO = {
       ...W.orderInput,
       outputIndex: i * 10,
@@ -129,8 +128,9 @@ test(`collect-orders | PASS | collect ${MAX_SIZE} orders`, async () => {
   }
   let options = remixOptions({
     treasuryDatum: {
-      reserveRaise: W.orderAmount * BigInt(MAX_SIZE),
-      totalPenalty: W.orderDatum.penaltyAmount * BigInt(MAX_SIZE),
+      reserveRaise: W.orderAmount * BigInt(MINIMUM_ORDER_COLLECTED),
+      totalPenalty:
+        W.orderDatum.penaltyAmount * BigInt(MINIMUM_ORDER_COLLECTED),
     },
   });
   options = { ...options, orderInputs };

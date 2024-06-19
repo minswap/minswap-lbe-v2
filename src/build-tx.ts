@@ -24,6 +24,7 @@ import {
   LP_COLATERAL,
   MANAGER_AUTH_AN,
   MANAGER_MIN_ADA,
+  MINIMUM_SELLER_COLLECTED,
   MINSWAP_V2_DEFAULT_POOL_ADA,
   MINSWAP_V2_FACTORY_AUTH_AN,
   MINSWAP_V2_MAX_LIQUIDITY,
@@ -1033,6 +1034,11 @@ export class WarehouseBuilder {
     const managerInDatum: ManagerDatum = this.fromDatumManager(
       managerInput.datum,
     );
+    invariant(
+      sellerInputs.length >= MINIMUM_SELLER_COLLECTED ||
+        managerInDatum.sellerCount === BigInt(sellerInputs.length),
+      `Collect all sellers or at least ${MINIMUM_SELLER_COLLECTED}`,
+    );
     let totalReserveRaise = 0n;
     let totalPenalty = 0n;
     for (const seller of sellerInputs) {
@@ -1347,9 +1353,6 @@ export class WarehouseBuilder {
       "": createTreasury,
       CollectManager: defaultAssets,
       RedeemOrders: redeemAssets,
-      RedeemLPByOwner: () => {
-        throw Error("not implement!");
-      },
       CancelLBE: defaultAssets,
       UpdateLBE: createTreasury,
       CreateAmmPool: createPoolAssets,
