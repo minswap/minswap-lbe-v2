@@ -102,7 +102,7 @@ async function getLBEUTxO({
   }
 }
 
-async function buildCollectSellerTx({ sellerUTxOs }: { sellerUTxOs: UTxO[] }) {
+async function collectSellers({ sellerUTxOs }: { sellerUTxOs: UTxO[] }) {
   const { treasuryUTxO, managerUTxO, warehouseOptions, t } = warehouse;
   const builder = new WarehouseBuilder(warehouseOptions);
   builder.buildCollectSeller({
@@ -121,7 +121,7 @@ async function buildCollectSellerTx({ sellerUTxOs }: { sellerUTxOs: UTxO[] }) {
   warehouse.managerDatum = builder.fromDatumManager(output.managerUTxO!.datum!);
 }
 
-async function buildCollectManagerTx() {
+async function collectManager() {
   const { treasuryUTxO, managerUTxO, warehouseOptions, t } = warehouse;
   const builder = new WarehouseBuilder(warehouseOptions);
   builder.buildCollectManager({
@@ -142,7 +142,7 @@ async function buildCollectManagerTx() {
   };
 }
 
-async function buildCollectOrdersTx({
+async function collectOrders({
   uncollectedOrderUTxOs,
 }: {
   uncollectedOrderUTxOs: UTxO[];
@@ -282,10 +282,30 @@ async function createAmmPool() {
   );
 }
 
-async function buildRedeemOrdersTx({ orderUTxOs }: { orderUTxOs: UTxO[] }) {
+async function redeemOrders({ orderUTxOs }: { orderUTxOs: UTxO[] }) {
   const { treasuryUTxO, warehouseOptions, t } = warehouse;
   const builder = new WarehouseBuilder(warehouseOptions);
   builder.buildRedeemOrders({
+    treasuryInput: treasuryUTxO,
+    orderInputs: orderUTxOs,
+    validFrom: Date.now() / 1000,
+    validTo: Date.now() / 1000 + 60 * 3,
+  });
+  const tx = await builder.complete().complete();
+  const signedTx = await tx.sign().complete();
+  const txHash = await signedTx.submit();
+  await t.awaitTx(txHash, 1000);
+  const output = await getLBEUTxO({ t, txHash, builder });
+  warehouse.treasuryUTxO = output.treasuryUTxO!;
+  warehouse.treasuryDatum = builder.fromDatumTreasury(
+    output.treasuryUTxO!.datum!,
+  );
+}
+
+async function refundOrders({ orderUTxOs }: { orderUTxOs: UTxO[] }) {
+  const { treasuryUTxO, warehouseOptions, t } = warehouse;
+  const builder = new WarehouseBuilder(warehouseOptions);
+  builder.buildRefundOrders({
     treasuryInput: treasuryUTxO,
     orderInputs: orderUTxOs,
     validFrom: Date.now() / 1000,
@@ -318,15 +338,15 @@ async function coutingPhase() {
           `Can not find remaining sellers to collect in LBE ${warehouse.lbeId}`,
         );
       }
-      await buildCollectSellerTx({
+      await collectSellers({
         sellerUTxOs: warehouse.sellerUTxOs.splice(0, collectAmount),
       });
     }
-    await buildCollectManagerTx();
+    await collectManager();
   }
   while (warehouse.uncollectedOrderUTxOs.length > 0) {
     // TODO: invariant if batcher miss some uncollected orders
-    await buildCollectOrdersTx({
+    await collectOrders({
       uncollectedOrderUTxOs: warehouse.uncollectedOrderUTxOs.splice(
         0,
         Math.min(
@@ -341,7 +361,7 @@ async function coutingPhase() {
 async function redeemLpTokenPhase() {
   while (warehouse.collectedOrderUTxOs.length !== 0) {
     // TODO: invariant if batcher miss some collected orders
-    await buildRedeemOrdersTx({
+    await redeemOrders({
       orderUTxOs: warehouse.collectedOrderUTxOs.splice(
         0,
         Math.min(
@@ -354,13 +374,23 @@ async function redeemLpTokenPhase() {
 }
 
 async function refundPhase() {
-  // TODO:
+  while (warehouse.collectedOrderUTxOs.length !== 0) {
+    // TODO: invariant if batcher miss some collected orders
+    await refundOrders({
+      orderUTxOs: warehouse.collectedOrderUTxOs.splice(
+        0,
+        Math.min(
+          warehouse.collectedOrderUTxOs.length,
+          Number(MINIMUM_ORDER_REDEEMED),
+        ),
+      ),
+    });
+  }
 }
 
 async function batchLBE(): Promise<void> {
   await coutingPhase();
   if (warehouse.treasuryDatum.isCancelled) {
-    //
     await refundPhase();
   } else {
     if (warehouse.treasuryDatum.totalLiquidity === 0n) {
@@ -388,7 +418,7 @@ async function handleLBE(options: {
   const builder = new WarehouseBuilder(warehouseOptions);
   const { datum } = treasuryUTxO;
   const treasuryDatum = builder.fromDatumTreasury(datum!);
-  const { endTime, isCancelled, baseAsset, raiseAsset } = treasuryDatum;
+  const { baseAsset, raiseAsset } = treasuryDatum;
 
   const lbeId = computeLPAssetName(
     baseAsset.policyId + baseAsset.assetName,
@@ -416,12 +446,12 @@ async function handleLBE(options: {
       warehouse.uncollectedOrderUTxOs.push(utxo);
     }
   }
-  if (current < endTime) {
-    // check pool is exist
-    // => cancel LBE
-    await cancelLBE();
-  }
-  if (endTime < current || isCancelled === true) {
+
+  await cancelLBE();
+  if (
+    warehouse.treasuryDatum.endTime < current ||
+    warehouse.treasuryDatum.isCancelled === true
+  ) {
     await batchLBE();
   }
 }
