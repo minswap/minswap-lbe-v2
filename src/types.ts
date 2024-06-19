@@ -33,6 +33,10 @@ export type UTxO = T.UTxO;
 export type Maestro = T.Maestro;
 export type MaestroSupportedNetworks = T.MaestroSupportedNetworks;
 export type Credential = T.Credential;
+export type CTransactionOutput = T.CTransactionOutput;
+export type CTransactionOutputs = T.CTransactionOutputs;
+export type CTransactionUnspentOutputs = T.CTransactionUnspentOutputs;
+export type TxSigned = T.TxSigned;
 
 export type AmmPoolDatum = FeedTypeAmmPool["_datum"];
 export type AmmFactoryDatum = FactoryValidatorValidateFactory["datum"];

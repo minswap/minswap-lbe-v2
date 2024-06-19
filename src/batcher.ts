@@ -20,17 +20,6 @@ import {
 import invariant from "@minswap/tiny-invariant";
 import lbeV2Script from "./../lbe-v2-script.json";
 
-function getParams() {
-  const network: MaestroSupportedNetworks = "Preprod";
-  const maestroApiKey = process.argv[3];
-  const seedPhase = process.argv[4];
-  return {
-    network,
-    maestroApiKey,
-    seedPhase,
-  };
-}
-
 let warehouse: {
   treasuryUTxO: UTxO;
   treasuryDatum: TreasuryDatum;
@@ -43,6 +32,22 @@ let warehouse: {
   t: Translucent;
   lbeId: string;
 };
+
+function getParams() {
+  const network: MaestroSupportedNetworks = "Preprod";
+  const maestroApiKey = process.argv[3];
+  const seedPhase = process.argv[4];
+  return {
+    network,
+    maestroApiKey,
+    seedPhase,
+  };
+}
+
+function prepareWarehouse() {
+
+}
+
 function getMapLbeIdUtxO<
   T extends { baseAsset: BluePrintAsset; raiseAsset: BluePrintAsset },
 >(utxos: UTxO[], toDatum: (arg0: string) => T): Record<string, UTxO[]> {
@@ -227,7 +232,7 @@ async function createAmmPool() {
   const [assetA, assetB] = sortPairAsset(baseAsset, raiseAsset);
   const [lbeReserveA, lbeReserveB] =
     baseAsset.policyId === assetA.policyId &&
-    baseAsset.assetName === assetA.assetName
+      baseAsset.assetName === assetA.assetName
       ? [reserveBase, finalReserveRaise]
       : [reserveBase, finalReserveRaise];
   const poolReserveA = (lbeReserveA * poolAllocation) / 100n;
