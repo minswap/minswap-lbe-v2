@@ -14,9 +14,13 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  assert, calculate_penalty, fee_ada, manager_auth_an,
+  assert, calculate_penalty, fee_ada, manager_auth_an, manager_minimum_ada,
   must_get_start_end_validity, order_auth_an, order_minimum_ada, seller_auth_an,
   seller_minimum_ada, treasury_auth_an,
+}
+
+fn is_equal_data(a: Data, b: Data) -> Bool {
+  a == b
 }
 
 pub fn has_spend_treasury(
@@ -42,15 +46,16 @@ pub fn has_spend_treasury(
     output_reference: treasury_out_ref,
     output: Output { value: out_value, .. },
   } = treasury_input
-  expect Some(raw_redeemer) = dict.get(redeemers, Spend(treasury_out_ref))
-  expect redeemer: TreasuryRedeemer = raw_redeemer
   and {
     assert(
       value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
       @"Treasury UTxO must contain 1 Treasury Token",
     ),
     assert(
-      expected_redeemer == redeemer,
+      is_equal_data(
+        dict.get(redeemers, Spend(treasury_out_ref)),
+        Some(expected_redeemer),
+      ),
       @"Spending Treasury must be correct redeemer!",
     ),
   }
@@ -78,10 +83,16 @@ pub fn has_spend_manager(
     output_reference: manager_out_ref,
     output: Output { value: out_value, .. },
   } = manager_input
-  expect value.quantity_of(out_value, factory_policy_id, manager_auth_an) == 1
-  expect Some(raw_redeemer) = dict.get(redeemers, Spend(manager_out_ref))
-  expect redeemer: ManagerRedeemer = raw_redeemer
-  expected_redeemer == redeemer
+  and {
+    value.flatten(out_value) == [
+      (ada_policy_id, ada_asset_name, manager_minimum_ada),
+      (factory_policy_id, manager_auth_an, 1),
+    ],
+    is_equal_data(
+      dict.get(redeemers, Spend(manager_out_ref)),
+      Some(expected_redeemer),
+    ),
+  }
 }
 
 pub fn has_spend_seller(
@@ -106,11 +117,16 @@ pub fn has_spend_seller(
     output_reference: seller_out_ref,
     output: Output { value: seller_out_value, .. },
   } = seller_input
-  expect
-    value.quantity_of(seller_out_value, factory_policy_id, seller_auth_an) == 1
-  expect Some(raw_redeemer) = dict.get(redeemers, Spend(seller_out_ref))
-  expect redeemer: SellerRedeemer = raw_redeemer
-  expected_redeemer == redeemer
+  and {
+    value.flatten(seller_out_value) == [
+      (ada_policy_id, ada_asset_name, seller_minimum_ada),
+      (factory_policy_id, seller_auth_an, 1),
+    ],
+    is_equal_data(
+      dict.get(redeemers, Spend(seller_out_ref)),
+      Some(expected_redeemer),
+    ),
+  }
 }
 
 pub fn get_seller_inputs(
@@ -130,7 +146,10 @@ pub fn get_seller_inputs(
         ..
       } = input
       and {
-        value.quantity_of(in_value, factory_policy_id, seller_auth_an) == 1,
+        value.flatten(in_value) == [
+          (ada_policy_id, ada_asset_name, seller_minimum_ada),
+          (factory_policy_id, seller_auth_an, 1),
+        ],
         payment_credential == ScriptCredential(seller_hash),
       }
     },
@@ -180,7 +199,10 @@ pub fn get_manager_inputs(
       } = input
       and {
         // Has 1 Manager Token
-        value.quantity_of(in_value, factory_policy_id, manager_auth_an) == 1,
+        value.flatten(in_value) == [
+          (ada_policy_id, ada_asset_name, manager_minimum_ada),
+          (factory_policy_id, manager_auth_an, 1),
+        ],
         // output belongs Manager Address
         payment_credential == ScriptCredential(manager_hash),
       }
@@ -304,8 +326,10 @@ pub fn get_manager_output(
           payment_credential == ScriptCredential(manager_hash),
           // No ref_script to avoid increase minimum ADA
           reference_script == None,
-          // Has 1 Manager Token
-          value.quantity_of(out_value, factory_policy_id, manager_auth_an) == 1,
+          value.flatten(out_value) == [
+            (ada_policy_id, ada_asset_name, manager_minimum_ada),
+            (factory_policy_id, manager_auth_an, 1),
+          ],
         }
       },
     )

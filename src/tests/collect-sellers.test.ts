@@ -35,12 +35,12 @@ import { WarehouseBuilder, type BuildCollectSellersOptions } from "../build-tx";
 import {
   MANAGER_MIN_ADA,
   MINIMUM_SELLER_COLLECTED,
+  SELLER_MIN_ADA,
   TREASURY_MIN_ADA,
 } from "../constants";
 import type { Assets, ManagerDatum, SellerDatum, UTxO } from "../types";
 import { plutusAddress2Address, toUnit } from "../utils";
 import {
-  assertValidator,
   assertValidatorFail,
   genWarehouseOptions,
   loadModule,
@@ -170,6 +170,7 @@ function genSellerUTxO(datum: SellerDatum, builder: WarehouseBuilder): UTxO {
     outputIndex: ++utxoIndex,
     assets: {
       [builder.sellerToken]: 1n,
+      lovelace: SELLER_MIN_ADA,
     },
     address: builder.sellerAddress,
     datum: builder.toDatumSeller(datum),
