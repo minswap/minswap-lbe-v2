@@ -1,16 +1,22 @@
 import { WarehouseBuilder, type WarehouseBuilderOptions } from "./build-tx";
 import { genWarehouseOptions, hexToUtxo } from "./tests/utils";
 import type {
-  Address,
+  AmmPoolDatum,
   BluePrintAsset,
   MaestroSupportedNetworks,
+  ManagerDatum,
   Translucent,
+  TreasuryDatum,
   UTxO,
   UnixTime,
 } from "./types";
 import * as T from "@minswap/translucent";
-import { computeLPAssetName } from "./utils";
-import { MINIMUM_ORDER_COLLECTED, MINIMUM_SELLER_COLLECTED } from "./constants";
+import { calculateInitialLiquidity, computeLPAssetName } from "./utils";
+import {
+  MINIMUM_ORDER_COLLECTED,
+  MINIMUM_ORDER_REDEEMED,
+  MINIMUM_SELLER_COLLECTED,
+} from "./constants";
 import invariant from "@minswap/tiny-invariant";
 import lbeV2Script from "./../lbe-v2-script.json";
 
@@ -25,6 +31,18 @@ function getParams() {
   };
 }
 
+let warehouse: {
+  treasuryUTxO: UTxO;
+  treasuryDatum: TreasuryDatum;
+  managerUTxO?: UTxO;
+  managerDatum?: ManagerDatum;
+  sellerUTxOs: UTxO[];
+  uncollectedOrderUTxOs: UTxO[];
+  collectedOrderUTxOs: UTxO[];
+  warehouseOptions: WarehouseBuilderOptions;
+  t: Translucent;
+  lbeId: string;
+};
 function getMapLbeIdUtxO<
   T extends { baseAsset: BluePrintAsset; raiseAsset: BluePrintAsset },
 >(utxos: UTxO[], toDatum: (arg0: string) => T): Record<string, UTxO[]> {
@@ -45,24 +63,11 @@ function getMapLbeIdUtxO<
   return mapLbeIdUTxO;
 }
 
-type BatchLBEOptions = {
-  t: Translucent;
-  treasuryUTxO: UTxO;
-  managerUTxO?: UTxO;
-  sellerUTxOs: UTxO[];
-  batcherUTxO: UTxO;
-  orderUTxOs: UTxO[];
-  batcherAddress: Address;
-  current: UnixTime;
-};
-
 async function getLBEUTxO({
-  batcherAddress,
   t,
   txHash,
   builder,
 }: {
-  batcherAddress: Address;
   t: Translucent;
   txHash: string;
   builder: WarehouseBuilder;
@@ -71,7 +76,6 @@ async function getLBEUTxO({
   const outputs: {
     treasuryUTxO?: UTxO;
     managerUTxO?: UTxO;
-    batcherUTxO?: UTxO;
     orderUTxOs: UTxO[];
   } = {
     orderUTxOs: [],
@@ -84,9 +88,6 @@ async function getLBEUTxO({
 
     // handle
     const { address, assets } = utxo;
-    if (address === batcherAddress) {
-      outputs.batcherUTxO = utxo;
-    }
     const hash = T.paymentCredentialOf(address).hash;
     if (hash === builder.orderHash && assets[builder.orderToken] === 1n) {
       outputs.orderUTxOs.push(utxo);
@@ -101,92 +102,52 @@ async function getLBEUTxO({
   }
 }
 
-async function buildCollectSellerTx({
-  managerUTxO,
-  treasuryUTxO,
-  sellerUTxOs,
-  warehouseOptions,
-  batcherUTxO,
-  batcherAddress,
-  t,
-}: {
-  managerUTxO: T.UTxO;
-  treasuryUTxO: T.UTxO;
-  sellerUTxOs: UTxO[];
-  batcherUTxO: UTxO;
-  batcherAddress: Address;
-  warehouseOptions: WarehouseBuilderOptions;
-  t: Translucent;
-}) {
+async function buildCollectSellerTx({ sellerUTxOs }: { sellerUTxOs: UTxO[] }) {
+  const { treasuryUTxO, managerUTxO, warehouseOptions, t } = warehouse;
   const builder = new WarehouseBuilder(warehouseOptions);
   builder.buildCollectSeller({
     treasuryRefInput: treasuryUTxO,
-    managerInput: managerUTxO,
+    managerInput: managerUTxO!,
     sellerInputs: sellerUTxOs,
     validFrom: Date.now() / 1000,
     validTo: Date.now() / 1000 + 60 * 3,
   });
-  const tx = await builder.complete().collectFrom([batcherUTxO]).complete();
+  const tx = await builder.complete().complete();
   const signedTx = await tx.sign().complete();
   const txHash = await signedTx.submit();
   await t.awaitTx(txHash, 1000);
-  const output = await getLBEUTxO({ t, batcherAddress, txHash, builder });
-  return {
-    managerUTxO: output.managerUTxO!,
-    managerDatum: builder.fromDatumManager(output.managerUTxO!.datum!),
-    batcherUTxO: output.batcherUTxO!,
-  };
+  const output = await getLBEUTxO({ t, txHash, builder });
+  warehouse.managerUTxO = output.managerUTxO!;
+  warehouse.managerDatum = builder.fromDatumManager(output.managerUTxO!.datum!);
 }
 
-async function buildCollectManagerTx({
-  managerUTxO,
-  treasuryUTxO,
-  warehouseOptions,
-  batcherUTxO,
-  batcherAddress,
-  t,
-}: {
-  managerUTxO: T.UTxO;
-  treasuryUTxO: T.UTxO;
-  batcherUTxO: UTxO;
-  batcherAddress: Address;
-  warehouseOptions: WarehouseBuilderOptions;
-  t: Translucent;
-}) {
+async function buildCollectManagerTx() {
+  const { treasuryUTxO, managerUTxO, warehouseOptions, t } = warehouse;
   const builder = new WarehouseBuilder(warehouseOptions);
   builder.buildCollectManager({
     treasuryInput: treasuryUTxO,
-    managerInput: managerUTxO,
+    managerInput: managerUTxO!,
     validFrom: Date.now() / 1000,
     validTo: Date.now() / 1000 + 60 * 3,
   });
-  const tx = await builder.complete().collectFrom([batcherUTxO]).complete();
+  const tx = await builder.complete().complete();
   const signedTx = await tx.sign().complete();
   const txHash = await signedTx.submit();
   await t.awaitTx(txHash, 1000);
-  const output = await getLBEUTxO({ t, batcherAddress, txHash, builder });
-  return {
-    batcherUTxO: output.batcherUTxO!,
+  const output = await getLBEUTxO({ t, txHash, builder });
+  warehouse = {
+    ...warehouse,
     treasuryUTxO: output.treasuryUTxO!,
     treasuryDatum: builder.fromDatumTreasury(output.treasuryUTxO!.datum!),
   };
 }
 
 async function buildCollectOrdersTx({
-  treasuryUTxO,
   uncollectedOrderUTxOs,
-  warehouseOptions,
-  batcherUTxO,
-  batcherAddress,
-  t,
 }: {
-  treasuryUTxO: T.UTxO;
   uncollectedOrderUTxOs: UTxO[];
-  batcherUTxO: UTxO;
-  batcherAddress: Address;
-  warehouseOptions: WarehouseBuilderOptions;
-  t: Translucent;
 }) {
+  const { warehouseOptions, treasuryUTxO, t } = warehouse;
   const builder = new WarehouseBuilder(warehouseOptions);
   builder.buildCollectOrders({
     treasuryInput: treasuryUTxO,
@@ -194,126 +155,275 @@ async function buildCollectOrdersTx({
     validFrom: Date.now() / 1000,
     validTo: Date.now() / 1000 + 60 * 3,
   });
-  const tx = await builder.complete().collectFrom([batcherUTxO]).complete();
+  const tx = await builder.complete().complete();
   const signedTx = await tx.sign().complete();
   const txHash = await signedTx.submit();
   await t.awaitTx(txHash, 1000);
-  const output = await getLBEUTxO({ t, batcherAddress, txHash, builder });
-  return {
-    batcherUTxO: output.batcherUTxO!,
-    treasuryUTxO: output.treasuryUTxO!,
-    treasuryDatum: builder.fromDatumTreasury(output.treasuryUTxO!.datum!),
-    collectedOrderUTxOs: output.orderUTxOs,
-  };
+  const output = await getLBEUTxO({ t, txHash, builder });
+  warehouse.treasuryUTxO = output.treasuryUTxO!;
+  warehouse.treasuryDatum = builder.fromDatumTreasury(
+    output.treasuryUTxO!.datum!,
+  );
+  warehouse.collectedOrderUTxOs = output.orderUTxOs;
 }
 
-// async function buildCreateAmmPoolTx({
-//   treasuryUTxO,
-//   treasuryDatum,
-//   warehouseOptions,
-//   batcherUTxO,
-//   batcherAddress,
-//   t,
-// }: {
-//   t: Translucent;
-//   treasuryUTxO: UTxO;
-//   treasuryDatum: TreasuryDatum;
-//   batcherUTxO: UTxO;
-//   batcherAddress: Address;
-//   warehouseOptions: WarehouseBuilderOptions;
-// }) {
-//   const { baseAsset, raiseAsset } = treasuryDatum;
-//   const lpAssetName = computeLPAssetName(
-//     baseAsset.policyId + baseAsset.assetName,
-//     raiseAsset.policyId + raiseAsset.assetName
-//   );
-//   const
+async function findFactoryUTxO(
+  t: Translucent,
+  builder: WarehouseBuilder,
+  lpAssetName: string,
+): Promise<UTxO> {
+  const utxos = await t.utxosAtWithUnit(
+    { type: "Script", hash: builder.ammFactoryHash },
+    builder.ammFactoryToken,
+  );
+  for (const utxo of utxos) {
+    const { head, tail } = builder.fromDatumAmmFactory(utxo.datum!);
+    if (lpAssetName > head && lpAssetName < tail) {
+      return utxo;
+    }
+  }
+  throw Error(`Can not find factory for lpAssetName: ${lpAssetName}`);
+}
 
-// }
-async function batchLBE(options: BatchLBEOptions): Promise<void> {
-  const { t, sellerUTxOs, orderUTxOs, batcherAddress } = options;
-  let treasuryUTxO = options.treasuryUTxO;
-  let managerUTxO = options.managerUTxO;
-  let batcherUTxO = options.batcherUTxO;
-  const warehouseOptions = await genWarehouseOptions(t);
-
+function sortPairAsset(
+  baseAsset: BluePrintAsset,
+  raiseAsset: BluePrintAsset,
+): [BluePrintAsset, BluePrintAsset] {
+  if (baseAsset.policyId !== raiseAsset.policyId) {
+    if (baseAsset.policyId !== raiseAsset.policyId) {
+      return [baseAsset, raiseAsset];
+    }
+    return [raiseAsset, baseAsset];
+  }
+  if (baseAsset.assetName < raiseAsset.assetName) {
+    return [baseAsset, raiseAsset];
+  }
+  return [raiseAsset, baseAsset];
+}
+async function createAmmPool() {
+  const { treasuryUTxO, treasuryDatum, warehouseOptions, t } = warehouse;
   const builder = new WarehouseBuilder(warehouseOptions);
-
-  let treasuryDatum = builder.fromDatumTreasury(treasuryUTxO.datum!);
-  if (treasuryDatum.isManagerCollected === false) {
-    invariant(managerUTxO);
-    let managerDatum = builder.fromDatumManager(managerUTxO.datum!);
-    while (managerDatum.sellerCount > 0) {
-      const outputs = await buildCollectSellerTx({
-        managerUTxO,
-        treasuryUTxO,
-        sellerUTxOs: sellerUTxOs.splice(
-          0,
-          Math.min(
-            Number(MINIMUM_SELLER_COLLECTED),
-            Number(managerDatum.sellerCount),
-          ),
-        ),
-        warehouseOptions,
-        batcherUTxO,
-        batcherAddress,
-        t,
-      });
-      managerUTxO = outputs.managerUTxO;
-      managerDatum = outputs.managerDatum;
-      batcherUTxO = outputs.batcherUTxO;
-    }
-    const outputs = await buildCollectManagerTx({
-      managerUTxO,
-      treasuryUTxO,
-      warehouseOptions,
-      batcherUTxO,
-      batcherAddress,
-      t,
-    });
-    batcherUTxO = outputs.batcherUTxO;
-    treasuryUTxO = outputs.treasuryUTxO;
-    treasuryDatum = outputs.treasuryDatum;
+  const {
+    baseAsset,
+    raiseAsset,
+    poolAllocation,
+    maximumRaise,
+    minimumRaise,
+    reserveBase,
+    reserveRaise,
+    totalPenalty,
+    poolBaseFee,
+  } = treasuryDatum;
+  let finalReserveRaise = reserveRaise + totalPenalty;
+  if (maximumRaise && reserveRaise + totalPenalty > maximumRaise) {
+    finalReserveRaise = maximumRaise;
   }
+  if (minimumRaise) {
+    invariant(
+      finalReserveRaise > minimumRaise,
+      "not raise enough to create pool and this LBE will be cancelled next round",
+    );
+  }
+  const [assetA, assetB] = sortPairAsset(baseAsset, raiseAsset);
+  const [lbeReserveA, lbeReserveB] =
+    baseAsset.policyId === assetA.policyId &&
+    baseAsset.assetName === assetA.assetName
+      ? [reserveBase, finalReserveRaise]
+      : [reserveBase, finalReserveRaise];
+  const poolReserveA = (lbeReserveA * poolAllocation) / 100n;
+  const poolReserveB = (lbeReserveB * poolAllocation) / 100n;
+  const lpAssetName = computeLPAssetName(
+    assetA.policyId + assetA.assetName,
+    assetB.policyId + assetB.assetName,
+  );
 
-  if (treasuryDatum.totalLiquidity === 0n) {
-    const uncollectedOrderUTxOs: UTxO[] = [];
-    const collectedOrderUTxOs: UTxO[] = [];
-    // collect order
-    for (const utxo of orderUTxOs) {
-      const orderDatum = builder.fromDatumOrder(utxo.datum!);
-      if (orderDatum.isCollected) {
-        collectedOrderUTxOs.push(utxo);
-      } else {
-        uncollectedOrderUTxOs.push(utxo);
+  const totalLpToken = calculateInitialLiquidity(poolReserveA, poolReserveB);
+  const ammPoolDatum: AmmPoolDatum = {
+    poolBatchingStakeCredential: {
+      Inline: [
+        {
+          ScriptCredential: [
+            t.utils.validatorToScriptHash(
+              builder.ammValidators.poolBatchingValidator,
+            ),
+          ],
+        },
+      ],
+    },
+    assetA: assetA,
+    assetB: assetB,
+    totalLiquidity: totalLpToken,
+    reserveA: poolReserveA,
+    reserveB: poolReserveB,
+    baseFeeANumerator: poolBaseFee,
+    baseFeeBNumerator: poolBaseFee,
+    feeSharingNumeratorOpt: null,
+    allowDynamicFee: false,
+  };
+  const factoryUTxO = await findFactoryUTxO(t, builder, lpAssetName);
+  builder.buildCreateAmmPool({
+    treasuryInput: treasuryUTxO,
+    ammFactoryInput: factoryUTxO,
+    ammPoolDatum: ammPoolDatum,
+    totalLiquidity: totalLpToken,
+    receiverA: lbeReserveA - poolReserveA,
+    receiverB: lbeReserveB - poolReserveB,
+    validFrom: Date.now() / 1000,
+    validTo: Date.now() / 1000 + 60 * 3,
+  });
+  const tx = await builder.complete().complete();
+  const signedTx = await tx.sign().complete();
+  const txHash = await signedTx.submit();
+  await t.awaitTx(txHash, 1000);
+  const output = await getLBEUTxO({ t, txHash, builder });
+  warehouse.treasuryUTxO = output.treasuryUTxO!;
+  warehouse.treasuryDatum = builder.fromDatumTreasury(
+    output.treasuryUTxO!.datum!,
+  );
+}
+
+async function buildRedeemOrdersTx({ orderUTxOs }: { orderUTxOs: UTxO[] }) {
+  const { treasuryUTxO, warehouseOptions, t } = warehouse;
+  const builder = new WarehouseBuilder(warehouseOptions);
+  builder.buildRedeemOrders({
+    treasuryInput: treasuryUTxO,
+    orderInputs: orderUTxOs,
+    validFrom: Date.now() / 1000,
+    validTo: Date.now() / 1000 + 60 * 3,
+  });
+  const tx = await builder.complete().complete();
+  const signedTx = await tx.sign().complete();
+  const txHash = await signedTx.submit();
+  await t.awaitTx(txHash, 1000);
+  const output = await getLBEUTxO({ t, txHash, builder });
+  warehouse.treasuryUTxO = output.treasuryUTxO!;
+  warehouse.treasuryDatum = builder.fromDatumTreasury(
+    output.treasuryUTxO!.datum!,
+  );
+}
+
+async function coutingPhase() {
+  if (warehouse.treasuryDatum.isManagerCollected === false) {
+    invariant(warehouse.managerUTxO);
+    while (warehouse.sellerUTxOs.length > 0) {
+      const collectAmount = Math.min(
+        Number(MINIMUM_SELLER_COLLECTED),
+        warehouse.sellerUTxOs.length,
+      );
+      if (
+        collectAmount < MINIMUM_SELLER_COLLECTED &&
+        BigInt(collectAmount) !== warehouse.managerDatum?.sellerCount
+      ) {
+        throw Error(
+          `Can not find remaining sellers to collect in LBE ${warehouse.lbeId}`,
+        );
       }
-    }
-    while (
-      treasuryDatum.collectedFund ===
-      treasuryDatum.reserveRaise + treasuryDatum.totalPenalty
-    ) {
-      const outputs = await buildCollectOrdersTx({
-        treasuryUTxO,
-        uncollectedOrderUTxOs: uncollectedOrderUTxOs.splice(
-          0,
-          Math.min(
-            uncollectedOrderUTxOs.length,
-            Number(MINIMUM_ORDER_COLLECTED),
-          ),
-        ),
-        warehouseOptions,
-        batcherUTxO,
-        batcherAddress,
-        t,
+      await buildCollectSellerTx({
+        sellerUTxOs: warehouse.sellerUTxOs.splice(0, collectAmount),
       });
-      batcherUTxO = outputs.batcherUTxO;
-      treasuryUTxO = outputs.treasuryUTxO;
-      treasuryDatum = outputs.treasuryDatum;
-      collectedOrderUTxOs.push(...outputs.collectedOrderUTxOs);
     }
-    // TODO: create pool
+    await buildCollectManagerTx();
   }
-  // TODO: redeem LP
+  while (warehouse.uncollectedOrderUTxOs.length > 0) {
+    // TODO: invariant if batcher miss some uncollected orders
+    await buildCollectOrdersTx({
+      uncollectedOrderUTxOs: warehouse.uncollectedOrderUTxOs.splice(
+        0,
+        Math.min(
+          warehouse.uncollectedOrderUTxOs.length,
+          Number(MINIMUM_ORDER_COLLECTED),
+        ),
+      ),
+    });
+  }
+}
+
+async function redeemLpTokenPhase() {
+  while (warehouse.collectedOrderUTxOs.length !== 0) {
+    // TODO: invariant if batcher miss some collected orders
+    await buildRedeemOrdersTx({
+      orderUTxOs: warehouse.collectedOrderUTxOs.splice(
+        0,
+        Math.min(
+          warehouse.collectedOrderUTxOs.length,
+          Number(MINIMUM_ORDER_REDEEMED),
+        ),
+      ),
+    });
+  }
+}
+
+async function refundPhase() {
+  // TODO:
+}
+
+async function batchLBE(): Promise<void> {
+  await coutingPhase();
+  if (warehouse.treasuryDatum.isCancelled) {
+    //
+    await refundPhase();
+  } else {
+    if (warehouse.treasuryDatum.totalLiquidity === 0n) {
+      await createAmmPool();
+    }
+    await redeemLpTokenPhase();
+  }
+}
+
+async function cancelLBE() {
+  // TODO
+}
+
+async function handleLBE(options: {
+  t: Translucent;
+  treasuryUTxO: UTxO;
+  managerUTxO?: UTxO;
+  sellerUTxOs: UTxO[];
+  orderUTxOs: UTxO[];
+  current: UnixTime;
+}) {
+  const { t, treasuryUTxO, managerUTxO, sellerUTxOs, orderUTxOs, current } =
+    options;
+  const warehouseOptions = await genWarehouseOptions(t);
+  const builder = new WarehouseBuilder(warehouseOptions);
+  const { datum } = treasuryUTxO;
+  const treasuryDatum = builder.fromDatumTreasury(datum!);
+  const { endTime, isCancelled, baseAsset, raiseAsset } = treasuryDatum;
+
+  const lbeId = computeLPAssetName(
+    baseAsset.policyId + baseAsset.assetName,
+    raiseAsset.policyId + raiseAsset.assetName,
+  );
+  warehouse = {
+    treasuryUTxO,
+    treasuryDatum: treasuryDatum,
+    managerUTxO,
+    managerDatum: managerUTxO
+      ? builder.fromDatumManager(managerUTxO!.datum!)
+      : undefined,
+    sellerUTxOs,
+    uncollectedOrderUTxOs: [],
+    collectedOrderUTxOs: [],
+    t,
+    warehouseOptions,
+    lbeId,
+  };
+  for (const utxo of orderUTxOs) {
+    const orderDatum = builder.fromDatumOrder(utxo.datum!);
+    if (orderDatum.isCollected) {
+      warehouse.collectedOrderUTxOs.push(utxo);
+    } else {
+      warehouse.uncollectedOrderUTxOs.push(utxo);
+    }
+  }
+  if (current < endTime) {
+    // check pool is exist
+    // => cancel LBE
+    await cancelLBE();
+  }
+  if (endTime < current || isCancelled === true) {
+    await batchLBE();
+  }
 }
 
 async function runBatcher(t: Translucent): Promise<void> {
@@ -373,19 +483,11 @@ async function runBatcher(t: Translucent): Promise<void> {
     builder.fromDatumManager,
   );
   const currentDate = Date.now() / 1000;
-  const batcherAddress = await t.wallet.address();
-  const batcherUTxO = (await t.wallet.getUtxos())[0];
   for (const utxo of treasuryUTxOs) {
     const { datum } = utxo;
     const treasuryDatum = builder.fromDatumTreasury(datum!);
-    const {
-      baseAsset,
-      raiseAsset,
-      collectedFund,
-      totalLiquidity,
-      endTime,
-      isCancelled,
-    } = treasuryDatum;
+    const { baseAsset, raiseAsset, collectedFund, totalLiquidity } =
+      treasuryDatum;
     if (totalLiquidity !== 0n && collectedFund === 0n) {
       // finished LBE
       continue;
@@ -394,17 +496,17 @@ async function runBatcher(t: Translucent): Promise<void> {
       baseAsset.policyId + baseAsset.assetName,
       raiseAsset.policyId + raiseAsset.assetName,
     );
-    if (endTime < currentDate || isCancelled === true) {
-      await batchLBE({
+    try {
+      await handleLBE({
         t,
         treasuryUTxO: utxo,
         managerUTxO: mapManager[lbeId][0] ?? undefined,
         sellerUTxOs: mapSeller[lbeId] ?? [],
         orderUTxOs: mapOrder[lbeId] ?? [],
-        batcherAddress,
-        batcherUTxO,
         current: currentDate,
       });
+    } catch (err) {
+      console.error(err);
     }
   }
 }

@@ -8,6 +8,7 @@ import type {
   SellerValidateSellerSpending,
   TreasuryValidateTreasurySpending,
 } from "../plutus";
+import type { FactoryValidatorValidateFactory } from "../amm-plutus";
 
 export type Address = T.Address;
 export type Assets = T.Assets;
@@ -34,6 +35,7 @@ export type MaestroSupportedNetworks = T.MaestroSupportedNetworks;
 export type Credential = T.Credential;
 
 export type AmmPoolDatum = FeedTypeAmmPool["_datum"];
+export type AmmFactoryDatum = FactoryValidatorValidateFactory["datum"];
 export type FactoryDatum = FactoryValidateFactory["datum"];
 export type ManagerDatum = ManagerValidateManagerSpending["managerInDatum"];
 export type OrderDatum = OrderValidateOrder["datum"];

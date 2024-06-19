@@ -43,6 +43,7 @@ import type {
 } from "./deploy-validators";
 import type {
   Address,
+  AmmFactoryDatum,
   AmmPoolDatum,
   Assets,
   BluePrintAsset,
@@ -1145,6 +1146,10 @@ export class WarehouseBuilder {
 
   toDatumAmmPool(datum: AmmPoolDatum): string {
     return T.Data.to(datum, FeedTypeAmmPool._datum);
+  }
+
+  fromDatumAmmFactory(rawDatum: string): AmmFactoryDatum {
+    return T.Data.from(rawDatum, AmmValidateFactory.datum);
   }
 
   calFinalReserveRaise(datum: TreasuryDatum) {
