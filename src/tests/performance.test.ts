@@ -21,9 +21,9 @@ import { calculateInitialLiquidity, toUnit } from "../utils";
 import { LP_COLATERAL, TREASURY_MIN_ADA } from "..";
 
 let MAX_COLLECT_SELLER_COUNT = 30;
-let MAX_COLLECT_ORDER_COUNT = 50;
+let MAX_COLLECT_ORDER_COUNT = 51;
 let MAX_REFUND_ORDER_COUNT = 50;
-let MAX_REDEEM_ORDER_COUNT = 53;
+let MAX_REDEEM_ORDER_COUNT = 54;
 
 let warehouse: GenWarehouse;
 let defaultMaxTxSize = T.PROTOCOL_PARAMETERS_DEFAULT.maxTxSize;
