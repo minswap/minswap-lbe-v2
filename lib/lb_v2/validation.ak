@@ -314,7 +314,6 @@ pub fn get_manager_output(
 
 pub fn get_order_outputs(
   outputs: List<Output>,
-  factory_policy_id: PolicyId,
   order_hash: ValidatorHash,
 ) -> List<Output> {
   list.filter(
@@ -322,13 +321,11 @@ pub fn get_order_outputs(
     fn(output) {
       let Output {
         address: Address { payment_credential, .. },
-        value: out_value,
         reference_script,
         ..
       } = output
       and {
         payment_credential == ScriptCredential(order_hash),
-        value.quantity_of(out_value, factory_policy_id, order_auth_an) == 1,
         reference_script == None,
       }
     },
@@ -502,11 +499,7 @@ pub fn validate_using_seller(
       order_hash: order_hash,
     )
   let order_outputs =
-    get_order_outputs(
-      outputs: outputs,
-      factory_policy_id: factory_policy_id,
-      order_hash: order_hash,
-    )
+    get_order_outputs(outputs: outputs, order_hash: order_hash)
   let (delta_amount, delta_penalty) =
     apply_order(
       order_inputs: order_inputs,
@@ -710,6 +703,13 @@ pub fn build_default_seller_output(
     datum: InlineDatum(seller_datum),
     reference_script: None,
   }
+}
+
+pub fn build_default_collected_order_value(
+  factory_policy_id: ValidatorHash,
+) -> Value {
+  value.from_asset(factory_policy_id, order_auth_an, 1)
+    |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
 }
 
 // Check if the owner authorizes the transaction
