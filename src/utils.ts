@@ -122,10 +122,10 @@ export function address2PlutusAddress(address: Address): PlutusAddress {
             Inline: [
               stakeCredential.type === "Key"
                 ? {
-                    VerificationKeyCredential: [paymentCredential.hash],
+                    VerificationKeyCredential: [stakeCredential.hash],
                   }
                 : {
-                    ScriptCredential: [paymentCredential.hash],
+                    ScriptCredential: [stakeCredential.hash],
                   },
             ],
           }

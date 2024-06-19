@@ -6,18 +6,19 @@ import {
   collectValidators,
   deployMinswapValidators,
   deployValidators,
-  type DeployedValidators,
   type MinswapValidators,
   type Validators,
 } from "../deploy-validators";
 import type {
   Assets,
+  Credential,
   Emulator,
   PrivateKey,
   Translucent,
   Tx,
   UTxO,
 } from "../types";
+import params from "./../../params.json";
 
 export type GeneratedAccount = {
   privateKey: string;
@@ -97,8 +98,8 @@ export const DUMMY_SEED_UTXO: UTxO = {
 };
 
 export const DUMMY_SEED_AMM_UTXO: UTxO = {
-  txHash: "5428517bd92102ce1af705f8b66560d445e620aead488b47fb824426484912f8",
-  outputIndex: 0,
+  txHash: params.minswap.seedOutRef.txHash,
+  outputIndex: params.minswap.seedOutRef.outputIndex,
   assets: { lovelace: 5_000_000n },
   address: "addr_test1vqtx6ahdpzm0nm9qa4wh4avhze8gv3j6jv6v3gmrukdxfrqm6m8d3",
 };
@@ -111,6 +112,7 @@ const genAmmValidators = async (t: Translucent) => {
       txHash: DUMMY_SEED_AMM_UTXO.txHash,
       outputIndex: DUMMY_SEED_AMM_UTXO.outputIndex,
     },
+    poolStakeCredential: params.minswap.poolStakeCredential as Credential,
   });
   return ammValidators;
 };
@@ -123,7 +125,6 @@ const genValidators = async (t: Translucent) => {
       txHash: DUMMY_SEED_UTXO.txHash,
       outputIndex: DUMMY_SEED_UTXO.outputIndex,
     },
-    dry: true,
   });
   return validators;
 };
@@ -146,12 +147,11 @@ export type GenWarehouseOptions = ReturnType<typeof genWarehouseOptions>;
 export const genWarehouseOptions = async (t: Translucent) => {
   let validators = await genValidators(t);
   let ammValidators: MinswapValidators = await genAmmValidators(t);
-  let deployedValidators: DeployedValidators = await genDeployValidators(
+  let deployedValidators = await genDeployValidators(t, validators);
+  let ammDeployedValidators = await genDeployMinswapValidators(
     t,
-    validators,
+    ammValidators,
   );
-  let ammDeployedValidators: DeployedValidators =
-    await genDeployMinswapValidators(t, ammValidators);
   const options: WarehouseBuilderOptions = {
     t,
     validators,
