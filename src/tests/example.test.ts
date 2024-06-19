@@ -30,6 +30,7 @@ import {
 import type {
   Address,
   Assets,
+  Credential,
   Emulator,
   OrderDatum,
   OutputData,
@@ -48,6 +49,7 @@ import {
   quickSubmitBuilder,
   type GeneratedAccount,
 } from "./utils";
+import params from "./../../params.json";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -80,11 +82,8 @@ beforeEach(async () => {
   t = await T.Translucent.new(emulator);
   ammValidators = collectMinswapValidators({
     t,
-    seedOutRef: {
-      txHash:
-        "5428517bd92102ce1af705f8b66560d445e620aead488b47fb824426484912f8", // dummy
-      outputIndex: 0,
-    },
+    seedOutRef: params.minswap.seedOutRef,
+    poolStakeCredential: params.minswap.poolStakeCredential as Credential,
   });
   // console.log("AMM Authen Policy Id", t.utils.validatorToScriptHash(ammValidators.authenValidator));
   // console.log("AMM Pool Validator Hash", t.utils.validatorToScriptHash(ammValidators.poolValidator));
@@ -519,8 +518,10 @@ test("example flow", async () => {
     };
     builder = new WarehouseBuilder(warehouseOptions);
     builder.buildCreateAmmPool(options);
+    const txb = builder.complete();
     await quickSubmitBuilder(emulator)({
-      txBuilder: builder.complete(),
+      txBuilder: txb,
+      debug: true,
     });
     console.info(`create AMM pool done.`);
   };
