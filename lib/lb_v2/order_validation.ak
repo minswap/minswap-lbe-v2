@@ -298,8 +298,10 @@ pub fn apply_redeem_orders(
       |> value.add(raise_asset_pid, raise_asset_an, raise_bonus)
       |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada)
   expect and {
+      // Order, Treasury must share the same LBE ID
       base_asset == o_base_asset,
       raise_asset == o_raise_asset,
+      // Paying User Output correctly!
       user_address == owner,
       expect_user_value == user_value,
     }
@@ -427,12 +429,19 @@ pub fn apply_refund_orders(
     ..
   } = order_input
   expect order_datum: OrderDatum = order_raw_datum
-  let OrderDatum { owner, amount, penalty_amount, base_asset: o_base_asset, raise_asset: o_raise_asset, .. } = order_datum
+  let OrderDatum {
+    owner,
+    amount,
+    penalty_amount,
+    base_asset: o_base_asset,
+    raise_asset: o_raise_asset,
+    ..
+  } = order_datum
   let Output { address: user_address, value: user_value, .. } = user_output
   expect and {
       // Order, Treasury must share the same LBE ID
       o_base_asset == base_asset,
-      o_raise_asset==raise_asset,
+      o_raise_asset == raise_asset,
       // Paying User Output correctly!
       user_address == owner,
       value.flatten(user_value) == if
