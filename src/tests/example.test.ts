@@ -521,7 +521,6 @@ test("example flow", async () => {
     const txb = builder.complete();
     await quickSubmitBuilder(emulator)({
       txBuilder: txb,
-      debug: true,
     });
     console.info(`create AMM pool done.`);
   };
