@@ -1,14 +1,10 @@
 import { WarehouseBuilder, type WarehouseBuilderOptions } from "./build-tx";
-import { genWarehouseOptions } from "./tests/utils";
+import { genWarehouseOptions, hexToUtxo } from "./tests/utils";
 import type {
   Address,
   BluePrintAsset,
   MaestroSupportedNetworks,
-  ManagerDatum,
-  OrderDatum,
-  SellerDatum,
   Translucent,
-  TreasuryDatum,
   UTxO,
   UnixTime,
 } from "./types";
@@ -16,6 +12,7 @@ import * as T from "@minswap/translucent";
 import { computeLPAssetName } from "./utils";
 import { MINIMUM_ORDER_COLLECTED, MINIMUM_SELLER_COLLECTED } from "./constants";
 import invariant from "@minswap/tiny-invariant";
+import lbeV2Script from "./../lbe-v2-script.json";
 
 function getParams() {
   const network: MaestroSupportedNetworks = "Preprod";
@@ -37,7 +34,7 @@ function getMapLbeIdUtxO<
     const { baseAsset, raiseAsset } = toDatum(datum!);
     const lbeId = computeLPAssetName(
       baseAsset.policyId + baseAsset.assetName,
-      raiseAsset.policyId + raiseAsset.assetName
+      raiseAsset.policyId + raiseAsset.assetName,
     );
     if (mapLbeIdUTxO[lbeId]) {
       mapLbeIdUTxO[lbeId] = [utxo];
@@ -109,13 +106,11 @@ async function buildCollectSellerTx({
   treasuryUTxO,
   sellerUTxOs,
   warehouseOptions,
-  managerDatum,
   batcherUTxO,
   batcherAddress,
   t,
 }: {
   managerUTxO: T.UTxO;
-  managerDatum: ManagerDatum;
   treasuryUTxO: T.UTxO;
   sellerUTxOs: UTxO[];
   batcherUTxO: UTxO;
@@ -256,11 +251,10 @@ async function batchLBE(options: BatchLBEOptions): Promise<void> {
           0,
           Math.min(
             Number(MINIMUM_SELLER_COLLECTED),
-            Number(managerDatum.sellerCount)
-          )
+            Number(managerDatum.sellerCount),
+          ),
         ),
         warehouseOptions,
-        managerDatum,
         batcherUTxO,
         batcherAddress,
         t,
@@ -304,8 +298,8 @@ async function batchLBE(options: BatchLBEOptions): Promise<void> {
           0,
           Math.min(
             uncollectedOrderUTxOs.length,
-            Number(MINIMUM_ORDER_COLLECTED)
-          )
+            Number(MINIMUM_ORDER_COLLECTED),
+          ),
         ),
         warehouseOptions,
         batcherUTxO,
@@ -324,48 +318,59 @@ async function batchLBE(options: BatchLBEOptions): Promise<void> {
 
 async function runBatcher(t: Translucent): Promise<void> {
   const warehouseOptions = await genWarehouseOptions(t);
-
+  warehouseOptions.deployedValidators = {
+    treasuryValidator: hexToUtxo(lbeV2Script.treasuryRefInput),
+    managerValidator: hexToUtxo(lbeV2Script.managerRefInput),
+    sellerValidator: hexToUtxo(lbeV2Script.sellerRefInput),
+    orderValidator: hexToUtxo(lbeV2Script.orderRefInput),
+    factoryValidator: hexToUtxo(lbeV2Script.factoryRefInput),
+  };
+  warehouseOptions.ammDeployedValidators = {
+    authenValidator: hexToUtxo(lbeV2Script.ammAuthenRefInput),
+    poolValidator: hexToUtxo(lbeV2Script.ammPoolRefInput),
+    factoryValidator: hexToUtxo(lbeV2Script.factoryRefInput),
+  };
   const builder = new WarehouseBuilder(warehouseOptions);
   const treasuryUTxOs = await t.utxosAtWithUnit(
     {
       type: "Script",
       hash: builder.treasuryHash,
     },
-    builder.treasuryToken
+    builder.treasuryToken,
   );
   const managerUTxOs = await t.utxosAtWithUnit(
     {
       type: "Script",
       hash: builder.managerHash,
     },
-    builder.managerToken
+    builder.managerToken,
   );
   const sellerUTxOs = await t.utxosAtWithUnit(
     {
       type: "Script",
       hash: builder.sellerHash,
     },
-    builder.sellerToken
+    builder.sellerToken,
   );
   const orderUTxOs = await t.utxosAtWithUnit(
     {
       type: "Script",
       hash: builder.orderHash,
     },
-    builder.orderToken
+    builder.orderToken,
   );
 
   const mapOrder: Record<string, UTxO[]> = getMapLbeIdUtxO(
     orderUTxOs,
-    builder.fromDatumOrder
+    builder.fromDatumOrder,
   );
   const mapSeller: Record<string, UTxO[]> = getMapLbeIdUtxO(
     sellerUTxOs,
-    builder.fromDatumSeller
+    builder.fromDatumSeller,
   );
   const mapManager: Record<string, UTxO[]> = getMapLbeIdUtxO(
     managerUTxOs,
-    builder.fromDatumManager
+    builder.fromDatumManager,
   );
   const currentDate = Date.now() / 1000;
   const batcherAddress = await t.wallet.address();
@@ -387,7 +392,7 @@ async function runBatcher(t: Translucent): Promise<void> {
     }
     const lbeId = computeLPAssetName(
       baseAsset.policyId + baseAsset.assetName,
-      raiseAsset.policyId + raiseAsset.assetName
+      raiseAsset.policyId + raiseAsset.assetName,
     );
     if (endTime < currentDate || isCancelled === true) {
       await batchLBE({
