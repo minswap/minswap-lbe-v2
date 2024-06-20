@@ -24,7 +24,7 @@ jobs:
         name: Run format 
       - run: aiken check -D
         name: Run onchain tests
-      - run: aiken build -t verbose && bun gen-plutus
+      - run: aiken build && bun gen-plutus
         name: Set up offchain tests
       - run: bun test
         name: Run offchain tests

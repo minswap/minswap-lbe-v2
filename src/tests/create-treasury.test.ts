@@ -131,10 +131,7 @@ test("create-treasury | FAIL | missing Factory Token", async () => {
   builder.tasks.push(() => {
     builder.tx.collectFrom([W.dummyUtxo]);
   });
-  assertValidator(
-    W.builder.buildCreateTreasury(options),
-    "Factory Input must be Legit!",
-  );
+  assertValidatorFail(W.builder.buildCreateTreasury(options));
 });
 
 test("create-treasury | FAIL | have 2 Factory Inputs", async () => {
@@ -198,7 +195,8 @@ test("create-treasury | FAIL | Factory Out Tail Datum incorrect!", async () => {
     builder.innerPayFactory(newFactoryHeadDatum);
     builder.innerPayFactory(newFactoryTailDatum);
   };
-  assertValidator(builder, "2 Factory Outputs must pay correctly!");
+  // 2 Factory Outputs must pay correctly!
+  assertValidatorFail(builder);
 });
 
 test("create-treasury | FAIL | Factory Out Head Datum incorrect!", async () => {
@@ -220,7 +218,8 @@ test("create-treasury | FAIL | Factory Out Head Datum incorrect!", async () => {
     builder.innerPayFactory(newFactoryHeadDatum);
     builder.innerPayFactory(newFactoryTailDatum);
   };
-  assertValidator(builder, "2 Factory Outputs must pay correctly!");
+  // 2 Factory Outputs must pay correctly!
+  assertValidatorFail(builder);
 });
 
 const remixManagerDatum = (remixDatum: any) => {
@@ -273,170 +272,101 @@ const remixTreasuryValue = (assets: Assets) => {
 };
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | factory_policy_id", async () => {
-  assertValidator(
-    remixManagerDatum({ factoryPolicyId: "00" }),
-    "Manager Output must pay correctly!",
-  );
+  assertValidatorFail(remixManagerDatum({ factoryPolicyId: "00" }));
 });
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | baseAsset", async () => {
-  assertValidator(
-    remixManagerDatum({ baseAsset: W.adaToken }),
-    "Manager Output must pay correctly!",
-  );
+  assertValidatorFail(remixManagerDatum({ baseAsset: W.adaToken }));
 });
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | raiseAsset", async () => {
-  assertValidator(
-    remixManagerDatum({ raiseAsset: W.minswapToken }),
-    "Manager Output must pay correctly!",
-  );
+  assertValidatorFail(remixManagerDatum({ raiseAsset: W.minswapToken }));
 });
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | sellerCount", async () => {
-  assertValidator(
-    remixManagerDatum({ sellerCount: 10n }),
-    "Manager Output must pay correctly!",
-  );
+  assertValidatorFail(remixManagerDatum({ sellerCount: 10n }));
 });
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | reserveRaise", async () => {
-  assertValidator(
-    remixManagerDatum({ reserveRaise: 10n }),
-    "Manager Output must pay correctly!",
-  );
+  assertValidatorFail(remixManagerDatum({ reserveRaise: 10n }));
 });
 
 test("create-treasury | FAIL | Manager Output Datum incorrect! | X | totalPenalty", async () => {
-  assertValidator(
-    remixManagerDatum({ totalPenalty: 10n }),
-    "Manager Output must pay correctly!",
-  );
+  assertValidatorFail(remixManagerDatum({ totalPenalty: 10n }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | factoryPolicyId", async () => {
-  assertValidator(
-    remixTreasuryDatum({ factoryPolicyId: "00" }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ factoryPolicyId: "00" }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | managerHash", async () => {
-  assertValidator(
-    remixTreasuryDatum({ managerHash: "00" }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ managerHash: "00" }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | sellerHash", async () => {
-  assertValidator(
-    remixTreasuryDatum({ sellerHash: "00" }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ sellerHash: "00" }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | orderHash", async () => {
-  assertValidator(
-    remixTreasuryDatum({ orderHash: "00" }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ orderHash: "00" }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | orderHash", async () => {
-  assertValidator(
-    remixTreasuryDatum({ collectedFund: 100n }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ collectedFund: 100n }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | baseAsset", async () => {
-  assertValidator(
-    remixTreasuryDatum({ baseAsset: W.adaToken }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ baseAsset: W.adaToken }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | raiseAsset", async () => {
-  assertValidator(
-    remixTreasuryDatum({ raiseAsset: W.minswapToken }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ raiseAsset: W.minswapToken }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | isManagerCollected", async () => {
-  assertValidator(
-    remixTreasuryDatum({ isManagerCollected: true }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ isManagerCollected: true }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | isCancelled", async () => {
-  assertValidator(
-    remixTreasuryDatum({ isCancelled: true }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ isCancelled: true }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | totalPenalty", async () => {
-  assertValidator(
-    remixTreasuryDatum({ totalPenalty: 12n }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ totalPenalty: 12n }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | totalLiquidity", async () => {
-  assertValidator(
-    remixTreasuryDatum({ totalLiquidity: 12n }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ totalLiquidity: 12n }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | reserveRaise", async () => {
-  assertValidator(
-    remixTreasuryDatum({ reserveRaise: 12n }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ reserveRaise: 12n }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | startTime", async () => {
   // LBE start time < current
   let startTime = BigInt(W.emulator.now() - 60 * 60 * 1000);
-  assertValidator(
-    remixTreasuryDatum({ startTime }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ startTime }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | endTime", async () => {
   // LBE start time > LBE end time
   let endTime = W.defaultTreasuryDatum.startTime - 60n * 60n * 1000n;
-  assertValidator(
-    remixTreasuryDatum({ endTime }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ endTime }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | minimumOrderRaise", async () => {
-  assertValidator(
-    remixTreasuryDatum({ minimumOrderRaise: -100n }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ minimumOrderRaise: -100n }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | minimumOrderRaise", async () => {
-  assertValidator(
-    remixTreasuryDatum({ minimumRaise: -100n }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ minimumRaise: -100n }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | maximumRaise", async () => {
   let minimumRaise = 100_000_000_000n;
   let maximumRaise = 1_000_000_000n;
-  assertValidator(
-    remixTreasuryDatum({ minimumRaise, maximumRaise }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ minimumRaise, maximumRaise }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | penaltyConfig.pecrent | 1", async () => {
@@ -446,10 +376,7 @@ test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | penaltyCon
       W.defaultTreasuryDatum.startTime + BigInt(24 * 60 * 60 * 1000),
     percent: -10n,
   };
-  assertValidator(
-    remixTreasuryDatum({ penaltyConfig }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ penaltyConfig }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | penaltyStartTime | 1", async () => {
@@ -458,10 +385,7 @@ test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | penaltySta
     penaltyStartTime: 0n,
     percent: MAX_PENALTY_RATE,
   };
-  assertValidator(
-    remixTreasuryDatum({ penaltyConfig }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ penaltyConfig }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | penaltyStartTime | 2", async () => {
@@ -470,10 +394,7 @@ test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | penaltySta
     penaltyStartTime: W.defaultTreasuryDatum.endTime,
     percent: MAX_PENALTY_RATE,
   };
-  assertValidator(
-    remixTreasuryDatum({ penaltyConfig }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ penaltyConfig }));
 });
 
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | penaltyStartTime | 3", async () => {
@@ -483,10 +404,7 @@ test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | penaltySta
       W.defaultTreasuryDatum.endTime - BigInt(3 * 24 * 60 * 60 * 1000),
     percent: MAX_PENALTY_RATE,
   };
-  assertValidator(
-    remixTreasuryDatum({ penaltyConfig }),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryDatum({ penaltyConfig }));
 });
 
 test("create-treasury | FAIL | Treasury Output Value incorrect! | X | reserveBase", async () => {
@@ -494,10 +412,7 @@ test("create-treasury | FAIL | Treasury Output Value incorrect! | X | reserveBas
     ...W.treasuryOutValue,
     [W.minswapTokenRaw]: 1_000_000_00n,
   };
-  assertValidator(
-    remixTreasuryValue(remixAssets),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryValue(remixAssets));
 });
 
 test("create-treasury | FAIL | Treasury Output Value incorrect! | X | treasury_minimum_ada", async () => {
@@ -505,10 +420,7 @@ test("create-treasury | FAIL | Treasury Output Value incorrect! | X | treasury_m
     ...W.treasuryOutValue,
     lovelace: TREASURY_MIN_ADA - 1_000_000n,
   };
-  assertValidator(
-    remixTreasuryValue(remixAssets),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryValue(remixAssets));
 });
 
 test("create-treasury | FAIL | Treasury Output Value incorrect! | X | treasury_minimum_ada", async () => {
@@ -516,10 +428,7 @@ test("create-treasury | FAIL | Treasury Output Value incorrect! | X | treasury_m
     ...W.treasuryOutValue,
     lovelace: TREASURY_MIN_ADA - 1_000_000n,
   };
-  assertValidator(
-    remixTreasuryValue(remixAssets),
-    "Treasury Output must pay correctly!",
-  );
+  assertValidatorFail(remixTreasuryValue(remixAssets));
 });
 
 test("create-treasury | FAIL | Minting incorrect! | X | Seller Token", async () => {
@@ -528,5 +437,6 @@ test("create-treasury | FAIL | Minting incorrect! | X | Seller Token", async () 
   builder.tasks[4] = () => {
     builder.mintingSellerToken(DEFAULT_NUMBER_SELLER + 10n);
   };
-  assertValidator(builder, "Mint Value must be correct!");
+  // Mint Value must be correct!
+  assertValidatorFail(builder);
 });

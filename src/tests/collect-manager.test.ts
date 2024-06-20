@@ -1,7 +1,7 @@
 import { WarehouseBuilder, type BuildCollectManagerOptions } from "../build-tx";
 import { TREASURY_MIN_ADA } from "../constants";
 import type { ManagerDatum, TreasuryDatum, UTxO } from "../types";
-import { assertValidator, loadModule } from "./utils";
+import { assertValidator, assertValidatorFail, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
 
 let W: any; // warehouse
@@ -80,17 +80,16 @@ test("collect-manager | FAIL | no auth treasury", async () => {
   };
   let options = { ...W.options, treasuryInput, managerInput };
   W.builder.buildCollectManager(options);
-  await assertValidator(
-    W.builder,
-    "Treasury UTxO must contain 1 Treasury Token",
-  );
+  // Treasury UTxO must contain 1 Treasury Token
+  await assertValidatorFail(W.builder);
 });
 
 test("collect-manager | FAIL | no minting", async () => {
   let { builder, options } = W;
   builder.buildCollectManager(options);
   builder.tasks = [...builder.tasks.slice(0, 3), ...builder.tasks.slice(4)];
-  await assertValidator(builder, "Must burn 1 Manager Token");
+  // Must burn 1 Manager Token
+  await assertValidatorFail(builder);
 });
 
 test("collect-manager | FAIL | wrong treasury out datum", async () => {
@@ -100,7 +99,8 @@ test("collect-manager | FAIL | wrong treasury out datum", async () => {
     treasuryOutDatum: W.treasuryDatum,
   };
   builder.buildCollectManager(options);
-  await assertValidator(builder, "Treasury Out Datum must be correct!");
+  // Treasury Out Datum must be correct!
+  await assertValidatorFail(builder);
 });
 
 test("collect-manager | FAIL | LBE ID missmatch", async () => {
@@ -119,5 +119,6 @@ test("collect-manager | FAIL | LBE ID missmatch", async () => {
     managerInput: W.managerInput,
   };
   builder.buildCollectManager(options);
-  await assertValidator(builder, "Treasury In Datum must be correct!");
+  // Treasury In Datum must be correct!
+  await assertValidatorFail(builder);
 });

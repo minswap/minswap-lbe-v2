@@ -17,13 +17,21 @@ validator(
     redeemer: OrderRedeemer,
     context: ScriptContext,
   ) {
-    expect ScriptContext {
-      transaction: Transaction { inputs, redeemers, withdrawals, .. },
-      purpose: Spend(_),
-    } = context
+    expect ScriptContext { transaction, purpose: Spend(_) } = context
     let OrderDatum { factory_policy_id, .. } = datum
     when redeemer is {
-      UpdateOrder ->
+      CollectOrder -> {
+        let Transaction { withdrawals, .. } = transaction
+        // Delegate Logic of CollectOrder and RedeemOrder to Factory Withdrawal
+        dict.has_key(withdrawals, Inline(ScriptCredential(factory_policy_id)))
+      }
+      RedeemOrder -> {
+        let Transaction { withdrawals, .. } = transaction
+        // Delegate Logic of CollectOrder and RedeemOrder to Factory Withdrawal
+        dict.has_key(withdrawals, Inline(ScriptCredential(factory_policy_id)))
+      }
+      UpdateOrder -> {
+        let Transaction { inputs, redeemers, .. } = transaction
         assert(
           validation.has_spend_seller(
             inputs: inputs,
@@ -34,12 +42,7 @@ validator(
           ),
           @"Using-seller: Tx don't have any seller",
         )
-      CollectOrder ->
-        // Delegate Logic of CollectOrder and RedeemOrder to Factory Withdrawal
-        dict.has_key(withdrawals, Inline(ScriptCredential(factory_policy_id)))
-      RedeemOrder ->
-        // Delegate Logic of CollectOrder and RedeemOrder to Factory Withdrawal
-        dict.has_key(withdrawals, Inline(ScriptCredential(factory_policy_id)))
+      }
     }
   }
 }

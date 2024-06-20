@@ -1,9 +1,14 @@
 import * as T from "@minswap/translucent";
 import { WarehouseBuilder } from "../build-tx";
 import {
+  CREATE_POOL_COMMISION,
   DEFAULT_NUMBER_SELLER,
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
+  MANAGER_MIN_ADA,
+  ORDER_MIN_ADA,
+  SELLER_MIN_ADA,
+  TREASURY_MIN_ADA,
 } from "../constants";
 import type {
   AmmPoolDatum,
@@ -32,12 +37,17 @@ export const skipToCountingPhase = (options: {
 }) => {
   const { t, e, datum } = options;
   const discoveryEndSlot = t.utils.unixTimeToSlot(Number(datum.endTime));
+  if (discoveryEndSlot > e.slot) {
+    e.awaitSlot(discoveryEndSlot - e.slot);
+  }
   while (e.slot <= discoveryEndSlot) {
-    e.awaitBlock(100);
+    e.awaitSlot(100);
   }
 };
 
-export const genWarehouse = async () => {
+export type GenWarehouse = Awaited<ReturnType<typeof genWarehouse>>;
+export const genWarehouse = async (maxTxSize?: number) => {
+  let outputIndex = 0;
   const minswapToken: BluePrintAsset = {
     policyId: "e16c2dc8ae937e8d3790c7fd7168d7b994621ba14ca11415f39fed72",
     assetName: "4d494e",
@@ -54,7 +64,7 @@ export const genWarehouse = async () => {
   });
   let protocolParameters: ProtocolParameters = {
     ...T.PROTOCOL_PARAMETERS_DEFAULT,
-    maxTxSize: 36384,
+    maxTxSize: maxTxSize ?? 36384,
   };
   const emulator = new T.Emulator([ACCOUNT_0], protocolParameters);
   let t = await T.Translucent.new(emulator);
@@ -159,13 +169,61 @@ export const genWarehouse = async () => {
     },
     datum: builder.toDatumAmmPool(ammPoolDatum),
     txHash: "01".repeat(32),
-    outputIndex: 0,
+    outputIndex: outputIndex++,
   };
 
   let findTreasuryInput = async (): Promise<UTxO> => {
     return (await emulator.getUtxos(builder.treasuryAddress)).find(
       (u) => !u.scriptRef,
     ) as UTxO;
+  };
+
+  let defaultManagerInput: UTxO = {
+    txHash: "00".repeat(32),
+    outputIndex: outputIndex++,
+    assets: {
+      [builder.managerToken]: 1n,
+      lovelace: MANAGER_MIN_ADA,
+    },
+    address: builder.managerAddress,
+    datum: builder.toDatumManager(defaultManagerDatum),
+  };
+
+  let defaultSellerInput: UTxO = {
+    txHash: "00".repeat(32),
+    outputIndex: outputIndex++,
+    assets: {
+      [builder.sellerToken]: 1n,
+      lovelace: SELLER_MIN_ADA,
+    },
+    address: builder.sellerAddress,
+    datum: builder.toDatumSeller(defaultSellerDatum),
+  };
+
+  let defaultOrderInput: UTxO = {
+    txHash: "00".repeat(32),
+    outputIndex: outputIndex++,
+    assets: {
+      [builder.orderToken]: 1n,
+      lovelace: ORDER_MIN_ADA,
+    },
+    address: builder.orderAddress,
+    datum: builder.toDatumOrder(defaultOrderDatum),
+  };
+
+  let defaultTreasuryInput: UTxO = {
+    txHash: "00".repeat(32),
+    outputIndex: outputIndex++,
+    assets: {
+      lovelace: TREASURY_MIN_ADA + CREATE_POOL_COMMISION,
+      [builder.treasuryToken]: 1n,
+      [toUnit(
+        defaultTreasuryDatum.baseAsset.policyId,
+        defaultTreasuryDatum.baseAsset.assetName,
+      )]: defaultTreasuryDatum.reserveBase,
+    },
+    address: builder.treasuryAddress,
+    datum: builder.toDatumTreasury(defaultTreasuryDatum),
   };
 
   return {
@@ -183,5 +241,11 @@ export const genWarehouse = async () => {
     ammPoolInput,
     findTreasuryInput,
     ammPoolDatum,
+    builder,
+    outputIndex,
+    defaultManagerInput,
+    defaultSellerInput,
+    defaultOrderInput,
+    defaultTreasuryInput,
   };
 };

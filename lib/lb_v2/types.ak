@@ -52,7 +52,7 @@ pub type ReceiverDatum {
 }
 
 pub type TreasuryDatum {
-  // Protocol Info
+  // Protocol Info:
   // ValidatorHash of Factory Validator 
   factory_policy_id: PolicyId,
   // ValidatorHash of Manager Validator
@@ -61,9 +61,7 @@ pub type TreasuryDatum {
   seller_hash: ValidatorHash,
   // ValidatorHash of Order Validator
   order_hash: ValidatorHash,
-  // Total fund accumulate by collecting orders (amount, penalty).
-  // It increases when collect orders, descreases when redeem LP or refund
-  collected_fund: Int,
+  // --------------------------------
   // LBE Parameters
   // Asset aims to list
   base_asset: Asset,
@@ -79,6 +77,7 @@ pub type TreasuryDatum {
   receiver: Address,
   // The Datum of the receiver's output
   receiver_datum: ReceiverDatum,
+  // The rule defines how many funds will go to pool
   pool_allocation: Int,
   // Minimum amount in a order.
   minimum_order_raise: Option<Int>,
@@ -100,6 +99,11 @@ pub type TreasuryDatum {
   pool_base_fee: Int,
   // Indicates whether project's owner can cancel LBE during discovery phase.
   revocable: Bool,
+  // --------------------------------
+  // Treasury State:
+  // Total fund accumulate by collecting orders (amount, penalty).
+  // It increases when collect orders, descreases when redeem LP or refund
+  collected_fund: Int,
   // Total Order Amount. Increasing when collect orders.
   reserve_raise: Int,
   // Total Order's penalty amount. Increasing when collect orders.

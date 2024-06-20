@@ -13,6 +13,7 @@ use lb_v2/utils.{
   calculate_penalty, fee_ada, make_wrapper_redeemer, order_auth_an,
   order_minimum_ada, sort_two_consecutive_factory_datum,
 }
+use lb_v2/validation.{build_default_collected_order_value}
 
 type DummyObject {
   owner: Address,
@@ -181,8 +182,10 @@ test test_apply_collecting_orders_1() fail {
     order_outputs: [],
     base_asset: dummy.base_asset,
     raise_asset: dummy.raise_asset,
-    factory_policy_id: dummy.factory_policy_id,
     acc_collect_amount: 0,
+    default_order_output_value: build_default_collected_order_value(
+      dummy.factory_policy_id,
+    ),
   ) == 0
 }
 
@@ -194,8 +197,10 @@ test test_apply_collecting_orders_2() fail {
     order_outputs: [],
     base_asset: dummy.base_asset,
     raise_asset: dummy.raise_asset,
-    factory_policy_id: dummy.factory_policy_id,
     acc_collect_amount: 0,
+    default_order_output_value: build_default_collected_order_value(
+      dummy.factory_policy_id,
+    ),
   ) == 0
 }
 
@@ -220,8 +225,10 @@ test test_apply_collecting_orders_3() {
     order_outputs: [order_out],
     base_asset: dummy.base_asset,
     raise_asset: dummy.raise_asset,
-    factory_policy_id: dummy.factory_policy_id,
     acc_collect_amount: 0,
+    default_order_output_value: build_default_collected_order_value(
+      dummy.factory_policy_id,
+    ),
   ) == collect_amount
 }
 
@@ -245,8 +252,10 @@ test test_apply_collecting_orders_4() {
     order_outputs: [order_out, order_out, order_out],
     base_asset: dummy.base_asset,
     raise_asset: dummy.raise_asset,
-    factory_policy_id: dummy.factory_policy_id,
     acc_collect_amount: 0,
+    default_order_output_value: build_default_collected_order_value(
+      dummy.factory_policy_id,
+    ),
   ) == collect_amount * 3
 }
 

@@ -13,11 +13,10 @@ validator(treasury_hash: ValidatorHash, manager_hash: ValidatorHash) {
     context: ScriptContext,
   ) {
     expect ScriptContext { purpose: Spend(out_ref), transaction } = context
-    let Transaction { mint, inputs, redeemers, .. } = transaction
     let SellerDatum { factory_policy_id, .. } = seller_in_datum
-    let mint_value = value.from_minted_value(mint)
     when redeemer is {
-      CountingSeller ->
+      CountingSeller -> {
+        let Transaction { inputs, redeemers, .. } = transaction
         validation.has_spend_manager(
           inputs: inputs,
           factory_policy_id: factory_policy_id,
@@ -25,6 +24,7 @@ validator(treasury_hash: ValidatorHash, manager_hash: ValidatorHash) {
           redeemers: redeemers,
           expected_redeemer: CollectSellers,
         )
+      }
       UsingSeller -> {
         let Transaction {
           inputs,
@@ -32,8 +32,10 @@ validator(treasury_hash: ValidatorHash, manager_hash: ValidatorHash) {
           outputs,
           validity_range,
           extra_signatories,
+          mint,
           ..
         } = transaction
+        let mint_value = value.from_minted_value(mint)
         validation.validate_using_seller(
           treasury_hash: treasury_hash,
           out_ref: out_ref,

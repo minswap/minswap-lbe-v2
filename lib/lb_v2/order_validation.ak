@@ -1,15 +1,16 @@
 use aiken/list
 use aiken/transaction.{InlineDatum, Input, Output}
-use aiken/transaction/value.{
-  AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
-}
+use aiken/transaction/value.{AssetName, Value, ada_asset_name, ada_policy_id}
 use lb_v2/types.{Asset, OrderDatum, TreasuryDatum, ValidatorHash}
 use lb_v2/utils.{
-  amm_authen_policy_id, compute_asset_name_from_base_and_raise, fee_ada,
+  amm_authen_policy_id, compute_asset_name_from_base_and_raise,
   minimum_order_collected, minimum_order_redeemed, order_auth_an,
   order_minimum_ada,
 }
-use lb_v2/validation.{get_order_inputs, get_order_outputs, get_treasury_output}
+use lb_v2/validation.{
+  build_default_collected_order_value, get_order_inputs, get_order_outputs,
+  get_treasury_output,
+}
 
 // Assertions:
 // - All Sellers, Manager have been collected.
@@ -49,7 +50,7 @@ pub fn validate_collect_orders(
       factory_policy_id: factory_policy_id,
       order_hash: order_hash,
     )
-  let order_outputs = get_order_outputs(outputs, factory_policy_id, order_hash)
+  let order_outputs = get_order_outputs(outputs, order_hash)
   let treasury_output =
     get_treasury_output(outputs, factory_policy_id, treasury_hash)
   expect Output {
@@ -64,8 +65,10 @@ pub fn validate_collect_orders(
       order_outputs: order_outputs,
       base_asset: base_asset,
       raise_asset: raise_asset,
-      factory_policy_id: factory_policy_id,
       acc_collect_amount: 0,
+      default_order_output_value: build_default_collected_order_value(
+        factory_policy_id,
+      ),
     )
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
     raise_asset
@@ -101,8 +104,8 @@ pub fn apply_collecting_orders(
   order_outputs: List<Output>,
   base_asset: Asset,
   raise_asset: Asset,
-  factory_policy_id: PolicyId,
   acc_collect_amount: Int,
+  default_order_output_value: Value,
 ) -> Int {
   expect [input, ..inputs] = order_inputs
   expect [output, ..outputs] = order_outputs
@@ -122,10 +125,7 @@ pub fn apply_collecting_orders(
       // Out Datum only changes: {is_collected: True } compare to In Datum
       out_datum == OrderDatum { ..in_datum, is_collected: True },
       // Out Value should be correct!
-      out_value == (
-        value.from_asset(factory_policy_id, order_auth_an, 1)
-          |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
-      ),
+      out_value == default_order_output_value,
     }
   let OrderDatum { amount, penalty_amount, .. } = in_datum
   let collect_amount = acc_collect_amount + amount + penalty_amount
@@ -141,8 +141,8 @@ pub fn apply_collecting_orders(
         order_outputs: outputs,
         base_asset: base_asset,
         raise_asset: raise_asset,
-        factory_policy_id: factory_policy_id,
         acc_collect_amount: collect_amount,
+        default_order_output_value: default_order_output_value,
       )
   }
 }
@@ -298,8 +298,10 @@ pub fn apply_redeem_orders(
       |> value.add(raise_asset_pid, raise_asset_an, raise_bonus)
       |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada)
   expect and {
+      // Order, Treasury must share the same LBE ID
       base_asset == o_base_asset,
       raise_asset == o_raise_asset,
+      // Paying User Output correctly!
       user_address == owner,
       expect_user_value == user_value,
     }
@@ -427,23 +429,40 @@ pub fn apply_refund_orders(
     ..
   } = order_input
   expect order_datum: OrderDatum = order_raw_datum
-  let OrderDatum { owner, amount, penalty_amount, .. } = order_datum
+  let OrderDatum {
+    owner,
+    amount,
+    penalty_amount,
+    base_asset: o_base_asset,
+    raise_asset: o_raise_asset,
+    ..
+  } = order_datum
   let Output { address: user_address, value: user_value, .. } = user_output
-  let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
-    raise_asset
-  let expect_user_out_value =
-    value.from_asset(raise_asset_pid, raise_asset_an, amount + penalty_amount)
-      |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada)
   expect and {
       // Order, Treasury must share the same LBE ID
-      order_datum == OrderDatum {
-        ..order_datum,
-        base_asset: base_asset,
-        raise_asset: raise_asset,
-      },
+      o_base_asset == base_asset,
+      o_raise_asset == raise_asset,
       // Paying User Output correctly!
       user_address == owner,
-      user_value == expect_user_out_value,
+      value.flatten(user_value) == if
+      raise_asset == Asset(ada_policy_id, ada_asset_name){
+      
+        [
+          (
+            ada_policy_id,
+            ada_asset_name,
+            order_minimum_ada + amount + penalty_amount,
+          ),
+        ]
+      } else {
+        let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
+          raise_asset
+        [
+          (ada_policy_id, ada_asset_name, order_minimum_ada),
+          // ensure amount+penalty_amount > 0
+          (raise_asset_pid, raise_asset_an, amount + penalty_amount),
+        ]
+      },
     }
   let refund_amount = acc_amount + amount
   let refund_penalty = acc_penalty + penalty_amount
