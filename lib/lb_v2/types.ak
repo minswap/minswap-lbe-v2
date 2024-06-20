@@ -157,6 +157,8 @@ pub type ManagerRedeemer {
 pub type SellerDatum {
   // ValidatorHash of Factory Validator
   factory_policy_id: PolicyId,
+  // Address will be paid a part of seller_minimum_ada when collecting sellers
+  owner: Address,
   // Asset aims to list
   base_asset: Asset,
   // Asset aims to raise
@@ -181,6 +183,8 @@ pub type OrderDatum {
   base_asset: Asset,
   // Asset aims to raise
   raise_asset: Asset,
+  // Address will be paid a part of fee when collecting orders or redeeming orders
+  seller_owner: Address,
   // Update order require owner authorize 
   // System will redeem | refund to owner address
   owner: Address,
