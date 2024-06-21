@@ -13,12 +13,12 @@ use lb_v2/utils.{manager_auth_an}
 use lb_v2/validation
 
 // Spending Manager for:
-// 1. Collect Manager
-//   - Purpose: Update `reserve_raise`, `total_penalty` of Treasury
-//   - 1 Manager Token needs to be burned (trigger Factory Minting)
-//   - 1 Manager Input needs to be spent
-//   - 1 Treasury Input needs to be spent
-//   - 1 Treasury Output needs to be paid
+// 1. AddSellers
+//   - Increase `seller_count` 
+// 2. CollectSellers
+//   - Decrease `seller_count`
+// 3. SpendManager
+//   - Update `reserve_raise`, `total_penalty` of Treasury
 validator(
   // ValidatorHash of Treasury Validator
   treasury_hash: ValidatorHash,
@@ -88,6 +88,9 @@ validator(
           ..
         } = treasury_ref_input
         expect treasury_datum: TreasuryDatum = raw_treasury_datum
+        // Assertion:
+        // - Manager Input is legitimate
+        // - Only 1 Manager Input
         expect and {
             value.quantity_of(
               manager_in_value,

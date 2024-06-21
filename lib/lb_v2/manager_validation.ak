@@ -12,8 +12,10 @@ use lb_v2/utils.{
   assert, collect_seller_commision, minimum_seller_collected,
   must_get_start_end_validity, seller_auth_an, seller_minimum_ada,
 }
-use lb_v2/validation.{validate_and_get_seller_outputs_length}
+use lb_v2/validation.{validate_seller_outputs}
 
+// Notes:
+// AddSellers: Outputs[0] is Seller Output
 // Assertions:
 // - Manager, Treasury share the same LBE ID
 // - Paying Manager Output correctly!
@@ -85,15 +87,8 @@ pub fn validate_manage_seller(
     }
   when redeemer is {
     AddSellers -> {
-      // Validate Add Sellers
-      let seller_output_length =
-        validate_and_get_seller_outputs_length(
-          outputs: outputs,
-          factory_policy_id: factory_policy_id,
-          base_asset: base_asset,
-          raise_asset: raise_asset,
-          seller_hash: seller_hash,
-        )
+      let mint_seller_count =
+        value.quantity_of(mint_value, factory_policy_id, seller_auth_an)
       and {
         end_valid_time_range < end_time,
         is_cancelled == False,
@@ -101,13 +96,22 @@ pub fn validate_manage_seller(
         mint_value == value.from_asset(
           factory_policy_id,
           seller_auth_an,
-          seller_output_length,
+          mint_seller_count,
         ),
         // Paying Manager Output correctly!
         manager_out_datum == ManagerDatum {
           ..manager_in_datum,
-          seller_count: seller_count + seller_output_length,
+          seller_count: seller_count + mint_seller_count,
         },
+        // Seller Outputs must pay correctly!
+        validate_seller_outputs(
+          outputs: outputs,
+          factory_policy_id: factory_policy_id,
+          base_asset: base_asset,
+          raise_asset: raise_asset,
+          seller_hash: seller_hash,
+          seller_count: mint_seller_count,
+        ),
       }
     }
     CollectSellers -> {

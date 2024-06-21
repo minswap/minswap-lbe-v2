@@ -16,7 +16,7 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   assert, compute_lp_asset_name, factory_auth_an, make_wrapper_redeemer,
-  manager_auth_an, manager_minimum_ada, minimum_default_number_seller,
+  manager_auth_an, manager_minimum_ada, minimum_number_seller,
   must_get_end_validity, seller_auth_an, treasury_auth_an,
 }
 use lb_v2/validation
@@ -30,8 +30,8 @@ use lb_v2/validation
 //    - 1 Treasury Ouptut needs to be paid
 //    - 1 Manager Token needs to be mint
 //    - 1 Manager Ouptut needs to be paid
-//    - at least @minimum_default_number_seller need to be mint
-//    - at least @minimum_default_number_seller Seller Ouptuts need to be paid
+//    - at least @minimum_number_seller need to be mint
+//    - at least @minimum_number_seller Seller Ouptuts need to be paid
 // 2. Close a Treasury:
 //    - 1 Treasury Token needs to be burn
 //    - 1 Treasury Input needs to be spent
@@ -170,21 +170,16 @@ validator(
           reference_script: f_out_tail_ref_script,
           ..
         } = f_out_tail
-        let seller_count =
-          validation.validate_and_get_seller_outputs_length(
-            outputs: outputs,
-            factory_policy_id: factory_hash,
-            base_asset: base_asset,
-            raise_asset: raise_asset,
-            seller_hash: seller_hash,
-          )
+        let mint_value = value.from_minted_value(mint)
+        let mint_seller_count =
+          value.quantity_of(mint_value, factory_hash, seller_auth_an)
         let default_manager_output =
           build_default_manager_output(
             factory_policy_id: factory_hash,
             manager_hash: manager_hash,
             base_asset: base_asset,
             raise_asset: raise_asset,
-            seller_count: seller_count,
+            seller_count: mint_seller_count,
           )
         // Trivial Assertions
         expect
@@ -222,34 +217,35 @@ validator(
             }, @"2 Factory Outputs must pay correctly!")
         // Assertions:
         and {
-          assert(
-            manager_output == default_manager_output,
-            @"Manager Output must pay correctly!",
+          // Manager Output must pay correctly!
+          manager_output == default_manager_output,
+          // Must prepare enough Sellers
+          mint_seller_count >= minimum_number_seller,
+          // Seller Outputs must pay correctly!
+          validation.validate_seller_outputs(
+            outputs: outputs,
+            factory_policy_id: factory_hash,
+            base_asset: base_asset,
+            raise_asset: raise_asset,
+            seller_hash: seller_hash,
+            seller_count: mint_seller_count,
           ),
-          assert(
-            seller_count >= minimum_default_number_seller,
-            @"Must pay enough Legitimate Seller Outputs!",
+          // Treasury Output must pay correctly!
+          validate_creating_treasury_out(
+            treasury_out: treasury_output,
+            base_asset: base_asset,
+            raise_asset: raise_asset,
+            manager_hash: manager_hash,
+            seller_hash: seller_hash,
+            order_hash: order_hash,
+            factory_policy_id: factory_hash,
+            end_valid_time_range: end_valid_time_range,
+            datums: datums,
           ),
-          assert(
-            validate_creating_treasury_out(
-              treasury_out: treasury_output,
-              base_asset: base_asset,
-              raise_asset: raise_asset,
-              manager_hash: manager_hash,
-              seller_hash: seller_hash,
-              order_hash: order_hash,
-              factory_policy_id: factory_hash,
-              end_valid_time_range: end_valid_time_range,
-              datums: datums,
-            ),
-            @"Treasury Output must pay correctly!",
-          ),
-          assert(
-            value.from_minted_value(mint) == get_minting_treasury(
-              factory_policy_id: factory_hash,
-              seller_count: seller_count,
-            ),
-            @"Mint Value must be correct!",
+          // Mint Value must be correct!
+          mint_value == get_minting_treasury(
+            factory_policy_id: factory_hash,
+            seller_count: mint_seller_count,
           ),
         }
       }

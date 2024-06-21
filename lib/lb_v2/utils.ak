@@ -21,8 +21,8 @@ pub const order_auth_an = #"6f72646572"
 // The Asset Name of Manager Authen Token
 pub const manager_auth_an = #"4d616e61676572"
 
-// The default number of Sellers to set up when starting a new LBE
-pub const minimum_default_number_seller = 10
+// The minimum number of Sellers to set up when starting a new LBE
+pub const minimum_number_seller = 10
 
 pub const minimum_seller_collected = 20
 

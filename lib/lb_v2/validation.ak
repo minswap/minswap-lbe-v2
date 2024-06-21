@@ -1,3 +1,4 @@
+use aiken/builtin
 use aiken/dict.{Dict}
 use aiken/list
 use aiken/transaction.{
@@ -705,49 +706,63 @@ pub fn apply_order(
   )
 }
 
-pub fn validate_and_get_seller_outputs_length(
+// return Seller Output when creating Treasury or Add Sellers
+fn build_default_seller_output(
+  factory_policy_id: ValidatorHash,
+  base_asset: Asset,
+  raise_asset: Asset,
+  seller_hash: ValidatorHash,
+  owner: Address,
+) -> Output {
+  let seller_address = credential.from_script(seller_hash)
+  // build default seller datum
+  let seller_datum =
+    SellerDatum {
+      factory_policy_id,
+      base_asset,
+      raise_asset,
+      amount: 0,
+      penalty_amount: 0,
+      owner,
+    }
+  // build default seller value
+  let seller_value =
+    value.from_lovelace(seller_minimum_ada)
+      |> value.add(factory_policy_id, seller_auth_an, 1)
+  Output {
+    address: seller_address,
+    value: seller_value,
+    datum: InlineDatum(seller_datum),
+    reference_script: None,
+  }
+}
+
+pub fn validate_seller_outputs(
   outputs: List<Output>,
   factory_policy_id: ValidatorHash,
   base_asset: Asset,
   raise_asset: Asset,
   seller_hash: ValidatorHash,
-) -> Int {
-  expect Some(seller_output) =
-    list.find(
-      outputs,
-      fn(output) {
-        let seller_address = credential.from_script(seller_hash)
-        let Output { datum, address, .. } = output
-        if seller_address == address {
-          expect InlineDatum(raw_datum) = datum
-          expect SellerDatum { owner, .. }: SellerDatum = raw_datum
-          output == Output {
-            address,
-            value: value.from_lovelace(seller_minimum_ada)
-              |> value.add(factory_policy_id, seller_auth_an, 1),
-            datum: InlineDatum(
-              SellerDatum {
-                factory_policy_id,
-                base_asset,
-                raise_asset,
-                owner,
-                amount: 0,
-                penalty_amount: 0,
-              },
-            ),
-            reference_script: None,
-          }
-        } else {
-          False
-        }
-      },
+  seller_count: Int,
+) -> Bool {
+  let seller_output = outputs |> builtin.head_list
+  expect Output { datum: InlineDatum(raw_datum), .. } = seller_output
+  expect datum: SellerDatum = raw_datum
+  let SellerDatum { owner, .. } = datum
+  let default_seller_output =
+    build_default_seller_output(
+      factory_policy_id: factory_policy_id,
+      base_asset: base_asset,
+      raise_asset: raise_asset,
+      seller_hash: seller_hash,
+      owner: owner,
     )
-  // all seller have the same owner
-  list.foldl(
+  // all sellers have the same owner
+  seller_count == list.foldl(
     outputs,
     0,
     fn(output, cnt) {
-      if output == seller_output {
+      if output == default_seller_output {
         cnt + 1
       } else {
         cnt
