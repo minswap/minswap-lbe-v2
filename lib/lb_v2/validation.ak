@@ -497,6 +497,7 @@ pub fn validate_using_seller(
     raise_asset: s_raise_asset,
     amount,
     penalty_amount,
+    owner: seller_owner,
     ..
   } = seller_in_datum
   let Input { output: Output { value: seller_input_value, .. }, .. } =
@@ -536,6 +537,7 @@ pub fn validate_using_seller(
       extra_signatories: extra_signatories,
       inputs: inputs,
       minimum_order_raise: minimum_order_raise,
+      seller_owner: seller_owner,
     )
   let order_input_count = list.length(order_inputs)
   let order_output_count = list.length(order_outputs)
@@ -590,6 +592,7 @@ pub fn apply_order(
   extra_signatories: List<ByteArray>,
   inputs: List<Input>,
   minimum_order_raise: Option<Int>,
+  seller_owner: Address,
 ) -> (Int, Int) {
   let (total_input_amount, total_input_penalty) =
     list.foldl(
@@ -642,6 +645,7 @@ pub fn apply_order(
           amount,
           is_collected,
           penalty_amount,
+          seller_owner: o_seller_owner,
           ..
         }: OrderDatum = raw_o_datum
         let expected_order =
@@ -663,6 +667,7 @@ pub fn apply_order(
           }
         // validate orders
         expect and {
+            o_seller_owner == seller_owner,
             o_factory_policy_id == factory_policy_id,
             is_collected == False,
             o_base_asset == base_asset,
