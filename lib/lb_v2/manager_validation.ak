@@ -1,13 +1,16 @@
 use aiken/list
-use aiken/transaction.{InlineDatum, Input, Output, ValidityRange}
-use aiken/transaction/credential.{Address, ScriptCredential}
+use aiken/transaction.{InlineDatum, Input, NoDatum, Output, ValidityRange}
+use aiken/transaction/credential.{
+  Address, ScriptCredential, VerificationKeyCredential,
+}
 use aiken/transaction/value.{PolicyId, Value}
 use lb_v2/types.{
   AddSellers, Asset, CollectSellers, ManagerDatum, ManagerRedeemer, SellerDatum,
   TreasuryDatum,
 }
 use lb_v2/utils.{
-  assert, minimum_seller_collected, must_get_start_end_validity, seller_auth_an,
+  assert, collect_seller_commision, minimum_seller_collected,
+  must_get_start_end_validity, seller_auth_an, seller_minimum_ada,
 }
 use lb_v2/validation.{validate_and_get_seller_outputs_length}
 
@@ -60,12 +63,15 @@ pub fn validate_manage_seller(
     list.filter(
       outputs,
       fn(output) {
-        let Output { address: Address { payment_credential, .. }, .. } = output
-        payment_credential == ScriptCredential(manager_hash)
+        let Output { address: Address { payment_credential, .. }, value, .. } =
+          output
+        and {
+          payment_credential == ScriptCredential(manager_hash),
+          value == manager_in_value,
+        }
       },
     )
   expect Output {
-    value: manager_out_value,
     datum: InlineDatum(raw_manager_out_datum),
     reference_script: manager_out_rs,
     ..
@@ -75,7 +81,6 @@ pub fn validate_manage_seller(
       // Manager, Treasury share the same LBE ID
       m_base_asset == base_asset,
       m_raise_asset == raise_asset,
-      manager_out_value == manager_in_value,
       manager_out_rs == None,
     }
   when redeemer is {
@@ -114,9 +119,26 @@ pub fn validate_manage_seller(
         )
       // Validate collect sellers
       let seller_input_count = list.length(seller_inputs)
+      let total_seller_minimum_ada = seller_input_count * seller_minimum_ada
+      let total_seller_owner_ada =
+        total_seller_minimum_ada - collect_seller_commision
+      let one_seller_owner_output_ada =
+        total_seller_owner_ada / seller_input_count
       let (total_reserve_raise, total_penalty_input) =
         apply_collect_sellers(
+          one_seller_owner_output_ada: one_seller_owner_output_ada,
           seller_inputs: seller_inputs,
+          outputs: outputs,
+          default_seller_owner_output: Output {
+            // DUMMY address
+            address: Address {
+              payment_credential: VerificationKeyCredential(#""),
+              stake_credential: None,
+            },
+            value: value.from_lovelace(one_seller_owner_output_ada),
+            datum: NoDatum,
+            reference_script: None,
+          },
           base_asset: base_asset,
           raise_asset: raise_asset,
           acc_raise: 0,
@@ -157,13 +179,17 @@ pub fn validate_manage_seller(
 }
 
 fn apply_collect_sellers(
+  one_seller_owner_output_ada: Int,
   seller_inputs: List<Input>,
+  outputs: List<Output>,
+  default_seller_owner_output: Output,
   base_asset: Asset,
   raise_asset: Asset,
   acc_raise: Int,
   acc_penalty: Int,
 ) -> (Int, Int) {
   expect [input, ..inputs] = seller_inputs
+  expect [seller_owner_output, ..remaining_outputs] = outputs
   expect Input { output: Output { datum: InlineDatum(raw_datum), .. }, .. } =
     input
   expect seller_datum: SellerDatum = raw_datum
@@ -172,19 +198,32 @@ fn apply_collect_sellers(
     raise_asset: s_raise_asset,
     amount,
     penalty_amount,
+    owner,
     ..
   } = seller_datum
-  expect assert(and {
-        s_base_asset == base_asset,
-        s_raise_asset == raise_asset,
-      }, @"Collect Sellers: invalid seller inputs' LBE ID")
+  expect and {
+      s_base_asset == base_asset,
+      s_raise_asset == raise_asset,
+      // minimum ada of 1 UTxO
+      if one_seller_owner_output_ada < 1_000_000 {
+        True
+      } else {
+        seller_owner_output == Output {
+          ..default_seller_owner_output,
+          address: owner,
+        }
+      },
+    }
   let collect_raise = acc_raise + amount
   let collect_penalty = acc_penalty + penalty_amount
   when inputs is {
     [] -> (collect_raise, collect_penalty)
     _ ->
       apply_collect_sellers(
+        seller_input_count: seller_input_count,
         seller_inputs: inputs,
+        outputs: remaining_outputs,
+        default_seller_owner_output: default_seller_owner_output,
         base_asset: base_asset,
         raise_asset: raise_asset,
         acc_raise: collect_raise,
