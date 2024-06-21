@@ -110,11 +110,8 @@ validator(
     let FactoryDatum { head: current_head, tail: current_tail } = datum
     let (base_asset, raise_asset) =
       when redeemer is {
-        CreateTreasury {
-          base_asset: d_base_asset,
-          raise_asset: d_raise_asset,
-          ..
-        } -> (d_base_asset, d_raise_asset)
+        CreateTreasury { base_asset: d_base_asset, raise_asset: d_raise_asset } ->
+          (d_base_asset, d_raise_asset)
         CloseTreasury { base_asset: d_base_asset, raise_asset: d_raise_asset } ->
           (d_base_asset, d_raise_asset)
         _ -> fail @"Only spending Factory Input when Create | Close Treasury"
@@ -134,7 +131,7 @@ validator(
         asset_b_asset_name,
       )
     when redeemer is {
-      CreateTreasury { seller_owner, .. } -> {
+      CreateTreasury { .. } -> {
         let Transaction { datums, .. } = transaction
         // finding exactly 1 Factory Input
         expect [factory_input] = factory_inputs
@@ -173,18 +170,14 @@ validator(
           reference_script: f_out_tail_ref_script,
           ..
         } = f_out_tail
-        let default_seller_output =
-          validation.build_default_seller_output(
+        let seller_count =
+          validation.validate_and_get_seller_outputs_length(
+            outputs: outputs,
             factory_policy_id: factory_hash,
             base_asset: base_asset,
             raise_asset: raise_asset,
             seller_hash: seller_hash,
-            owner: seller_owner,
           )
-        // finding all Legitimate Seller Outputs
-        let seller_outputs =
-          list.filter(outputs, fn(output) { output == default_seller_output })
-        let seller_count = list.length(seller_outputs)
         let default_manager_output =
           build_default_manager_output(
             factory_policy_id: factory_hash,
@@ -435,13 +428,13 @@ validator(
               redeemers: redeemers,
               expected_redeemer: CollectManager,
             )
-          MintSeller { seller_owner } ->
+          MintSeller ->
             validation.has_spend_manager(
               inputs: inputs,
               factory_policy_id: factory_policy_id,
               manager_hash: manager_hash,
               redeemers: redeemers,
-              expected_redeemer: AddSellers { seller_owner },
+              expected_redeemer: AddSellers,
             )
           BurnSeller ->
             validation.has_spend_manager(

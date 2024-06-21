@@ -9,7 +9,7 @@ use lb_v2/types.{
 use lb_v2/utils.{
   assert, minimum_seller_collected, must_get_start_end_validity, seller_auth_an,
 }
-use lb_v2/validation.{build_default_seller_output}
+use lb_v2/validation.{validate_and_get_seller_outputs_length}
 
 // Assertions:
 // - Manager, Treasury share the same LBE ID
@@ -79,20 +79,16 @@ pub fn validate_manage_seller(
       manager_out_rs == None,
     }
   when redeemer is {
-    AddSellers { seller_owner } -> {
+    AddSellers -> {
       // Validate Add Sellers
-      let default_seller_output =
-        build_default_seller_output(
+      let seller_output_length =
+        validate_and_get_seller_outputs_length(
+          outputs: outputs,
           factory_policy_id: factory_policy_id,
           base_asset: base_asset,
           raise_asset: raise_asset,
           seller_hash: seller_hash,
-          owner: seller_owner,
         )
-      // Paying Seller Outputs correctly!
-      let seller_outputs =
-        list.filter(outputs, fn(output) { output == default_seller_output })
-      let seller_output_length = list.length(seller_outputs)
       and {
         end_valid_time_range < end_time,
         is_cancelled == False,
