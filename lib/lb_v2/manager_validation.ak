@@ -220,7 +220,7 @@ fn apply_collect_sellers(
     [] -> (collect_raise, collect_penalty)
     _ ->
       apply_collect_sellers(
-        seller_input_count: seller_input_count,
+        one_seller_owner_output_ada: one_seller_owner_output_ada,
         seller_inputs: inputs,
         outputs: remaining_outputs,
         default_seller_owner_output: default_seller_owner_output,
