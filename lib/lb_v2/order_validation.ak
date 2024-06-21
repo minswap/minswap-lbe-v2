@@ -1,5 +1,7 @@
+use aiken/dict.{Dict}
 use aiken/list
 use aiken/transaction.{InlineDatum, Input, Output}
+use aiken/transaction/credential.{Address}
 use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
@@ -13,8 +15,6 @@ use lb_v2/validation.{
   build_default_collected_order_value, get_order_inputs, get_order_outputs,
   get_treasury_output,
 }
-use aiken/transaction/credential.{Address}
-use aiken/dict.{Dict}
 
 // Assertions:
 // - All Sellers, Manager have been collected.
@@ -110,13 +110,26 @@ pub fn apply_collecting_orders(
   acc_collect_amount: Int,
   default_order_output_value: Value,
   order_hash: PolicyId,
-  map_seller_owner_fund: Dict<Address, Int>,
+  seller_owner_reward_per_order: Int,
+  map_seller_owner_reward: Dict<Address, Int>,
 ) -> Int {
   expect [input, ..inputs] = order_inputs
   expect [output, ..remaining_outputs] = outputs
   expect Input { output: Output { datum: InlineDatum(in_datum_raw), .. }, .. } =
     input
   expect in_datum: OrderDatum = in_datum_raw
+  let OrderDatum {
+    base_asset: o_base_asset,
+    raise_asset: o_raise_asset,
+    seller_owner,
+    ..
+  } = in_datum
+  let acc_seller_owner_reward = dict.get(map_seller_owner_reward,seller_owner)
+
+  let new_map_seller_owner_fund = 
+    when acc_seller_owner_reward is {
+      None -> 
+    }
   expect Output {
     value: out_value,
     datum: InlineDatum(out_datum_raw),
@@ -126,11 +139,8 @@ pub fn apply_collecting_orders(
   expect out_datum: OrderDatum = out_datum_raw
   expect and {
       // Order, Treasury must share the same LBE ID
-      in_datum == OrderDatum {
-        ..in_datum,
-        base_asset: base_asset,
-        raise_asset: raise_asset,
-      },
+      o_base_asset == base_asset,
+      o_raise_asset == raise_asset,
       // Out Datum only changes: {is_collected: True } compare to In Datum
       out_datum == OrderDatum { ..in_datum, is_collected: True },
       // Out Value should be correct!
