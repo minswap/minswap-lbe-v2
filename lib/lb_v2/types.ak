@@ -29,10 +29,14 @@ pub type FactoryDatum {
 
 pub type FactoryRedeemer {
   Initialization
-  CreateTreasury { base_asset: Asset, raise_asset: Asset }
+  CreateTreasury {
+    base_asset: Asset,
+    raise_asset: Asset,
+    seller_owner: Address,
+  }
   CloseTreasury { base_asset: Asset, raise_asset: Asset }
   MintManager
-  MintSeller
+  MintSeller { seller_owner: Address }
   BurnSeller
   MintOrder
   MintRedeemOrders
@@ -149,7 +153,7 @@ pub type ManagerDatum {
 }
 
 pub type ManagerRedeemer {
-  AddSellers
+  AddSellers { seller_owner: Address }
   CollectSellers
   SpendManager
 }

@@ -706,6 +706,7 @@ pub fn build_default_seller_output(
   base_asset: Asset,
   raise_asset: Asset,
   seller_hash: ValidatorHash,
+  owner: Address,
 ) -> Output {
   let seller_address = credential.from_script(seller_hash)
   // build default seller datum
@@ -716,6 +717,7 @@ pub fn build_default_seller_output(
       raise_asset,
       amount: 0,
       penalty_amount: 0,
+      owner,
     }
   // build default seller value
   let seller_value =

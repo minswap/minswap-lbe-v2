@@ -15,8 +15,8 @@ use lb_v2/types.{
   MintSeller, RedeemOrders, TreasuryDatum, UsingSeller, ValidatorHash,
 }
 use lb_v2/utils.{
-  assert, compute_lp_asset_name, default_number_seller, factory_auth_an,
-  make_wrapper_redeemer, manager_auth_an, manager_minimum_ada,
+  assert, compute_lp_asset_name, factory_auth_an, make_wrapper_redeemer,
+  manager_auth_an, manager_minimum_ada, minimum_default_number_seller,
   must_get_end_validity, seller_auth_an, treasury_auth_an,
 }
 use lb_v2/validation
@@ -30,8 +30,8 @@ use lb_v2/validation
 //    - 1 Treasury Ouptut needs to be paid
 //    - 1 Manager Token needs to be mint
 //    - 1 Manager Ouptut needs to be paid
-//    - @default_number_seller need to be mint
-//    - @default_number_seller Seller Ouptuts need to be paid
+//    - at least @minimum_default_number_seller need to be mint
+//    - at least @minimum_default_number_seller Seller Ouptuts need to be paid
 // 2. Close a Treasury:
 //    - 1 Treasury Token needs to be burn
 //    - 1 Treasury Input needs to be spent
@@ -110,8 +110,11 @@ validator(
     let FactoryDatum { head: current_head, tail: current_tail } = datum
     let (base_asset, raise_asset) =
       when redeemer is {
-        CreateTreasury { base_asset: d_base_asset, raise_asset: d_raise_asset } ->
-          (d_base_asset, d_raise_asset)
+        CreateTreasury {
+          base_asset: d_base_asset,
+          raise_asset: d_raise_asset,
+          ..
+        } -> (d_base_asset, d_raise_asset)
         CloseTreasury { base_asset: d_base_asset, raise_asset: d_raise_asset } ->
           (d_base_asset, d_raise_asset)
         _ -> fail @"Only spending Factory Input when Create | Close Treasury"
@@ -131,7 +134,7 @@ validator(
         asset_b_asset_name,
       )
     when redeemer is {
-      CreateTreasury { .. } -> {
+      CreateTreasury { seller_owner, .. } -> {
         let Transaction { datums, .. } = transaction
         // finding exactly 1 Factory Input
         expect [factory_input] = factory_inputs
@@ -170,23 +173,26 @@ validator(
           reference_script: f_out_tail_ref_script,
           ..
         } = f_out_tail
-        let default_manager_output =
-          build_default_manager_output(
-            factory_policy_id: factory_hash,
-            manager_hash: manager_hash,
-            base_asset: base_asset,
-            raise_asset: raise_asset,
-          )
         let default_seller_output =
           validation.build_default_seller_output(
             factory_policy_id: factory_hash,
             base_asset: base_asset,
             raise_asset: raise_asset,
             seller_hash: seller_hash,
+            owner: seller_owner,
           )
         // finding all Legitimate Seller Outputs
         let seller_outputs =
           list.filter(outputs, fn(output) { output == default_seller_output })
+        let seller_count = list.length(seller_outputs)
+        let default_manager_output =
+          build_default_manager_output(
+            factory_policy_id: factory_hash,
+            manager_hash: manager_hash,
+            base_asset: base_asset,
+            raise_asset: raise_asset,
+            seller_count: seller_count,
+          )
         // Trivial Assertions
         expect
           assert(
@@ -228,7 +234,7 @@ validator(
             @"Manager Output must pay correctly!",
           ),
           assert(
-            list.length(seller_outputs) == default_number_seller,
+            seller_count >= minimum_default_number_seller,
             @"Must pay enough Legitimate Seller Outputs!",
           ),
           assert(
@@ -248,6 +254,7 @@ validator(
           assert(
             value.from_minted_value(mint) == get_minting_treasury(
               factory_policy_id: factory_hash,
+              seller_count: seller_count,
             ),
             @"Mint Value must be correct!",
           ),
@@ -428,13 +435,13 @@ validator(
               redeemers: redeemers,
               expected_redeemer: CollectManager,
             )
-          MintSeller ->
+          MintSeller { seller_owner } ->
             validation.has_spend_manager(
               inputs: inputs,
               factory_policy_id: factory_policy_id,
               manager_hash: manager_hash,
               redeemers: redeemers,
-              expected_redeemer: AddSellers,
+              expected_redeemer: AddSellers { seller_owner },
             )
           BurnSeller ->
             validation.has_spend_manager(
@@ -595,6 +602,7 @@ fn build_default_manager_output(
   manager_hash: ValidatorHash,
   base_asset: Asset,
   raise_asset: Asset,
+  seller_count: Int,
 ) -> Output {
   let manager_address = credential.from_script(manager_hash)
   // build default manager datum
@@ -603,7 +611,7 @@ fn build_default_manager_output(
       factory_policy_id,
       base_asset,
       raise_asset,
-      seller_count: default_number_seller,
+      seller_count,
       reserve_raise: 0,
       total_penalty: 0,
     }
@@ -648,11 +656,11 @@ fn validate_factory_remove_node(
 }
 
 // return Mint Value when creating new Treasury
-fn get_minting_treasury(factory_policy_id: PolicyId) -> Value {
+fn get_minting_treasury(factory_policy_id: PolicyId, seller_count: Int) -> Value {
   value.from_asset(factory_policy_id, factory_auth_an, 1)
     |> value.add(factory_policy_id, treasury_auth_an, 1)
     |> value.add(factory_policy_id, manager_auth_an, 1)
-    |> value.add(factory_policy_id, seller_auth_an, default_number_seller)
+    |> value.add(factory_policy_id, seller_auth_an, seller_count)
 }
 
 // return Mint Value when close a Treasury

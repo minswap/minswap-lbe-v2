@@ -79,7 +79,7 @@ pub fn validate_manage_seller(
       manager_out_rs == None,
     }
   when redeemer is {
-    AddSellers -> {
+    AddSellers { seller_owner } -> {
       // Validate Add Sellers
       let default_seller_output =
         build_default_seller_output(
@@ -87,6 +87,7 @@ pub fn validate_manage_seller(
           base_asset: base_asset,
           raise_asset: raise_asset,
           seller_hash: seller_hash,
+          owner: seller_owner,
         )
       // Paying Seller Outputs correctly!
       let seller_outputs =
