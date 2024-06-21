@@ -1,6 +1,8 @@
 use aiken/list
 use aiken/transaction.{InlineDatum, Input, Output}
-use aiken/transaction/value.{AssetName, Value, ada_asset_name, ada_policy_id}
+use aiken/transaction/value.{
+  AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
+}
 use lb_v2/types.{Asset, OrderDatum, TreasuryDatum, ValidatorHash}
 use lb_v2/utils.{
   amm_authen_policy_id, compute_asset_name_from_base_and_raise,
@@ -11,6 +13,8 @@ use lb_v2/validation.{
   build_default_collected_order_value, get_order_inputs, get_order_outputs,
   get_treasury_output,
 }
+use aiken/transaction/credential.{Address}
+use aiken/dict.{Dict}
 
 // Assertions:
 // - All Sellers, Manager have been collected.
@@ -50,7 +54,6 @@ pub fn validate_collect_orders(
       factory_policy_id: factory_policy_id,
       order_hash: order_hash,
     )
-  let order_outputs = get_order_outputs(outputs, order_hash)
   let treasury_output =
     get_treasury_output(outputs, factory_policy_id, treasury_hash)
   expect Output {
@@ -62,7 +65,7 @@ pub fn validate_collect_orders(
   let collect_amount =
     apply_collecting_orders(
       order_inputs: order_inputs,
-      order_outputs: order_outputs,
+      outputs: outputs,
       base_asset: base_asset,
       raise_asset: raise_asset,
       acc_collect_amount: 0,
@@ -101,19 +104,25 @@ pub fn validate_collect_orders(
 // return Sum(amount + penalty_amount) of orders
 pub fn apply_collecting_orders(
   order_inputs: List<Input>,
-  order_outputs: List<Output>,
+  outputs: List<Output>,
   base_asset: Asset,
   raise_asset: Asset,
   acc_collect_amount: Int,
   default_order_output_value: Value,
+  order_hash: PolicyId,
+  map_seller_owner_fund: Dict<Address, Int>,
 ) -> Int {
   expect [input, ..inputs] = order_inputs
-  expect [output, ..outputs] = order_outputs
+  expect [output, ..remaining_outputs] = outputs
   expect Input { output: Output { datum: InlineDatum(in_datum_raw), .. }, .. } =
     input
   expect in_datum: OrderDatum = in_datum_raw
-  expect Output { value: out_value, datum: InlineDatum(out_datum_raw), .. } =
-    output
+  expect Output {
+    value: out_value,
+    datum: InlineDatum(out_datum_raw),
+    address: Address { payment_credential: order_out_payment_credential, .. },
+    ..
+  } = output
   expect out_datum: OrderDatum = out_datum_raw
   expect and {
       // Order, Treasury must share the same LBE ID
@@ -126,6 +135,7 @@ pub fn apply_collecting_orders(
       out_datum == OrderDatum { ..in_datum, is_collected: True },
       // Out Value should be correct!
       out_value == default_order_output_value,
+      order_out_payment_credential == ScriptCredential(order_hash),
     }
   let OrderDatum { amount, penalty_amount, .. } = in_datum
   let collect_amount = acc_collect_amount + amount + penalty_amount
@@ -138,11 +148,12 @@ pub fn apply_collecting_orders(
     _ ->
       apply_collecting_orders(
         order_inputs: inputs,
-        order_outputs: outputs,
+        outputs: remaining_outputs,
         base_asset: base_asset,
         raise_asset: raise_asset,
         acc_collect_amount: collect_amount,
         default_order_output_value: default_order_output_value,
+        order_hash: order_hash,
       )
   }
 }
