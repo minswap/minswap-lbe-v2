@@ -11,6 +11,7 @@ use lb_v2/types.{
 use lb_v2/utils.{
   assert, collect_seller_commision, minimum_seller_collected,
   must_get_start_end_validity, seller_auth_an, seller_minimum_ada,
+  utxo_minimum_ada,
 }
 use lb_v2/validation.{validate_seller_outputs}
 
@@ -209,7 +210,7 @@ fn apply_collect_sellers(
       s_base_asset == base_asset,
       s_raise_asset == raise_asset,
       // minimum ada of 1 UTxO
-      if one_seller_owner_output_ada < 1_000_000 {
+      if one_seller_owner_output_ada < utxo_minimum_ada {
         True
       } else {
         seller_owner_output == Output {

@@ -49,6 +49,8 @@ pub const max_penalty = 25
 // The ADA amount to reward the Operator
 pub const fee_ada = 1_000_000
 
+pub const utxo_minimum_ada = 1_000_000
+
 // the ADA amount store in Treasury UTxO
 pub const treasury_minimum_ada = 3_000_000
 

@@ -1,19 +1,17 @@
-use aiken/dict.{Dict}
 use aiken/list
 use aiken/transaction.{InlineDatum, Input, Output}
-use aiken/transaction/credential.{Address}
+use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
 use lb_v2/types.{Asset, OrderDatum, TreasuryDatum, ValidatorHash}
 use lb_v2/utils.{
-  amm_authen_policy_id, compute_asset_name_from_base_and_raise,
-  minimum_order_collected, minimum_order_redeemed, order_auth_an,
-  order_minimum_ada,
+  amm_authen_policy_id, collect_order_commision,
+  compute_asset_name_from_base_and_raise, fee_ada, minimum_order_collected,
+  minimum_order_redeemed, order_auth_an, order_minimum_ada,
 }
 use lb_v2/validation.{
-  build_default_collected_order_value, get_order_inputs, get_order_outputs,
-  get_treasury_output,
+  build_default_collected_order_value, get_order_inputs, get_treasury_output,
 }
 
 // Assertions:
@@ -62,16 +60,20 @@ pub fn validate_collect_orders(
     ..
   } = treasury_output
   expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
+  let order_inputs_length = list.length(order_inputs)
   let collect_amount =
     apply_collecting_orders(
       order_inputs: order_inputs,
       outputs: outputs,
       base_asset: base_asset,
       raise_asset: raise_asset,
-      acc_collect_amount: 0,
       default_order_output_value: build_default_collected_order_value(
         factory_policy_id,
       ),
+      order_hash: order_hash,
+      seller_owner_reward_per_order: order_inputs_length * fee_ada - collect_order_commision,
+      map_seller_owner_reward: [],
+      acc_collect_amount: 0,
     )
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
     raise_asset
@@ -93,10 +95,42 @@ pub fn validate_collect_orders(
     or {
       // prevent spamming by setting minimum for orders collected 
       //  if this tx is not the last collect action
-      list.length(order_inputs) >= minimum_order_collected,
+      order_inputs_length >= minimum_order_collected,
       // the last collecting
       collected_fund + collect_amount == reserve_raise + total_penalty,
     },
+  }
+}
+
+fn add_seller_owner_reward(
+  map_seller_owner_reward: List<(Address, Int)>,
+  seller_owner: Address,
+  seller_owner_reward_per_order: Int,
+) -> List<(Address, Int)> {
+  let acc_seller_owner_reward =
+    list.find(
+      map_seller_owner_reward,
+      fn(x) {
+        let (owner, _) = x
+        seller_owner == owner
+      },
+    )
+
+  when acc_seller_owner_reward is {
+    None ->
+      [(seller_owner, seller_owner_reward_per_order), ..map_seller_owner_reward]
+    Some(_) ->
+      list.map(
+        map_seller_owner_reward,
+        fn(x) {
+          let (owner, acc_reward) = x
+          if seller_owner == owner {
+            (owner, acc_reward + seller_owner_reward_per_order)
+          } else {
+            x
+          }
+        },
+      )
   }
 }
 
@@ -107,13 +141,13 @@ pub fn apply_collecting_orders(
   outputs: List<Output>,
   base_asset: Asset,
   raise_asset: Asset,
-  acc_collect_amount: Int,
   default_order_output_value: Value,
   order_hash: PolicyId,
   seller_owner_reward_per_order: Int,
-  map_seller_owner_reward: Dict<Address, Int>,
+  map_seller_owner_reward: List<(Address, Int)>,
+  acc_collect_amount: Int,
 ) -> Int {
-  expect [input, ..inputs] = order_inputs
+  expect [input, ..remaining_order_inputs] = order_inputs
   expect [output, ..remaining_outputs] = outputs
   expect Input { output: Output { datum: InlineDatum(in_datum_raw), .. }, .. } =
     input
@@ -124,12 +158,12 @@ pub fn apply_collecting_orders(
     seller_owner,
     ..
   } = in_datum
-  let acc_seller_owner_reward = dict.get(map_seller_owner_reward,seller_owner)
-
-  let new_map_seller_owner_fund = 
-    when acc_seller_owner_reward is {
-      None -> 
-    }
+  let new_map_seller_owner_reward =
+    add_seller_owner_reward(
+      map_seller_owner_reward: map_seller_owner_reward,
+      seller_owner: seller_owner,
+      seller_owner_reward_per_order: seller_owner_reward_per_order,
+    )
   expect Output {
     value: out_value,
     datum: InlineDatum(out_datum_raw),
@@ -149,21 +183,37 @@ pub fn apply_collecting_orders(
     }
   let OrderDatum { amount, penalty_amount, .. } = in_datum
   let collect_amount = acc_collect_amount + amount + penalty_amount
-  when inputs is {
+  when remaining_order_inputs is {
     [] -> {
       // Ensure order_inputs.length == order_outputs.length
-      expect outputs == []
+      let _ = list.foldl(new_map_seller_owner_reward, remaining_outputs,fn(owner_seller_reward,output){
+        let (owner, reward) = owner_seller_reward
+        if reward < utxo_minimum_ada {
+          outputs
+        }else{
+          let [output, remaining_outputs] = outputs
+          expect output == Output {
+            address: owner,
+            value: value.from_lovelace(reward)
+            datum: NoDatum,
+            reference_script: None,
+          }
+          remaining_outputs
+        }
+      })
       collect_amount
     }
     _ ->
       apply_collecting_orders(
-        order_inputs: inputs,
+        order_inputs: remaining_order_inputs,
         outputs: remaining_outputs,
         base_asset: base_asset,
         raise_asset: raise_asset,
-        acc_collect_amount: collect_amount,
         default_order_output_value: default_order_output_value,
         order_hash: order_hash,
+        seller_owner_reward_per_order: seller_owner_reward_per_order,
+        map_seller_owner_reward: new_map_seller_owner_reward,
+        acc_collect_amount: collect_amount,
       )
   }
 }
