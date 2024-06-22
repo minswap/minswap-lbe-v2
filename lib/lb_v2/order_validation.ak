@@ -8,7 +8,8 @@ use lb_v2/types.{Asset, OrderDatum, TreasuryDatum, ValidatorHash}
 use lb_v2/utils.{
   amm_authen_policy_id, collect_order_commision,
   compute_asset_name_from_base_and_raise, fee_ada, minimum_order_collected,
-  minimum_order_redeemed, order_auth_an, order_minimum_ada, utxo_minimum_ada,
+  minimum_order_redeemed, order_auth_an, order_minimum_ada,
+  redeem_order_commision, utxo_minimum_ada,
 }
 use lb_v2/validation.{
   build_default_collected_order_value, get_order_inputs, get_treasury_output,
@@ -71,7 +72,7 @@ pub fn validate_collect_orders(
         factory_policy_id,
       ),
       order_hash: order_hash,
-      seller_owner_reward_per_order: order_inputs_length * fee_ada - collect_order_commision,
+      seller_owner_reward_per_order: fee_ada - collect_order_commision / order_inputs_length,
       map_seller_owner_reward: [],
       acc_collect_amount: 0,
     )
@@ -134,6 +135,38 @@ fn add_seller_owner_reward(
   }
 }
 
+fn validate_seller_owner_outputs(
+  map_seller_owner_reward: List<(Address, Int)>,
+  remaining_outputs: List<Output>,
+) -> Bool {
+  let remaining_outputs =
+    list.foldl(
+      map_seller_owner_reward,
+      remaining_outputs,
+      fn(owner_seller_reward, outputs) {
+        let (owner, reward) = owner_seller_reward
+        if reward < utxo_minimum_ada {
+          outputs
+        } else {
+          expect [output, ..remaining_outputs] = outputs
+          expect
+            output == Output {
+              address: owner,
+              value: value.from_lovelace(reward),
+              datum: NoDatum,
+              reference_script: None,
+            }
+          remaining_outputs
+        }
+      },
+    )
+  // lack warning `remaining_outputs` is unspend
+  when remaining_outputs is {
+    [] -> True
+    _ -> True
+  }
+}
+
 // Transaction must collects at least 1 order.
 // return Sum(amount + penalty_amount) of orders
 pub fn apply_collecting_orders(
@@ -185,33 +218,11 @@ pub fn apply_collecting_orders(
   let collect_amount = acc_collect_amount + amount + penalty_amount
   when remaining_order_inputs is {
     [] -> {
-      let remaining_outputs =
-        list.foldl(
-          new_map_seller_owner_reward,
-          remaining_outputs,
-          fn(owner_seller_reward, outputs) {
-            let (owner, reward) = owner_seller_reward
-            if reward < utxo_minimum_ada {
-              outputs
-            } else {
-              expect [output, ..remaining_outputs] = outputs
-              expect
-                output == Output {
-                  address: owner,
-                  value: value.from_lovelace(reward),
-                  datum: NoDatum,
-                  reference_script: None,
-                }
-              remaining_outputs
-            }
-          },
-        )
-      // lack warning `remaining_outputs` is unspend
       expect
-        when remaining_outputs is {
-          [] -> True
-          _ -> True
-        }
+        validate_seller_owner_outputs(
+          map_seller_owner_reward: new_map_seller_owner_reward,
+          remaining_outputs: remaining_outputs,
+        )
       collect_amount
     }
     _ ->
@@ -292,6 +303,7 @@ pub fn validate_redeem(
     }
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
     raise_asset
+  let order_inputs_length = list.length(order_inputs)
   let (total_fund, total_lp, total_raise) =
     apply_redeem_orders(
       order_inputs: order_inputs,
@@ -305,6 +317,8 @@ pub fn validate_redeem(
       acc_fund: 0,
       acc_lp: 0,
       acc_raise: 0,
+      seller_owner_reward_per_order: fee_ada - redeem_order_commision / order_inputs_length,
+      map_seller_owner_reward: [],
     )
   and {
     // Check AMM Pool create successfully!
@@ -326,7 +340,7 @@ pub fn validate_redeem(
     or {
       // prevent spamming by setting minimum for orders redeemed 
       //  if this tx is not the last redeemed action
-      list.length(order_inputs) >= minimum_order_redeemed,
+      order_inputs_length >= minimum_order_redeemed,
       // the last redeeming
       collected_fund == total_fund,
     },
@@ -346,6 +360,8 @@ pub fn apply_redeem_orders(
   acc_fund: Int,
   acc_lp: Int,
   acc_raise: Int,
+  seller_owner_reward_per_order: Int,
+  map_seller_owner_reward: List<(Address, Int)>,
 ) -> (Int, Int, Int) {
   expect [order_input, ..remaining_order_inputs] = order_inputs
   expect [user_output, ..remaining_outputs] = outputs
@@ -360,6 +376,7 @@ pub fn apply_redeem_orders(
     raise_asset: o_raise_asset,
     amount,
     penalty_amount,
+    seller_owner,
     ..
   } = order_in_datum
   let Output { address: user_address, value: user_value, .. } = user_output
@@ -387,8 +404,21 @@ pub fn apply_redeem_orders(
       user_address == owner,
       expect_user_value == user_value,
     }
+  let new_map_seller_owner_reward =
+    add_seller_owner_reward(
+      map_seller_owner_reward: map_seller_owner_reward,
+      seller_owner: seller_owner,
+      seller_owner_reward_per_order: seller_owner_reward_per_order,
+    )
   when remaining_order_inputs is {
-    [] -> (fund_amount, lp_amount, raise_amount)
+    [] -> {
+      expect
+        validate_seller_owner_outputs(
+          map_seller_owner_reward: new_map_seller_owner_reward,
+          remaining_outputs: remaining_outputs,
+        )
+      (fund_amount, lp_amount, raise_amount)
+    }
     _ ->
       apply_redeem_orders(
         order_inputs: remaining_order_inputs,
@@ -402,6 +432,8 @@ pub fn apply_redeem_orders(
         acc_fund: fund_amount,
         acc_lp: lp_amount,
         acc_raise: raise_amount,
+        seller_owner_reward_per_order: seller_owner_reward_per_order,
+        map_seller_owner_reward: new_map_seller_owner_reward,
       )
   }
 }
@@ -454,6 +486,7 @@ pub fn validate_refund(
   expect treasury_out_datum: TreasuryDatum = raw_treasury_out_datum
   let Asset { policy_id: raise_asset_pid, asset_name: raise_asset_an } =
     raise_asset
+  let order_inputs_length = list.length(order_inputs)
   let (total_orders_amount, total_orders_penalty) =
     apply_refund_orders(
       order_inputs: order_inputs,
@@ -462,6 +495,8 @@ pub fn validate_refund(
       raise_asset: raise_asset,
       acc_amount: 0,
       acc_penalty: 0,
+      seller_owner_reward_per_order: fee_ada - redeem_order_commision / order_inputs_length,
+      map_seller_owner_reward: [],
     )
   let refund_amount = total_orders_amount + total_orders_penalty
   and {
@@ -486,7 +521,7 @@ pub fn validate_refund(
     or {
       // prevent spamming by setting minimum for orders redeemed 
       //  if this tx is not the last redeemed action
-      list.length(order_inputs) >= minimum_order_redeemed,
+      order_inputs_length >= minimum_order_redeemed,
       // the last redeeming
       collected_fund == refund_amount,
     },
@@ -503,6 +538,8 @@ pub fn apply_refund_orders(
   raise_asset: Asset,
   acc_amount: Int,
   acc_penalty: Int,
+  seller_owner_reward_per_order: Int,
+  map_seller_owner_reward: List<(Address, Int)>,
 ) -> (Int, Int) {
   expect [order_input, ..remaining_order_inputs] = order_inputs
   expect [user_output, ..remaining_outputs] = outputs
@@ -517,6 +554,7 @@ pub fn apply_refund_orders(
     penalty_amount,
     base_asset: o_base_asset,
     raise_asset: o_raise_asset,
+    seller_owner,
     ..
   } = order_datum
   let Output { address: user_address, value: user_value, .. } = user_output
@@ -548,8 +586,21 @@ pub fn apply_refund_orders(
     }
   let refund_amount = acc_amount + amount
   let refund_penalty = acc_penalty + penalty_amount
+  let new_map_seller_owner_reward =
+    add_seller_owner_reward(
+      map_seller_owner_reward: map_seller_owner_reward,
+      seller_owner: seller_owner,
+      seller_owner_reward_per_order: seller_owner_reward_per_order,
+    )
   when remaining_order_inputs is {
-    [] -> (refund_amount, refund_penalty)
+    [] -> {
+      expect
+        validate_seller_owner_outputs(
+          map_seller_owner_reward: new_map_seller_owner_reward,
+          remaining_outputs: remaining_outputs,
+        )
+      (refund_amount, refund_penalty)
+    }
     _ ->
       apply_refund_orders(
         order_inputs: remaining_order_inputs,
@@ -558,6 +609,8 @@ pub fn apply_refund_orders(
         raise_asset: raise_asset,
         acc_amount: refund_amount,
         acc_penalty: refund_penalty,
+        seller_owner_reward_per_order: seller_owner_reward_per_order,
+        map_seller_owner_reward: new_map_seller_owner_reward,
       )
   }
 }

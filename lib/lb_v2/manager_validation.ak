@@ -124,11 +124,8 @@ pub fn validate_manage_seller(
         )
       // Validate collect sellers
       let seller_input_count = list.length(seller_inputs)
-      let total_seller_minimum_ada = seller_input_count * seller_minimum_ada
-      let total_seller_owner_ada =
-        total_seller_minimum_ada - collect_seller_commision
       let one_seller_owner_output_ada =
-        total_seller_owner_ada / seller_input_count
+        seller_minimum_ada - collect_seller_commision / seller_input_count
       let (total_reserve_raise, total_penalty_input) =
         apply_collect_sellers(
           one_seller_owner_output_ada: one_seller_owner_output_ada,
