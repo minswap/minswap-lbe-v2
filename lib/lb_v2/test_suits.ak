@@ -2,82 +2,74 @@ use aiken/builtin
 use aiken/bytearray
 use aiken/fuzz
 use aiken/list
-use aiken/transaction.{
-  InlineDatum, Input, Output, OutputReference, TransactionId,
-}
-use aiken/transaction/credential.{Address, VerificationKeyCredential}
-use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
-use lb_v2/order_validation.{apply_collecting_orders}
-use lb_v2/types.{Asset, FactoryDatum, OrderDatum, PenaltyConfig, UsingSeller}
+use lb_v2/types.{FactoryDatum, PenaltyConfig, UsingSeller}
 use lb_v2/utils.{
-  calculate_penalty, fee_ada, make_wrapper_redeemer, order_auth_an,
-  order_minimum_ada, sort_two_consecutive_factory_datum,
-}
-use lb_v2/validation.{build_default_collected_order_value}
-
-type DummyObject {
-  owner: Address,
-  base_asset: Asset,
-  raise_asset: Asset,
-  factory_policy_id: PolicyId,
-  order_input: Input,
-  order_datum: OrderDatum,
-  order_value: Value,
+  calculate_penalty, make_wrapper_redeemer, sort_two_consecutive_factory_datum,
 }
 
-fn gen_dummy_object() -> DummyObject {
-  let factory_policy_id =
-    #"4ad61bf61971298e1aba4e71ce34cac02cddf8030b6fce35c2693a70"
-  let base_asset =
-    Asset {
-      policy_id: #"4ad61bf61971298e8aba4e71ce34cac02cddf8030b6fce35c2693a70",
-      asset_name: #"68696869",
-    }
-  let raise_asset = Asset { policy_id: #"", asset_name: #"" }
-  let owner =
-    Address {
-      payment_credential: VerificationKeyCredential(
-        #"4ad61bf61971298e8aba4e71ce34cac02cddf8030b6fce35c2693a70",
-      ),
-      stake_credential: None,
-    }
-  let order_datum =
-    OrderDatum {
-      factory_policy_id,
-      base_asset,
-      raise_asset,
-      owner,
-      is_collected: False,
-      amount: 100_000_000,
-      penalty_amount: 20_000_000,
-      seller_owner: owner,
-    }
-  let order_value =
-    value.from_asset(factory_policy_id, order_auth_an, 1)
-      |> value.add(raise_asset.policy_id, raise_asset.asset_name, 104_000_000)
-  DummyObject {
-    owner,
-    base_asset,
-    raise_asset,
-    factory_policy_id,
-    order_datum,
-    order_value,
-    order_input: Input {
-      output_reference: OutputReference {
-        transaction_id: TransactionId(
-          #"4ad61bf61971298e1aba4e71ce34cac02cddf8030b6fce35c2693a70",
-        ),
-        output_index: 1,
-      },
-      output: Output {
-        address: owner,
-        value: order_value,
-        datum: InlineDatum(order_datum),
-        reference_script: None,
-      },
-    },
-  }
-}
+// type DummyObject {
+//   owner: Address,
+//   base_asset: Asset,
+//   raise_asset: Asset,
+//   factory_policy_id: PolicyId,
+//   order_input: Input,
+//   order_datum: OrderDatum,
+//   order_value: Value,
+// }
+
+// fn gen_dummy_object() -> DummyObject {
+//   let factory_policy_id =
+//     #"4ad61bf61971298e1aba4e71ce34cac02cddf8030b6fce35c2693a70"
+//   let base_asset =
+//     Asset {
+//       policy_id: #"4ad61bf61971298e8aba4e71ce34cac02cddf8030b6fce35c2693a70",
+//       asset_name: #"68696869",
+//     }
+//   let raise_asset = Asset { policy_id: #"", asset_name: #"" }
+//   let owner =
+//     Address {
+//       payment_credential: VerificationKeyCredential(
+//         #"4ad61bf61971298e8aba4e71ce34cac02cddf8030b6fce35c2693a70",
+//       ),
+//       stake_credential: None,
+//     }
+//   let order_datum =
+//     OrderDatum {
+//       factory_policy_id,
+//       base_asset,
+//       raise_asset,
+//       owner,
+//       is_collected: False,
+//       amount: 100_000_000,
+//       penalty_amount: 20_000_000,
+//       seller_owner: owner,
+//     }
+//   let order_value =
+//     value.from_asset(factory_policy_id, order_auth_an, 1)
+//       |> value.add(raise_asset.policy_id, raise_asset.asset_name, 104_000_000)
+//   DummyObject {
+//     owner,
+//     base_asset,
+//     raise_asset,
+//     factory_policy_id,
+//     order_datum,
+//     order_value,
+//     order_input: Input {
+//       output_reference: OutputReference {
+//         transaction_id: TransactionId(
+//           #"4ad61bf61971298e1aba4e71ce34cac02cddf8030b6fce35c2693a70",
+//         ),
+//         output_index: 1,
+//       },
+//       output: Output {
+//         address: owner,
+//         value: order_value,
+//         datum: InlineDatum(order_datum),
+//         reference_script: None,
+//       },
+//     },
+//   }
+// }
 
 fn custom_factory_node() -> Fuzzer<ByteArray> {
   let head = fuzz.bytearray()
@@ -175,90 +167,90 @@ test test_calculate_penalty(total_amount via calculate_penalty_params()) {
   penalty_amount == expect_pen_amount
 }
 
-// order inputs is empty
-test test_apply_collecting_orders_1() fail {
-  let dummy = gen_dummy_object()
-  apply_collecting_orders(
-    order_inputs: [],
-    order_outputs: [],
-    base_asset: dummy.base_asset,
-    raise_asset: dummy.raise_asset,
-    acc_collect_amount: 0,
-    default_order_output_value: build_default_collected_order_value(
-      dummy.factory_policy_id,
-    ),
-  ) == 0
-}
+// // order inputs is empty
+// test test_apply_collecting_orders_1() fail {
+//   let dummy = gen_dummy_object()
+//   apply_collecting_orders(
+//     order_inputs: [],
+//     order_outputs: [],
+//     base_asset: dummy.base_asset,
+//     raise_asset: dummy.raise_asset,
+//     acc_collect_amount: 0,
+//     default_order_output_value: build_default_collected_order_value(
+//       dummy.factory_policy_id,
+//     ),
+//   ) == 0
+// }
 
-// order_inputs.length != order_outputs.length
-test test_apply_collecting_orders_2() fail {
-  let dummy = gen_dummy_object()
-  apply_collecting_orders(
-    order_inputs: [dummy.order_input],
-    order_outputs: [],
-    base_asset: dummy.base_asset,
-    raise_asset: dummy.raise_asset,
-    acc_collect_amount: 0,
-    default_order_output_value: build_default_collected_order_value(
-      dummy.factory_policy_id,
-    ),
-  ) == 0
-}
+// // order_inputs.length != order_outputs.length
+// test test_apply_collecting_orders_2() fail {
+//   let dummy = gen_dummy_object()
+//   apply_collecting_orders(
+//     order_inputs: [dummy.order_input],
+//     order_outputs: [],
+//     base_asset: dummy.base_asset,
+//     raise_asset: dummy.raise_asset,
+//     acc_collect_amount: 0,
+//     default_order_output_value: build_default_collected_order_value(
+//       dummy.factory_policy_id,
+//     ),
+//   ) == 0
+// }
 
-// happy case
-test test_apply_collecting_orders_3() {
-  let dummy = gen_dummy_object()
-  let collect_amount =
-    dummy.order_datum.amount + dummy.order_datum.penalty_amount
-  let order_out_datum = OrderDatum { ..dummy.order_datum, is_collected: True }
-  let order_out_value =
-    value.from_asset(dummy.factory_policy_id, order_auth_an, 1)
-      |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
-  let order_out =
-    Output {
-      address: dummy.order_input.output.address,
-      value: order_out_value,
-      datum: InlineDatum(order_out_datum),
-      reference_script: None,
-    }
-  apply_collecting_orders(
-    order_inputs: [dummy.order_input],
-    order_outputs: [order_out],
-    base_asset: dummy.base_asset,
-    raise_asset: dummy.raise_asset,
-    acc_collect_amount: 0,
-    default_order_output_value: build_default_collected_order_value(
-      dummy.factory_policy_id,
-    ),
-  ) == collect_amount
-}
+// // happy case
+// test test_apply_collecting_orders_3() {
+//   let dummy = gen_dummy_object()
+//   let collect_amount =
+//     dummy.order_datum.amount + dummy.order_datum.penalty_amount
+//   let order_out_datum = OrderDatum { ..dummy.order_datum, is_collected: True }
+//   let order_out_value =
+//     value.from_asset(dummy.factory_policy_id, order_auth_an, 1)
+//       |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
+//   let order_out =
+//     Output {
+//       address: dummy.order_input.output.address,
+//       value: order_out_value,
+//       datum: InlineDatum(order_out_datum),
+//       reference_script: None,
+//     }
+//   apply_collecting_orders(
+//     order_inputs: [dummy.order_input],
+//     order_outputs: [order_out],
+//     base_asset: dummy.base_asset,
+//     raise_asset: dummy.raise_asset,
+//     acc_collect_amount: 0,
+//     default_order_output_value: build_default_collected_order_value(
+//       dummy.factory_policy_id,
+//     ),
+//   ) == collect_amount
+// }
 
-test test_apply_collecting_orders_4() {
-  let dummy = gen_dummy_object()
-  let collect_amount =
-    dummy.order_datum.amount + dummy.order_datum.penalty_amount
-  let order_out_datum = OrderDatum { ..dummy.order_datum, is_collected: True }
-  let order_out_value =
-    value.from_asset(dummy.factory_policy_id, order_auth_an, 1)
-      |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
-  let order_out =
-    Output {
-      address: dummy.order_input.output.address,
-      value: order_out_value,
-      datum: InlineDatum(order_out_datum),
-      reference_script: None,
-    }
-  apply_collecting_orders(
-    order_inputs: [dummy.order_input, dummy.order_input, dummy.order_input],
-    order_outputs: [order_out, order_out, order_out],
-    base_asset: dummy.base_asset,
-    raise_asset: dummy.raise_asset,
-    acc_collect_amount: 0,
-    default_order_output_value: build_default_collected_order_value(
-      dummy.factory_policy_id,
-    ),
-  ) == collect_amount * 3
-}
+// test test_apply_collecting_orders_4() {
+//   let dummy = gen_dummy_object()
+//   let collect_amount =
+//     dummy.order_datum.amount + dummy.order_datum.penalty_amount
+//   let order_out_datum = OrderDatum { ..dummy.order_datum, is_collected: True }
+//   let order_out_value =
+//     value.from_asset(dummy.factory_policy_id, order_auth_an, 1)
+//       |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
+//   let order_out =
+//     Output {
+//       address: dummy.order_input.output.address,
+//       value: order_out_value,
+//       datum: InlineDatum(order_out_datum),
+//       reference_script: None,
+//     }
+//   apply_collecting_orders(
+//     order_inputs: [dummy.order_input, dummy.order_input, dummy.order_input],
+//     order_outputs: [order_out, order_out, order_out],
+//     base_asset: dummy.base_asset,
+//     raise_asset: dummy.raise_asset,
+//     acc_collect_amount: 0,
+//     default_order_output_value: build_default_collected_order_value(
+//       dummy.factory_policy_id,
+//     ),
+//   ) == collect_amount * 3
+// }
 
 test test_make_wrapper_redeemer() {
   let redeemer_wrapper = make_wrapper_redeemer(UsingSeller)

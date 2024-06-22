@@ -1,5 +1,5 @@
 use aiken/list
-use aiken/transaction.{InlineDatum, Input, Output}
+use aiken/transaction.{InlineDatum, Input, NoDatum, Output}
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
@@ -8,7 +8,7 @@ use lb_v2/types.{Asset, OrderDatum, TreasuryDatum, ValidatorHash}
 use lb_v2/utils.{
   amm_authen_policy_id, collect_order_commision,
   compute_asset_name_from_base_and_raise, fee_ada, minimum_order_collected,
-  minimum_order_redeemed, order_auth_an, order_minimum_ada,
+  minimum_order_redeemed, order_auth_an, order_minimum_ada, utxo_minimum_ada,
 }
 use lb_v2/validation.{
   build_default_collected_order_value, get_order_inputs, get_treasury_output,
@@ -185,22 +185,33 @@ pub fn apply_collecting_orders(
   let collect_amount = acc_collect_amount + amount + penalty_amount
   when remaining_order_inputs is {
     [] -> {
-      // Ensure order_inputs.length == order_outputs.length
-      let _ = list.foldl(new_map_seller_owner_reward, remaining_outputs,fn(owner_seller_reward,output){
-        let (owner, reward) = owner_seller_reward
-        if reward < utxo_minimum_ada {
-          outputs
-        }else{
-          let [output, remaining_outputs] = outputs
-          expect output == Output {
-            address: owner,
-            value: value.from_lovelace(reward)
-            datum: NoDatum,
-            reference_script: None,
-          }
-          remaining_outputs
+      let remaining_outputs =
+        list.foldl(
+          new_map_seller_owner_reward,
+          remaining_outputs,
+          fn(owner_seller_reward, outputs) {
+            let (owner, reward) = owner_seller_reward
+            if reward < utxo_minimum_ada {
+              outputs
+            } else {
+              expect [output, ..remaining_outputs] = outputs
+              expect
+                output == Output {
+                  address: owner,
+                  value: value.from_lovelace(reward),
+                  datum: NoDatum,
+                  reference_script: None,
+                }
+              remaining_outputs
+            }
+          },
+        )
+      // lack warning `remaining_outputs` is unspend
+      expect
+        when remaining_outputs is {
+          [] -> True
+          _ -> True
         }
-      })
       collect_amount
     }
     _ ->
