@@ -66,15 +66,12 @@ pub fn validate_manage_seller(
     list.filter(
       outputs,
       fn(output) {
-        let Output { address: Address { payment_credential, .. }, value, .. } =
-          output
-        and {
-          payment_credential == ScriptCredential(manager_hash),
-          value == manager_in_value,
-        }
+        let Output { address: Address { payment_credential, .. }, .. } = output
+        payment_credential == ScriptCredential(manager_hash)
       },
     )
   expect Output {
+    value: manager_out_value,
     datum: InlineDatum(raw_manager_out_datum),
     reference_script: manager_out_rs,
     ..
@@ -84,6 +81,7 @@ pub fn validate_manage_seller(
       // Manager, Treasury share the same LBE ID
       m_base_asset == base_asset,
       m_raise_asset == raise_asset,
+      manager_out_value == manager_in_value,
       manager_out_rs == None,
     }
   when redeemer is {
