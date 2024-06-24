@@ -234,6 +234,7 @@ test("example flow", async () => {
     validTo: t.utils.slotToUnixTime(emulator.slot + 60),
     extraDatum,
     sellerAmount: 20n,
+    sellerOwner: ACCOUNT_0.address,
   });
   const createTreasuryTx = await quickSubmitBuilder(emulator)({
     txBuilder: builder.complete(),

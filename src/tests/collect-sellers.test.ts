@@ -322,7 +322,7 @@ function stupidManagerDatumOut(stupidInfo: any): WarehouseBuilder {
   const { builder, options } = warehouse;
   builder.buildCollectSeller(options);
 
-  builder.tasks[5] = () => {
+  builder.tasks[4] = () => {
     builder.payingManagerOutput({
       ...warehouse.expectedManagerDatumOut,
       ...stupidInfo,
