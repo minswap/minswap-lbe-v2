@@ -1,16 +1,14 @@
 use aiken/list
 use aiken/transaction.{InlineDatum, Input, NoDatum, Output, ValidityRange}
-use aiken/transaction/credential.{
-  Address, ScriptCredential, VerificationKeyCredential,
-}
+use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId, Value}
 use lb_v2/types.{
   AddSellers, Asset, CollectSellers, ManagerDatum, ManagerRedeemer, SellerDatum,
   TreasuryDatum,
 }
 use lb_v2/utils.{
-  assert, minimum_seller_collected, must_get_start_end_validity, seller_auth_an,
-  seller_commision, seller_minimum_ada,
+  assert, collect_seller_commission, minimum_seller_collected,
+  must_get_start_end_validity, seller_auth_an,
 }
 use lb_v2/validation.{validate_seller_outputs}
 
@@ -123,16 +121,6 @@ pub fn validate_manage_seller(
         apply_collect_sellers(
           seller_inputs: seller_inputs,
           outputs: outputs,
-          default_seller_owner_output: Output {
-            // DUMMY address
-            address: Address {
-              payment_credential: VerificationKeyCredential(#""),
-              stake_credential: None,
-            },
-            value: value.from_lovelace(seller_minimum_ada - seller_commision),
-            datum: NoDatum,
-            reference_script: None,
-          },
           base_asset: base_asset,
           raise_asset: raise_asset,
           acc_raise: 0,
@@ -175,7 +163,6 @@ pub fn validate_manage_seller(
 fn apply_collect_sellers(
   seller_inputs: List<Input>,
   outputs: List<Output>,
-  default_seller_owner_output: Output,
   base_asset: Asset,
   raise_asset: Asset,
   acc_raise: Int,
@@ -183,8 +170,10 @@ fn apply_collect_sellers(
 ) -> (Int, Int) {
   expect [input, ..inputs] = seller_inputs
   expect [seller_owner_output, ..remaining_outputs] = outputs
-  expect Input { output: Output { datum: InlineDatum(raw_datum), .. }, .. } =
-    input
+  expect Input {
+    output: Output { datum: InlineDatum(raw_datum), value: in_value, .. },
+    ..
+  } = input
   expect seller_datum: SellerDatum = raw_datum
   let SellerDatum {
     base_asset: s_base_asset,
@@ -198,8 +187,12 @@ fn apply_collect_sellers(
       s_base_asset == base_asset,
       s_raise_asset == raise_asset,
       seller_owner_output == Output {
-        ..default_seller_owner_output,
         address: owner,
+        value: value.from_lovelace(
+          value.lovelace_of(in_value) - collect_seller_commission,
+        ),
+        datum: NoDatum,
+        reference_script: None,
       },
     }
   let collect_raise = acc_raise + amount
@@ -210,7 +203,6 @@ fn apply_collect_sellers(
       apply_collect_sellers(
         seller_inputs: inputs,
         outputs: remaining_outputs,
-        default_seller_owner_output: default_seller_owner_output,
         base_asset: base_asset,
         raise_asset: raise_asset,
         acc_raise: collect_raise,

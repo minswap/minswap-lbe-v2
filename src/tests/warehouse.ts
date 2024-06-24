@@ -1,7 +1,7 @@
 import * as T from "@minswap/translucent";
 import { WarehouseBuilder } from "../build-tx";
 import {
-  CREATE_POOL_COMMISION,
+  CREATE_POOL_COMMISSION,
   DEFAULT_NUMBER_SELLER,
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
@@ -215,7 +215,7 @@ export const genWarehouse = async (maxTxSize?: number) => {
     txHash: "00".repeat(32),
     outputIndex: outputIndex++,
     assets: {
-      lovelace: TREASURY_MIN_ADA + CREATE_POOL_COMMISION,
+      lovelace: TREASURY_MIN_ADA + CREATE_POOL_COMMISSION,
       [builder.treasuryToken]: 1n,
       [toUnit(
         defaultTreasuryDatum.baseAsset.policyId,

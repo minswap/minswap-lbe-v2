@@ -55,11 +55,15 @@ pub const seller_minimum_ada = 2_000_000
 // the ADA amount store in Order UTxO
 pub const order_minimum_ada = 2_000_000
 
+// Commissions:
 // The ADA amount to reward the pool creator
 pub const create_pool_comission = 10_000_000
 
-// Commisions:
-pub const seller_commision = 250_000
+// The ADA amount to reward the seller's colector
+pub const collect_seller_commission = 250_000
+
+// The ADA amount to reward the seller
+pub const seller_commission = 1_500_000
 
 // The AMM configs based on https://github.com/minswap/minswap-dex-v2
 // The Asset Name of AMM Factory Authen Token

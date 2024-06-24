@@ -50,7 +50,6 @@ fn gen_dummy_object() -> DummyObject {
       is_collected: False,
       amount: 100_000_000,
       penalty_amount: 20_000_000,
-      seller_owner: owner,
     }
   let order_value =
     value.from_asset(factory_policy_id, order_auth_an, 1)

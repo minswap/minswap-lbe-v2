@@ -183,8 +183,6 @@ pub type OrderDatum {
   base_asset: Asset,
   // Asset aims to raise
   raise_asset: Asset,
-  // Fee will be return to seller's owner (PubKey Address)
-  seller_owner: Address,
   // Update order require owner authorize 
   // System will redeem | refund to owner address (should be Pubkey Address)
   owner: Address,

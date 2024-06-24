@@ -14,7 +14,7 @@ import {
   TreasuryValidateTreasurySpending,
 } from "../plutus";
 import {
-  CREATE_POOL_COMMISION,
+  CREATE_POOL_COMMISSION,
   DEFAULT_NUMBER_SELLER,
   DUMMY_REDEEMER,
   FACTORY_AUTH_AN,
@@ -1344,7 +1344,7 @@ export class WarehouseBuilder {
       const assets = {
         [this.treasuryToken]: 1n,
         [baseAsset]: treasuryOutDatum.reserveBase,
-        lovelace: TREASURY_MIN_ADA + CREATE_POOL_COMMISION,
+        lovelace: TREASURY_MIN_ADA + CREATE_POOL_COMMISSION,
       };
       return assets;
     };

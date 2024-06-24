@@ -16,7 +16,7 @@ use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
   assert, calculate_penalty, fee_ada, manager_auth_an, manager_minimum_ada,
   must_get_start_end_validity, order_auth_an, order_minimum_ada, seller_auth_an,
-  seller_minimum_ada, treasury_auth_an,
+  seller_commission, seller_minimum_ada, treasury_auth_an,
 }
 
 fn is_equal_data(a: Data, b: Data) -> Bool {
@@ -539,6 +539,12 @@ pub fn validate_using_seller(
     )
   let order_input_count = list.length(order_inputs)
   let order_output_count = list.length(order_outputs)
+  let new_order_count =
+    if order_output_count > order_input_count {
+      order_output_count - order_input_count
+    } else {
+      0
+    }
   and {
     // prevent spam
     order_input_count + order_output_count > 0,
@@ -558,7 +564,12 @@ pub fn validate_using_seller(
       },
     ) == [seller_input],
     // Validate Seller Output
-    seller_output_value == seller_input_value,
+    seller_output_value == value.add(
+      seller_input_value,
+      ada_policy_id,
+      ada_asset_name,
+      seller_commission * new_order_count,
+    ),
     seller_output_rs == None,
     seller_output_datum == SellerDatum {
       ..seller_in_datum,

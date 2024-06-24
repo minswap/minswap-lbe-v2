@@ -1,6 +1,6 @@
 import { WarehouseBuilder, type BuildCreateTreasuryOptions } from "../build-tx";
 import {
-  CREATE_POOL_COMMISION,
+  CREATE_POOL_COMMISSION,
   DEFAULT_NUMBER_SELLER,
   MANAGER_MIN_ADA,
   MAX_PENALTY_RATE,
@@ -55,7 +55,7 @@ beforeEach(async () => {
   let treasuryOutValue = {
     [builder.treasuryToken]: 1n,
     [minswapTokenRaw]: defaultTreasuryDatum.reserveBase,
-    lovelace: TREASURY_MIN_ADA + CREATE_POOL_COMMISION,
+    lovelace: TREASURY_MIN_ADA + CREATE_POOL_COMMISSION,
   };
   W = {
     ...W,
