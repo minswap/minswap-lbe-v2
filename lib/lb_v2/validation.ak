@@ -14,14 +14,10 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  assert, calculate_penalty, manager_auth_an, manager_minimum_ada,
+  assert, calculate_penalty, is_equal_data, manager_auth_an, manager_minimum_ada,
   must_get_start_end_validity, order_auth_an, order_commission,
   order_minimum_ada, seller_auth_an, seller_commission, seller_minimum_ada,
   treasury_auth_an,
-}
-
-fn is_equal_data(a: Data, b: Data) -> Bool {
-  a == b
 }
 
 pub fn has_spend_treasury(
@@ -48,16 +44,12 @@ pub fn has_spend_treasury(
     output: Output { value: out_value, .. },
   } = treasury_input
   and {
-    assert(
-      value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
-      @"Treasury UTxO must contain 1 Treasury Token",
-    ),
-    assert(
-      is_equal_data(
-        dict.get(redeemers, Spend(treasury_out_ref)),
-        Some(expected_redeemer),
-      ),
-      @"Spending Treasury must be correct redeemer!",
+    // Treasury UTxO must contain 1 Treasury Token
+    value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
+    // Spending Treasury must be correct redeemer!
+    is_equal_data(
+      dict.get(redeemers, Spend(treasury_out_ref)),
+      Some(expected_redeemer),
     ),
   }
 }
@@ -229,37 +221,20 @@ pub fn get_treasury_ref_inputs(
   )
 }
 
-pub fn get_treasury_input_by_out_ref(
-  inputs: List<Input>,
-  factory_policy_id: PolicyId,
-  out_ref: OutputReference,
-) -> Input {
-  expect [treasury_input] =
-    list.filter(
-      inputs,
-      fn(input) {
-        let Input { output_reference, output: Output { value: out_value, .. } } =
-          input
-        and {
-          value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
-          output_reference == out_ref,
-        }
-      },
-    )
-  treasury_input
-}
-
 pub fn get_amm_pool_output(outputs: List<Output>) -> Output {
   expect [pool_output] =
     list.filter(
       outputs,
       fn(output) {
-        let Output { address: Address { payment_credential, .. }, value, .. } =
-          output
+        let Output {
+          address: Address { payment_credential, .. },
+          value: pool_value,
+          ..
+        } = output
         and {
           payment_credential == ScriptCredential(amm_pool_validation_hash),
           value.quantity_of(
-            value,
+            pool_value,
             amm_authen_policy_id,
             amm_pool_auth_asset_name,
           ) == 1,
@@ -299,38 +274,6 @@ pub fn get_treasury_output(
   treasury_output
 }
 
-// If a transaction needs to pay the Manager,
-// its outputs must contain exactly 1 Legit Manager Output.
-pub fn get_manager_output(
-  outputs: List<Output>,
-  factory_policy_id: PolicyId,
-  manager_hash: ValidatorHash,
-) -> Output {
-  expect [manager_output] =
-    list.filter(
-      outputs,
-      fn(output) {
-        let Output {
-          address: Address { payment_credential, .. },
-          value: out_value,
-          reference_script,
-          ..
-        } = output
-        and {
-          // output belongs Manager Address
-          payment_credential == ScriptCredential(manager_hash),
-          // No ref_script to avoid increase minimum ADA
-          reference_script == None,
-          value.flatten(out_value) == [
-            (ada_policy_id, ada_asset_name, manager_minimum_ada),
-            (factory_policy_id, manager_auth_an, 1),
-          ],
-        }
-      },
-    )
-  manager_output
-}
-
 pub fn get_order_outputs(
   outputs: List<Output>,
   order_hash: ValidatorHash,
@@ -338,15 +281,8 @@ pub fn get_order_outputs(
   list.filter(
     outputs,
     fn(output) {
-      let Output {
-        address: Address { payment_credential, .. },
-        reference_script,
-        ..
-      } = output
-      and {
-        payment_credential == ScriptCredential(order_hash),
-        reference_script == None,
-      }
+      let Output { address: Address { payment_credential, .. }, .. } = output
+      payment_credential == ScriptCredential(order_hash)
     },
   )
 }

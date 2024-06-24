@@ -223,3 +223,7 @@ pub fn must_get_end_validity(validity_range: ValidityRange) -> Int {
   } = validity_range
   end
 }
+
+pub fn is_equal_data(a: Data, b: Data) -> Bool {
+  a == b
+}

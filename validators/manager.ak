@@ -28,8 +28,7 @@ validator(
     redeemer: ManagerRedeemer,
     context: ScriptContext,
   ) {
-    expect ScriptContext { purpose: Spend(manager_out_ref), transaction } =
-      context
+    expect ScriptContext { purpose: Spend(out_ref), transaction } = context
     let Transaction {
       mint,
       reference_inputs,
@@ -61,8 +60,8 @@ validator(
           list.find(
             inputs,
             fn(input) {
-              let Input { output_reference: out_ref, .. } = input
-              out_ref == manager_out_ref
+              let Input { output_reference, .. } = input
+              output_reference == out_ref
             },
           )
         // Extract some necessary data.
