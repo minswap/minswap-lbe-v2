@@ -91,6 +91,7 @@ export type BuildCreateTreasuryOptions = {
   sellerAmount: bigint;
   factoryUtxo: UTxO;
   treasuryDatum: TreasuryDatum;
+  sellerOwner: Address;
   validFrom: UnixTime;
   validTo: UnixTime;
   extraDatum?: Datum; // the datum of treasuryDatum.receiverDatum
@@ -363,6 +364,7 @@ export class WarehouseBuilder {
     const {
       factoryUtxo,
       treasuryDatum,
+      sellerOwner,
       validFrom,
       validTo,
       extraDatum,
@@ -410,7 +412,7 @@ export class WarehouseBuilder {
       () => {
         this.payingSellerOutput({
           addSellerCount: sellerAmount,
-          owner: plutusAddress2Address(this.t.network, treasuryDatum.owner),
+          owner: sellerOwner,
         });
       },
       () => {

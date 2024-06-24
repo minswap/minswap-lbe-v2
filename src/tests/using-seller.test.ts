@@ -40,6 +40,7 @@ import { WarehouseBuilder, type BuildUsingSellerOptions } from "../build-tx";
 import {
   ORDER_COMMISSION,
   ORDER_MIN_ADA,
+  SELLER_COMMISSION,
   SELLER_MIN_ADA,
   TREASURY_MIN_ADA,
 } from "../constants";
@@ -102,7 +103,7 @@ async function genTestWarehouse() {
     outputIndex: ++utxoIndex,
     assets: {
       [builder.sellerToken]: 1n,
-      lovelace: SELLER_MIN_ADA,
+      lovelace: SELLER_MIN_ADA + SELLER_COMMISSION * 5n,
     },
     address: builder.sellerAddress,
     datum: builder.toDatumSeller(sellerDatum),

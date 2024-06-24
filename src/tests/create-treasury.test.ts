@@ -37,9 +37,11 @@ beforeEach(async () => {
     datum: builder.toDatumFactory(defaultFactoryDatum),
     address: builder.factoryAddress,
   };
+  const owner = await t.wallet.address();
   let options: BuildCreateTreasuryOptions = {
     sellerAmount: DEFAULT_SELLER_AMOUNT,
     factoryUtxo,
+    sellerOwner: owner,
     treasuryDatum: defaultTreasuryDatum,
     validFrom: t.utils.slotToUnixTime(emulator.slot),
     validTo: t.utils.slotToUnixTime(emulator.slot + 60),
