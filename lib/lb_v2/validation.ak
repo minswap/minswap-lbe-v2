@@ -119,10 +119,7 @@ pub fn has_spend_seller(
     output: Output { value: seller_out_value, .. },
   } = seller_input
   and {
-    value.flatten(seller_out_value) == [
-      (ada_policy_id, ada_asset_name, seller_minimum_ada),
-      (factory_policy_id, seller_auth_an, 1),
-    ],
+    value.quantity_of(seller_out_value, factory_policy_id, seller_auth_an) == 1,
     is_equal_data(
       dict.get(redeemers, Spend(seller_out_ref)),
       Some(expected_redeemer),
@@ -147,10 +144,7 @@ pub fn get_seller_inputs(
         ..
       } = input
       and {
-        value.flatten(in_value) == [
-          (ada_policy_id, ada_asset_name, seller_minimum_ada),
-          (factory_policy_id, seller_auth_an, 1),
-        ],
+        value.quantity_of(in_value, factory_policy_id, seller_auth_an) == 1,
         payment_credential == ScriptCredential(seller_hash),
       }
     },

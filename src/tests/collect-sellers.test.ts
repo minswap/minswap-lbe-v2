@@ -320,7 +320,7 @@ function stupidManagerDatumOut(stupidInfo: any): WarehouseBuilder {
   const { builder, options } = warehouse;
   builder.buildCollectSeller(options);
 
-  builder.tasks[4] = () => {
+  builder.tasks[5] = () => {
     builder.payingManagerOutput({
       ...warehouse.expectedManagerDatumOut,
       ...stupidInfo,
@@ -377,7 +377,7 @@ test("collect sellers | FAIL | Stupid Manager datum output(totalPenalty)", async
 test("collect sellers | FAIL | No manager input", async () => {
   const { builder, options } = warehouse;
   builder.buildCollectSeller(options);
-  builder.tasks[4] = () => {};
+  builder.tasks[5] = () => {};
   assertValidatorFail(builder);
 });
 

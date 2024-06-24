@@ -17,7 +17,7 @@ Validation:
 */
 import { WarehouseBuilder, type BuildRedeemOrdersOptions } from "../build-tx";
 import {
-  LBE_FEE,
+  ORDER_COMMISSION,
   LP_COLATERAL,
   ORDER_MIN_ADA,
   TREASURY_MIN_ADA,
@@ -162,7 +162,7 @@ function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): UTxO {
     outputIndex: ++utxoIndex,
     assets: {
       [builder.orderToken]: 1n,
-      lovelace: ORDER_MIN_ADA + LBE_FEE,
+      lovelace: ORDER_MIN_ADA + ORDER_COMMISSION,
     },
     address: builder.orderAddress,
     datum: builder.toDatumOrder(datum),

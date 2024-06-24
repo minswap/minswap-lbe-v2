@@ -1,7 +1,6 @@
 import { WarehouseBuilder, type BuildCreateTreasuryOptions } from "../build-tx";
 import {
   CREATE_POOL_COMMISSION,
-  DEFAULT_NUMBER_SELLER,
   MANAGER_MIN_ADA,
   MAX_PENALTY_RATE,
   TREASURY_MIN_ADA,
@@ -11,6 +10,7 @@ import { assertValidator, assertValidatorFail, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
 
 let W: any;
+const DEFAULT_SELLER_AMOUNT = 20n;
 
 beforeAll(async () => {
   await loadModule();
@@ -38,6 +38,7 @@ beforeEach(async () => {
     address: builder.factoryAddress,
   };
   let options: BuildCreateTreasuryOptions = {
+    sellerAmount: DEFAULT_SELLER_AMOUNT,
     factoryUtxo,
     treasuryDatum: defaultTreasuryDatum,
     validFrom: t.utils.slotToUnixTime(emulator.slot),
@@ -435,7 +436,7 @@ test("create-treasury | FAIL | Minting incorrect! | X | Seller Token", async () 
   let builder: WarehouseBuilder = W.builder;
   builder = builder.buildCreateTreasury(W.options);
   builder.tasks[4] = () => {
-    builder.mintingSellerToken(DEFAULT_NUMBER_SELLER + 10n);
+    builder.mintingSellerToken(DEFAULT_SELLER_AMOUNT + 10n);
   };
   // Mint Value must be correct!
   assertValidatorFail(builder);

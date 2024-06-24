@@ -2,7 +2,6 @@ import * as T from "@minswap/translucent";
 import { WarehouseBuilder } from "../build-tx";
 import {
   CREATE_POOL_COMMISSION,
-  DEFAULT_NUMBER_SELLER,
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
   MANAGER_MIN_ADA,
@@ -119,7 +118,7 @@ export const genWarehouse = async (maxTxSize?: number) => {
     factoryPolicyId: builder.factoryHash,
     baseAsset: minswapToken,
     raiseAsset: adaToken,
-    sellerCount: DEFAULT_NUMBER_SELLER,
+    sellerCount: 20n,
     reserveRaise: 0n,
     totalPenalty: 0n,
   };
@@ -129,6 +128,7 @@ export const genWarehouse = async (maxTxSize?: number) => {
     raiseAsset: adaToken,
     amount: 0n,
     penaltyAmount: 0n,
+    owner: address2PlutusAddress(ACCOUNT_0.address),
   };
   const defaultOrderDatum: OrderDatum = {
     factoryPolicyId: builder.factoryHash,

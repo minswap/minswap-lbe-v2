@@ -4,7 +4,7 @@ import {
   type BuildCollectOrdersOptions,
 } from "../build-tx";
 import {
-  LBE_FEE,
+  ORDER_COMMISSION,
   MINIMUM_ORDER_COLLECTED,
   ORDER_MIN_ADA,
   TREASURY_MIN_ADA,
@@ -52,7 +52,7 @@ async function genTestWarehouse() {
     outputIndex: 2,
     assets: {
       [builder.orderToken]: 1n,
-      lovelace: ORDER_MIN_ADA + 2n * LBE_FEE + orderAmount,
+      lovelace: ORDER_MIN_ADA + 2n * ORDER_COMMISSION + orderAmount,
     },
     address: builder.orderAddress,
     datum: builder.toDatumOrder(orderDatum),
