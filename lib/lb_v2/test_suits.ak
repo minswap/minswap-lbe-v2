@@ -10,7 +10,7 @@ use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
 use lb_v2/order_validation.{apply_collecting_orders}
 use lb_v2/types.{Asset, FactoryDatum, OrderDatum, PenaltyConfig, UsingSeller}
 use lb_v2/utils.{
-  calculate_penalty, fee_ada, make_wrapper_redeemer, order_auth_an,
+  calculate_penalty, make_wrapper_redeemer, order_auth_an, order_commission,
   order_minimum_ada, sort_two_consecutive_factory_datum,
 }
 use lb_v2/validation.{build_default_collected_order_value}
@@ -212,7 +212,11 @@ test test_apply_collecting_orders_3() {
   let order_out_datum = OrderDatum { ..dummy.order_datum, is_collected: True }
   let order_out_value =
     value.from_asset(dummy.factory_policy_id, order_auth_an, 1)
-      |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
+      |> value.add(
+          ada_policy_id,
+          ada_asset_name,
+          order_minimum_ada + order_commission,
+        )
   let order_out =
     Output {
       address: dummy.order_input.output.address,
@@ -239,7 +243,11 @@ test test_apply_collecting_orders_4() {
   let order_out_datum = OrderDatum { ..dummy.order_datum, is_collected: True }
   let order_out_value =
     value.from_asset(dummy.factory_policy_id, order_auth_an, 1)
-      |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
+      |> value.add(
+          ada_policy_id,
+          ada_asset_name,
+          order_minimum_ada + order_commission,
+        )
   let order_out =
     Output {
       address: dummy.order_input.output.address,

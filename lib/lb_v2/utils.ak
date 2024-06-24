@@ -40,9 +40,6 @@ pub const two_day_ms = 172800000
 // Maximum penalty rate based on business
 pub const max_penalty = 25
 
-// The ADA amount to reward the Operator
-pub const fee_ada = 1_000_000
-
 // the ADA amount store in Treasury UTxO
 pub const treasury_minimum_ada = 3_000_000
 
@@ -61,6 +58,9 @@ pub const create_pool_comission = 10_000_000
 
 // The ADA amount to reward the seller's colector
 pub const collect_seller_commission = 250_000
+
+// The ADA amount to reward the Operator
+pub const order_commission = 250_000
 
 // The ADA amount to reward the seller
 pub const seller_commission = 1_500_000

@@ -14,9 +14,10 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  assert, calculate_penalty, fee_ada, manager_auth_an, manager_minimum_ada,
-  must_get_start_end_validity, order_auth_an, order_minimum_ada, seller_auth_an,
-  seller_commission, seller_minimum_ada, treasury_auth_an,
+  assert, calculate_penalty, manager_auth_an, manager_minimum_ada,
+  must_get_start_end_validity, order_auth_an, order_commission,
+  order_minimum_ada, seller_auth_an, seller_commission, seller_minimum_ada,
+  treasury_auth_an,
 }
 
 fn is_equal_data(a: Data, b: Data) -> Bool {
@@ -665,7 +666,7 @@ pub fn apply_order(
             |> value.add(
                 ada_policy_id,
                 ada_asset_name,
-                order_minimum_ada + fee_ada * 2,
+                order_minimum_ada + order_commission * 2,
               )
         let minimum_amount =
           when minimum_order_raise is {
@@ -776,7 +777,11 @@ pub fn build_default_collected_order_value(
   factory_policy_id: ValidatorHash,
 ) -> Value {
   value.from_asset(factory_policy_id, order_auth_an, 1)
-    |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
+    |> value.add(
+        ada_policy_id,
+        ada_asset_name,
+        order_minimum_ada + order_commission,
+      )
 }
 
 // Check if the owner authorizes the transaction
