@@ -37,6 +37,10 @@ pub const min_pool_allocation = 70
 // The business requires a maximum penalty period of two final days.
 pub const two_day_ms = 172800000
 
+// 30 days in milliseconds = 30 * 24 * 60 * 60 * 1000
+// The business requires a maximum encounter phase period is 30 days
+pub const one_month_ms = 2592000000
+
 // Maximum penalty rate based on business
 pub const max_penalty = 25
 
