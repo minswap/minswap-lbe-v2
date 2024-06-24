@@ -800,11 +800,11 @@ export class WarehouseBuilder {
     const userOutputs: { address: Address; assets: Assets }[] = [];
     const totalBonusRaiseAsset =
       treasuryInDatum.maximumRaise &&
-      treasuryInDatum.reserveRaise + treasuryInDatum.totalPenalty >
+        treasuryInDatum.reserveRaise + treasuryInDatum.totalPenalty >
         treasuryInDatum.maximumRaise
         ? treasuryInDatum.reserveRaise +
-          treasuryInDatum.totalPenalty -
-          treasuryInDatum.maximumRaise
+        treasuryInDatum.totalPenalty -
+        treasuryInDatum.maximumRaise
         : 0n;
     const raiseAsset = toUnit(
       this.raiseAsset!.policyId,
@@ -847,6 +847,13 @@ export class WarehouseBuilder {
         this.mintRedeemer = "MintRedeemOrders";
       },
       () => {
+        this.payingTreasuryOutput({
+          treasuryOutDatum,
+          deltaLp: totalLiquidity,
+          deltaRaise: totalBonusRaise,
+        });
+      },
+      () => {
         for (const output of userOutputs) {
           this.tx.payToAddress(output.address, output.assets);
         }
@@ -856,13 +863,6 @@ export class WarehouseBuilder {
       },
       () => {
         this.spendingOrderInput();
-      },
-      () => {
-        this.payingTreasuryOutput({
-          treasuryOutDatum,
-          deltaLp: totalLiquidity,
-          deltaRaise: totalBonusRaise,
-        });
       },
       () => {
         this.mintingOrderToken(-1n * BigInt(orderInputs.length));
@@ -924,6 +924,13 @@ export class WarehouseBuilder {
         this.mintRedeemer = "MintRedeemOrders";
       },
       () => {
+        this.payingTreasuryOutput({
+          treasuryOutDatum,
+          deltaLp: 0n,
+          deltaRaise: totalRaise + totalPenalty,
+        });
+      },
+      () => {
         for (const output of userOutputs) {
           this.tx.payToAddress(output.address, output.assets);
         }
@@ -933,13 +940,6 @@ export class WarehouseBuilder {
       },
       () => {
         this.spendingOrderInput();
-      },
-      () => {
-        this.payingTreasuryOutput({
-          treasuryOutDatum,
-          deltaLp: 0n,
-          deltaRaise: totalRaise + totalPenalty,
-        });
       },
       () => {
         this.mintingOrderToken(-1n * BigInt(orderInputs.length));
@@ -1062,7 +1062,7 @@ export class WarehouseBuilder {
     );
     invariant(
       sellerInputs.length >= MINIMUM_SELLER_COLLECTED ||
-        managerInDatum.sellerCount === BigInt(sellerInputs.length),
+      managerInDatum.sellerCount === BigInt(sellerInputs.length),
       `Collect all sellers or at least ${MINIMUM_SELLER_COLLECTED}`,
     );
     let totalReserveRaise = 0n;
@@ -1099,6 +1099,9 @@ export class WarehouseBuilder {
         this.mintingSellerToken(mintSellerCount);
       },
       () => {
+        this.payingManagerOutput(managerOutDatum);
+      },
+      () => {
         for (const utxo of sellerInputs) {
           const sellerDatum = this.fromDatumSeller(utxo.datum!);
           const assets = {
@@ -1109,9 +1112,6 @@ export class WarehouseBuilder {
             assets,
           );
         }
-      },
-      () => {
-        this.payingManagerOutput(managerOutDatum);
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
@@ -1484,11 +1484,11 @@ export class WarehouseBuilder {
       outDatum?: SellerDatum;
       newOrderCount?: bigint;
     } = {
-      addSellerCount: undefined,
-      outDatum: undefined,
-      owner: undefined,
-      newOrderCount: 0n,
-    },
+        addSellerCount: undefined,
+        outDatum: undefined,
+        owner: undefined,
+        newOrderCount: 0n,
+      },
   ) {
     const { addSellerCount, outDatum, owner, newOrderCount } = option;
     if (this.sellerInputs.length) {

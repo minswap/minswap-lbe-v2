@@ -26,6 +26,7 @@ use lb_v2/validation.{validate_seller_outputs}
 //  + No Seller Outputs (no need to check)
 //  + Collect at least 1 Seller
 //  + Spending Seller Inputs correctly!
+//  + Transaction Outputs: [Manager Output, Seller Outputs, ..]
 pub fn validate_manage_seller(
   outputs: List<Output>,
   inputs: List<Input>,
@@ -57,19 +58,12 @@ pub fn validate_manage_seller(
     ..
   } = manager_in_datum
   // Finding exactly 1 Manager Output
-  expect [manager_out] =
-    list.filter(
-      outputs,
-      fn(output) {
-        let Output { address: Address { payment_credential, .. }, .. } = output
-        payment_credential == ScriptCredential(manager_hash)
-      },
-    )
+  expect [manager_out, ..remaining_outputs] = outputs
   expect Output {
+    address: Address { payment_credential, .. },
     value: manager_out_value,
     datum: InlineDatum(raw_manager_out_datum),
-    reference_script: manager_out_rs,
-    ..
+    reference_script: None,
   } = manager_out
   expect manager_out_datum: ManagerDatum = raw_manager_out_datum
   expect and {
@@ -77,7 +71,7 @@ pub fn validate_manage_seller(
       m_base_asset == base_asset,
       m_raise_asset == raise_asset,
       manager_out_value == manager_in_value,
-      manager_out_rs == None,
+      payment_credential == ScriptCredential(manager_hash),
     }
   when redeemer is {
     AddSellers -> {
@@ -99,7 +93,7 @@ pub fn validate_manage_seller(
         },
         // Seller Outputs must pay correctly!
         validate_seller_outputs(
-          outputs: outputs,
+          outputs: remaining_outputs,
           factory_policy_id: factory_policy_id,
           base_asset: base_asset,
           raise_asset: raise_asset,
@@ -120,7 +114,7 @@ pub fn validate_manage_seller(
       let (total_reserve_raise, total_penalty_input) =
         apply_collect_sellers(
           seller_inputs: seller_inputs,
-          outputs: outputs,
+          outputs: remaining_outputs,
           base_asset: base_asset,
           raise_asset: raise_asset,
           acc_raise: 0,
