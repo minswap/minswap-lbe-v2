@@ -157,6 +157,8 @@ pub type ManagerRedeemer {
 pub type SellerDatum {
   // ValidatorHash of Factory Validator
   factory_policy_id: PolicyId,
+  // Fee will be return to seller's owner (PubKey Address)
+  owner: Address,
   // Asset aims to list
   base_asset: Asset,
   // Asset aims to raise
@@ -182,7 +184,7 @@ pub type OrderDatum {
   // Asset aims to raise
   raise_asset: Asset,
   // Update order require owner authorize 
-  // System will redeem | refund to owner address
+  // System will redeem | refund to owner address (should be Pubkey Address)
   owner: Address,
   // Amount of Raise Asset
   amount: Int,

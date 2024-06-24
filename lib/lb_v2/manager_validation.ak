@@ -1,5 +1,5 @@
 use aiken/list
-use aiken/transaction.{InlineDatum, Input, Output, ValidityRange}
+use aiken/transaction.{InlineDatum, Input, NoDatum, Output, ValidityRange}
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{PolicyId, Value}
 use lb_v2/types.{
@@ -7,9 +7,10 @@ use lb_v2/types.{
   TreasuryDatum,
 }
 use lb_v2/utils.{
-  assert, minimum_seller_collected, must_get_start_end_validity, seller_auth_an,
+  assert, collect_seller_commission, minimum_seller_collected,
+  must_get_start_end_validity, seller_auth_an,
 }
-use lb_v2/validation.{build_default_seller_output}
+use lb_v2/validation.{validate_seller_outputs}
 
 // Assertions:
 // - Manager, Treasury share the same LBE ID
@@ -80,18 +81,8 @@ pub fn validate_manage_seller(
     }
   when redeemer is {
     AddSellers -> {
-      // Validate Add Sellers
-      let default_seller_output =
-        build_default_seller_output(
-          factory_policy_id: factory_policy_id,
-          base_asset: base_asset,
-          raise_asset: raise_asset,
-          seller_hash: seller_hash,
-        )
-      // Paying Seller Outputs correctly!
-      let seller_outputs =
-        list.filter(outputs, fn(output) { output == default_seller_output })
-      let seller_output_length = list.length(seller_outputs)
+      let mint_seller_count =
+        value.quantity_of(mint_value, factory_policy_id, seller_auth_an)
       and {
         end_valid_time_range < end_time,
         is_cancelled == False,
@@ -99,13 +90,22 @@ pub fn validate_manage_seller(
         mint_value == value.from_asset(
           factory_policy_id,
           seller_auth_an,
-          seller_output_length,
+          mint_seller_count,
         ),
         // Paying Manager Output correctly!
         manager_out_datum == ManagerDatum {
           ..manager_in_datum,
-          seller_count: seller_count + seller_output_length,
+          seller_count: seller_count + mint_seller_count,
         },
+        // Seller Outputs must pay correctly!
+        validate_seller_outputs(
+          outputs: outputs,
+          factory_policy_id: factory_policy_id,
+          base_asset: base_asset,
+          raise_asset: raise_asset,
+          seller_hash: seller_hash,
+          seller_count: mint_seller_count,
+        ),
       }
     }
     CollectSellers -> {
@@ -120,6 +120,7 @@ pub fn validate_manage_seller(
       let (total_reserve_raise, total_penalty_input) =
         apply_collect_sellers(
           seller_inputs: seller_inputs,
+          outputs: outputs,
           base_asset: base_asset,
           raise_asset: raise_asset,
           acc_raise: 0,
@@ -161,26 +162,39 @@ pub fn validate_manage_seller(
 
 fn apply_collect_sellers(
   seller_inputs: List<Input>,
+  outputs: List<Output>,
   base_asset: Asset,
   raise_asset: Asset,
   acc_raise: Int,
   acc_penalty: Int,
 ) -> (Int, Int) {
   expect [input, ..inputs] = seller_inputs
-  expect Input { output: Output { datum: InlineDatum(raw_datum), .. }, .. } =
-    input
+  expect [seller_owner_output, ..remaining_outputs] = outputs
+  expect Input {
+    output: Output { datum: InlineDatum(raw_datum), value: in_value, .. },
+    ..
+  } = input
   expect seller_datum: SellerDatum = raw_datum
   let SellerDatum {
     base_asset: s_base_asset,
     raise_asset: s_raise_asset,
     amount,
     penalty_amount,
+    owner,
     ..
   } = seller_datum
-  expect assert(and {
-        s_base_asset == base_asset,
-        s_raise_asset == raise_asset,
-      }, @"Collect Sellers: invalid seller inputs' LBE ID")
+  expect and {
+      s_base_asset == base_asset,
+      s_raise_asset == raise_asset,
+      seller_owner_output == Output {
+        address: owner,
+        value: value.from_lovelace(
+          value.lovelace_of(in_value) - collect_seller_commission,
+        ),
+        datum: NoDatum,
+        reference_script: None,
+      },
+    }
   let collect_raise = acc_raise + amount
   let collect_penalty = acc_penalty + penalty_amount
   when inputs is {
@@ -188,6 +202,7 @@ fn apply_collect_sellers(
     _ ->
       apply_collect_sellers(
         seller_inputs: inputs,
+        outputs: remaining_outputs,
         base_asset: base_asset,
         raise_asset: raise_asset,
         acc_raise: collect_raise,

@@ -21,8 +21,8 @@ pub const order_auth_an = #"6f72646572"
 // The Asset Name of Manager Authen Token
 pub const manager_auth_an = #"4d616e61676572"
 
-// The default number of Sellers to set up when starting a new LBE
-pub const default_number_seller = 20
+// The minimum number of Sellers to set up when starting a new LBE
+pub const minimum_number_seller = 10
 
 pub const minimum_seller_collected = 20
 
@@ -37,11 +37,12 @@ pub const min_pool_allocation = 70
 // The business requires a maximum penalty period of two final days.
 pub const two_day_ms = 172800000
 
+// 30 days in milliseconds = 30 * 24 * 60 * 60 * 1000
+// The business requires a maximum encounter phase period is 30 days
+pub const one_month_ms = 2592000000
+
 // Maximum penalty rate based on business
 pub const max_penalty = 25
-
-// The ADA amount to reward the Operator
-pub const fee_ada = 1_000_000
 
 // the ADA amount store in Treasury UTxO
 pub const treasury_minimum_ada = 3_000_000
@@ -55,8 +56,18 @@ pub const seller_minimum_ada = 2_000_000
 // the ADA amount store in Order UTxO
 pub const order_minimum_ada = 2_000_000
 
+// Commissions:
 // The ADA amount to reward the pool creator
-pub const create_pool_comission = 8_000_000
+pub const create_pool_comission = 10_000_000
+
+// The ADA amount to reward the seller's colector
+pub const collect_seller_commission = 250_000
+
+// The ADA amount to reward the Operator
+pub const order_commission = 250_000
+
+// The ADA amount to reward the seller
+pub const seller_commission = 1_500_000
 
 // The AMM configs based on https://github.com/minswap/minswap-dex-v2
 // The Asset Name of AMM Factory Authen Token

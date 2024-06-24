@@ -14,9 +14,10 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  assert, calculate_penalty, fee_ada, manager_auth_an, manager_minimum_ada,
-  must_get_start_end_validity, order_auth_an, order_minimum_ada, seller_auth_an,
-  seller_minimum_ada, treasury_auth_an,
+  assert, calculate_penalty, manager_auth_an, manager_minimum_ada,
+  must_get_start_end_validity, order_auth_an, order_commission,
+  order_minimum_ada, seller_auth_an, seller_commission, seller_minimum_ada,
+  treasury_auth_an,
 }
 
 fn is_equal_data(a: Data, b: Data) -> Bool {
@@ -539,6 +540,12 @@ pub fn validate_using_seller(
     )
   let order_input_count = list.length(order_inputs)
   let order_output_count = list.length(order_outputs)
+  let new_order_count =
+    if order_output_count > order_input_count {
+      order_output_count - order_input_count
+    } else {
+      0
+    }
   and {
     // prevent spam
     order_input_count + order_output_count > 0,
@@ -558,7 +565,12 @@ pub fn validate_using_seller(
       },
     ) == [seller_input],
     // Validate Seller Output
-    seller_output_value == seller_input_value,
+    seller_output_value == value.add(
+      seller_input_value,
+      ada_policy_id,
+      ada_asset_name,
+      seller_commission * new_order_count,
+    ),
     seller_output_rs == None,
     seller_output_datum == SellerDatum {
       ..seller_in_datum,
@@ -654,7 +666,7 @@ pub fn apply_order(
             |> value.add(
                 ada_policy_id,
                 ada_asset_name,
-                order_minimum_ada + fee_ada * 2,
+                order_minimum_ada + order_commission * 2,
               )
         let minimum_amount =
           when minimum_order_raise is {
@@ -700,32 +712,64 @@ pub fn apply_order(
   )
 }
 
-// return Seller Output when creating Treasury
-pub fn build_default_seller_output(
+pub fn validate_seller_outputs(
+  outputs: List<Output>,
   factory_policy_id: ValidatorHash,
   base_asset: Asset,
   raise_asset: Asset,
   seller_hash: ValidatorHash,
-) -> Output {
-  let seller_address = credential.from_script(seller_hash)
-  // build default seller datum
-  let seller_datum =
-    SellerDatum {
+  seller_count: Int,
+) -> Bool {
+  expect Some(seller_output) =
+    list.find(
+      outputs,
+      fn(output) {
+        let Output { address: Address { payment_credential, .. }, .. } = output
+        payment_credential == ScriptCredential(seller_hash)
+      },
+    )
+  expect Output {
+    datum: InlineDatum(raw_datum),
+    value: seller_value,
+    reference_script: None,
+    ..
+  } = seller_output
+  expect datum: SellerDatum = raw_datum
+  let SellerDatum { owner, .. } = datum
+  expect
+    datum == SellerDatum {
       factory_policy_id,
       base_asset,
       raise_asset,
       amount: 0,
       penalty_amount: 0,
+      owner,
     }
-  // build default seller value
-  let seller_value =
-    value.from_lovelace(seller_minimum_ada)
-      |> value.add(factory_policy_id, seller_auth_an, 1)
-  Output {
-    address: seller_address,
-    value: seller_value,
-    datum: InlineDatum(seller_datum),
-    reference_script: None,
+  // all sellers have the same owner
+  and {
+    value.flatten(seller_value) == [
+      (ada_policy_id, ada_asset_name, seller_minimum_ada),
+      (factory_policy_id, seller_auth_an, 1),
+    ],
+    datum == SellerDatum {
+      factory_policy_id,
+      base_asset,
+      raise_asset,
+      amount: 0,
+      penalty_amount: 0,
+      owner,
+    },
+    seller_count == list.foldl(
+      outputs,
+      0,
+      fn(output, cnt) {
+        if output == seller_output {
+          cnt + 1
+        } else {
+          cnt
+        }
+      },
+    ),
   }
 }
 
@@ -733,7 +777,11 @@ pub fn build_default_collected_order_value(
   factory_policy_id: ValidatorHash,
 ) -> Value {
   value.from_asset(factory_policy_id, order_auth_an, 1)
-    |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
+    |> value.add(
+        ada_policy_id,
+        ada_asset_name,
+        order_minimum_ada + order_commission,
+      )
 }
 
 // Check if the owner authorizes the transaction
