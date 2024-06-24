@@ -21,8 +21,8 @@ pub const order_auth_an = #"6f72646572"
 // The Asset Name of Manager Authen Token
 pub const manager_auth_an = #"4d616e61676572"
 
-// The default number of Sellers to set up when starting a new LBE
-pub const default_number_seller = 20
+// The minimum number of Sellers to set up when starting a new LBE
+pub const minimum_number_seller = 10
 
 pub const minimum_seller_collected = 20
 
@@ -56,7 +56,10 @@ pub const seller_minimum_ada = 2_000_000
 pub const order_minimum_ada = 2_000_000
 
 // The ADA amount to reward the pool creator
-pub const create_pool_comission = 8_000_000
+pub const create_pool_comission = 10_000_000
+
+// Commisions:
+pub const seller_commision = 250_000
 
 // The AMM configs based on https://github.com/minswap/minswap-dex-v2
 // The Asset Name of AMM Factory Authen Token

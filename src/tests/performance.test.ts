@@ -85,7 +85,7 @@ test("performance | collect-order", async () => {
   let { builder, emulator } = warehouse;
   let validFrom = Number(warehouse.defaultTreasuryDatum.endTime) + 1000;
   let orderInputs: UTxO[] = [];
-  for (let i = 0; i <= MAX_COLLECT_ORDER_COUNT; i++) {
+  for (let i = 0; i < MAX_COLLECT_ORDER_COUNT; i++) {
     let utxo: UTxO = {
       ...warehouse.defaultOrderInput,
       outputIndex: warehouse.outputIndex++,
@@ -133,7 +133,7 @@ test("performance | refund-order", async () => {
   };
   let collectedFund = 0n;
   let reserveRaise = 0n;
-  for (let i = 0; i <= MAX_REFUND_ORDER_COUNT; i++) {
+  for (let i = 0; i < MAX_REFUND_ORDER_COUNT; i++) {
     let utxo: UTxO = {
       ...warehouse.defaultOrderInput,
       outputIndex: warehouse.outputIndex++,
@@ -192,7 +192,7 @@ test("performance | redeem-order", async () => {
   };
   let collectedFund = 0n;
   let reserveRaise = 0n;
-  for (let i = 0; i <= MAX_REDEEM_ORDER_COUNT; i++) {
+  for (let i = 0; i < MAX_REDEEM_ORDER_COUNT; i++) {
     let utxo: UTxO = {
       ...warehouse.defaultOrderInput,
       outputIndex: warehouse.outputIndex++,

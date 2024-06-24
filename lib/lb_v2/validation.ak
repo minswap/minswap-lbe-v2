@@ -700,32 +700,64 @@ pub fn apply_order(
   )
 }
 
-// return Seller Output when creating Treasury
-pub fn build_default_seller_output(
+pub fn validate_seller_outputs(
+  outputs: List<Output>,
   factory_policy_id: ValidatorHash,
   base_asset: Asset,
   raise_asset: Asset,
   seller_hash: ValidatorHash,
-) -> Output {
-  let seller_address = credential.from_script(seller_hash)
-  // build default seller datum
-  let seller_datum =
-    SellerDatum {
+  seller_count: Int,
+) -> Bool {
+  expect Some(seller_output) =
+    list.find(
+      outputs,
+      fn(output) {
+        let Output { address: Address { payment_credential, .. }, .. } = output
+        payment_credential == ScriptCredential(seller_hash)
+      },
+    )
+  expect Output {
+    datum: InlineDatum(raw_datum),
+    value: seller_value,
+    reference_script: None,
+    ..
+  } = seller_output
+  expect datum: SellerDatum = raw_datum
+  let SellerDatum { owner, .. } = datum
+  expect
+    datum == SellerDatum {
       factory_policy_id,
       base_asset,
       raise_asset,
       amount: 0,
       penalty_amount: 0,
+      owner,
     }
-  // build default seller value
-  let seller_value =
-    value.from_lovelace(seller_minimum_ada)
-      |> value.add(factory_policy_id, seller_auth_an, 1)
-  Output {
-    address: seller_address,
-    value: seller_value,
-    datum: InlineDatum(seller_datum),
-    reference_script: None,
+  // all sellers have the same owner
+  and {
+    value.flatten(seller_value) == [
+      (ada_policy_id, ada_asset_name, seller_minimum_ada),
+      (factory_policy_id, seller_auth_an, 1),
+    ],
+    datum == SellerDatum {
+      factory_policy_id,
+      base_asset,
+      raise_asset,
+      amount: 0,
+      penalty_amount: 0,
+      owner,
+    },
+    seller_count == list.foldl(
+      outputs,
+      0,
+      fn(output, cnt) {
+        if output == seller_output {
+          cnt + 1
+        } else {
+          cnt
+        }
+      },
+    ),
   }
 }
 
