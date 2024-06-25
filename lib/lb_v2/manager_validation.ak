@@ -7,7 +7,7 @@ use lb_v2/types.{
   TreasuryDatum,
 }
 use lb_v2/utils.{
-  assert, collect_seller_commission, minimum_seller_collected,
+  collect_seller_commission, minimum_seller_collected,
   must_get_start_end_validity, seller_auth_an,
 }
 use lb_v2/validation.{validate_seller_outputs}
@@ -78,8 +78,12 @@ pub fn validate_manage_seller(
       let mint_seller_count =
         value.quantity_of(mint_value, factory_policy_id, seller_auth_an)
       and {
+        // Add Sellers before discovery phase end
         end_valid_time_range < end_time,
+        // LBE is not cancelled
         is_cancelled == False,
+        // Add at least 1 Seller
+        mint_seller_count > 0,
         // Mint should be correctly!
         mint_value == value.from_asset(
           factory_policy_id,
@@ -121,6 +125,7 @@ pub fn validate_manage_seller(
           acc_penalty: 0,
         )
       and {
+        // Collect Sellers after Discovery phase or LBE is cancelled
         or {
           start_valid_time_range > end_time,
           is_cancelled == True,
@@ -132,15 +137,12 @@ pub fn validate_manage_seller(
           -seller_input_count,
         ),
         // Paying Manager Output correctly!
-        assert(
-          manager_out_datum == ManagerDatum {
-            ..manager_in_datum,
-            seller_count: seller_count - seller_input_count,
-            reserve_raise: reserve_raise + total_reserve_raise,
-            total_penalty: total_penalty + total_penalty_input,
-          },
-          @"Collect sellers: Invalid manager datum",
-        ),
+        manager_out_datum == ManagerDatum {
+          ..manager_in_datum,
+          seller_count: seller_count - seller_input_count,
+          reserve_raise: reserve_raise + total_reserve_raise,
+          total_penalty: total_penalty + total_penalty_input,
+        },
         or {
           // prevent spamming by setting minimum for seller collected 
           //  if this tx is not the last collect action
@@ -162,12 +164,13 @@ fn apply_collect_sellers(
   acc_raise: Int,
   acc_penalty: Int,
 ) -> (Int, Int) {
-  expect [input, ..inputs] = seller_inputs
+  // This ensure collect at least 1 Seller
+  expect [seller_input, ..remaining_seller_inputs] = seller_inputs
   expect [seller_owner_output, ..remaining_outputs] = outputs
   expect Input {
     output: Output { datum: InlineDatum(raw_datum), value: in_value, .. },
     ..
-  } = input
+  } = seller_input
   expect seller_datum: SellerDatum = raw_datum
   let SellerDatum {
     base_asset: s_base_asset,
@@ -191,11 +194,11 @@ fn apply_collect_sellers(
     }
   let collect_raise = acc_raise + amount
   let collect_penalty = acc_penalty + penalty_amount
-  when inputs is {
+  when remaining_seller_inputs is {
     [] -> (collect_raise, collect_penalty)
     _ ->
       apply_collect_sellers(
-        seller_inputs: inputs,
+        seller_inputs: remaining_seller_inputs,
         outputs: remaining_outputs,
         base_asset: base_asset,
         raise_asset: raise_asset,

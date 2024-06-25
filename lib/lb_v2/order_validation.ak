@@ -18,7 +18,7 @@ use lb_v2/validation.{build_default_collected_order_value, get_order_inputs}
 // - Treasury Input, Order Inputs must share the same LBE ID.
 // - Paying Treasury Output correctly!
 // - Paying Order Outputs correctly!
-// - Collect at least 1 Order.
+// - Collect at least @minimum_order_collected orders per transaction or collect all remaining orders.
 // - The length of Order Inputs equals the length of Order Outputs.
 // - Transaction mint nothing.
 // Notes:
@@ -374,7 +374,7 @@ pub fn apply_redeem_orders(
 // - Treasury Input, Order Inputs must share the same LBE ID.
 // - Paying Treasury Output correctly!
 // - Paying User Outputs correctly!
-// - Refund at least 1 Order.
+// - Refund at least @minimum_order_redeemed Order or refund all orders.
 // - The length of Order Inputs equals the length of User Outputs.
 // - Transaction burn Order Tokens correctly!
 // Notes:
