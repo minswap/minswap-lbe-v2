@@ -7,10 +7,12 @@ use aiken/transaction.{
 use aiken/transaction/credential.{
   Address, PaymentCredential, ScriptCredential, VerificationKeyCredential,
 }
-use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
+use aiken/transaction/value.{
+  AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
+}
 use lb_v2/types.{
-  Asset, ManagerDatum, ManagerRedeemer, OrderDatum, PenaltyConfig, PubKeyHash,
-  SellerDatum, SellerRedeemer, TreasuryDatum, TreasuryRedeemer, ValidatorHash,
+  Asset, ManagerDatum, OrderDatum, PenaltyConfig, PubKeyHash, SellerDatum,
+  TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
@@ -20,19 +22,15 @@ use lb_v2/utils.{
   treasury_auth_an,
 }
 
-fn is_equal_data(a: Data, b: Data) -> Bool {
-  a == b
-}
-
-pub fn has_spend_treasury(
+pub fn has_spend(
   inputs: List<Input>,
-  factory_policy_id: PolicyId,
-  treasury_hash: ValidatorHash,
+  auth_policy_id: PolicyId,
+  auth_asset_name: AssetName,
+  validator_hash: ValidatorHash,
   redeemers: Dict<ScriptPurpose, Redeemer>,
-  expected_redeemer: TreasuryRedeemer,
+  expected_redeemer: Data,
 ) -> Bool {
-  // Transaction always contain exactly 1 Treasury Input
-  expect [treasury_input] =
+  expect [input] =
     list.filter(
       inputs,
       fn(input) {
@@ -40,93 +38,14 @@ pub fn has_spend_treasury(
           output: Output { address: Address { payment_credential, .. }, .. },
           ..
         } = input
-        payment_credential == ScriptCredential(treasury_hash)
+        payment_credential == ScriptCredential(validator_hash)
       },
     )
-  let Input {
-    output_reference: treasury_out_ref,
-    output: Output { value: out_value, .. },
-  } = treasury_input
+  let Input { output_reference, output: Output { value: out_value, .. } } =
+    input
   and {
-    assert(
-      value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
-      @"Treasury UTxO must contain 1 Treasury Token",
-    ),
-    assert(
-      is_equal_data(
-        dict.get(redeemers, Spend(treasury_out_ref)),
-        Some(expected_redeemer),
-      ),
-      @"Spending Treasury must be correct redeemer!",
-    ),
-  }
-}
-
-pub fn has_spend_manager(
-  inputs: List<Input>,
-  factory_policy_id: PolicyId,
-  manager_hash: ValidatorHash,
-  redeemers: Dict<ScriptPurpose, Redeemer>,
-  expected_redeemer: ManagerRedeemer,
-) -> Bool {
-  expect [manager_input] =
-    list.filter(
-      inputs,
-      fn(input) {
-        let Input {
-          output: Output { address: Address { payment_credential, .. }, .. },
-          ..
-        } = input
-        payment_credential == ScriptCredential(manager_hash)
-      },
-    )
-  let Input {
-    output_reference: manager_out_ref,
-    output: Output { value: out_value, .. },
-  } = manager_input
-  and {
-    value.flatten(out_value) == [
-      (ada_policy_id, ada_asset_name, manager_minimum_ada),
-      (factory_policy_id, manager_auth_an, 1),
-    ],
-    is_equal_data(
-      dict.get(redeemers, Spend(manager_out_ref)),
-      Some(expected_redeemer),
-    ),
-  }
-}
-
-pub fn has_spend_seller(
-  inputs: List<Input>,
-  factory_policy_id: PolicyId,
-  seller_hash: ValidatorHash,
-  redeemers: Dict<ScriptPurpose, Redeemer>,
-  expected_redeemer: SellerRedeemer,
-) -> Bool {
-  expect [seller_input] =
-    list.filter(
-      inputs,
-      fn(input) {
-        let Input {
-          output: Output { address: Address { payment_credential, .. }, .. },
-          ..
-        } = input
-        payment_credential == ScriptCredential(seller_hash)
-      },
-    )
-  let Input {
-    output_reference: seller_out_ref,
-    output: Output { value: seller_out_value, .. },
-  } = seller_input
-  and {
-    value.flatten(seller_out_value) == [
-      (ada_policy_id, ada_asset_name, seller_minimum_ada),
-      (factory_policy_id, seller_auth_an, 1),
-    ],
-    is_equal_data(
-      dict.get(redeemers, Spend(seller_out_ref)),
-      Some(expected_redeemer),
-    ),
+    value.quantity_of(out_value, auth_policy_id, auth_asset_name) == 1,
+    dict.get(redeemers, Spend(output_reference)) == Some(expected_redeemer),
   }
 }
 
@@ -147,10 +66,7 @@ pub fn get_seller_inputs(
         ..
       } = input
       and {
-        value.flatten(in_value) == [
-          (ada_policy_id, ada_asset_name, seller_minimum_ada),
-          (factory_policy_id, seller_auth_an, 1),
-        ],
+        value.quantity_of(in_value, factory_policy_id, seller_auth_an) == 1,
         payment_credential == ScriptCredential(seller_hash),
       }
     },
@@ -235,37 +151,20 @@ pub fn get_treasury_ref_inputs(
   )
 }
 
-pub fn get_treasury_input_by_out_ref(
-  inputs: List<Input>,
-  factory_policy_id: PolicyId,
-  out_ref: OutputReference,
-) -> Input {
-  expect [treasury_input] =
-    list.filter(
-      inputs,
-      fn(input) {
-        let Input { output_reference, output: Output { value: out_value, .. } } =
-          input
-        and {
-          value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
-          output_reference == out_ref,
-        }
-      },
-    )
-  treasury_input
-}
-
 pub fn get_amm_pool_output(outputs: List<Output>) -> Output {
   expect [pool_output] =
     list.filter(
       outputs,
       fn(output) {
-        let Output { address: Address { payment_credential, .. }, value, .. } =
-          output
+        let Output {
+          address: Address { payment_credential, .. },
+          value: pool_value,
+          ..
+        } = output
         and {
           payment_credential == ScriptCredential(amm_pool_validation_hash),
           value.quantity_of(
-            value,
+            pool_value,
             amm_authen_policy_id,
             amm_pool_auth_asset_name,
           ) == 1,
@@ -305,38 +204,6 @@ pub fn get_treasury_output(
   treasury_output
 }
 
-// If a transaction needs to pay the Manager,
-// its outputs must contain exactly 1 Legit Manager Output.
-pub fn get_manager_output(
-  outputs: List<Output>,
-  factory_policy_id: PolicyId,
-  manager_hash: ValidatorHash,
-) -> Output {
-  expect [manager_output] =
-    list.filter(
-      outputs,
-      fn(output) {
-        let Output {
-          address: Address { payment_credential, .. },
-          value: out_value,
-          reference_script,
-          ..
-        } = output
-        and {
-          // output belongs Manager Address
-          payment_credential == ScriptCredential(manager_hash),
-          // No ref_script to avoid increase minimum ADA
-          reference_script == None,
-          value.flatten(out_value) == [
-            (ada_policy_id, ada_asset_name, manager_minimum_ada),
-            (factory_policy_id, manager_auth_an, 1),
-          ],
-        }
-      },
-    )
-  manager_output
-}
-
 pub fn get_order_outputs(
   outputs: List<Output>,
   order_hash: ValidatorHash,
@@ -344,15 +211,8 @@ pub fn get_order_outputs(
   list.filter(
     outputs,
     fn(output) {
-      let Output {
-        address: Address { payment_credential, .. },
-        reference_script,
-        ..
-      } = output
-      and {
-        payment_credential == ScriptCredential(order_hash),
-        reference_script == None,
-      }
+      let Output { address: Address { payment_credential, .. }, .. } = output
+      payment_credential == ScriptCredential(order_hash)
     },
   )
 }
@@ -513,7 +373,7 @@ pub fn validate_using_seller(
   expect Output {
     value: seller_output_value,
     datum: InlineDatum(seller_output_raw_datum),
-    reference_script: seller_output_rs,
+    reference_script: None,
     ..
   } = seller_output
   expect seller_output_datum: SellerDatum = seller_output_raw_datum
@@ -551,6 +411,7 @@ pub fn validate_using_seller(
     order_input_count + order_output_count > 0,
     // Validate Seller Input
     value.quantity_of(seller_input_value, factory_policy_id, seller_auth_an) == 1,
+    // Seller, Treasury share the same LBE ID
     s_base_asset == base_asset,
     s_raise_asset == raise_asset,
     // Spending exactly 1 Legit Seller Input
@@ -564,14 +425,14 @@ pub fn validate_using_seller(
         payment_credential == ScriptCredential(seller_hash)
       },
     ) == [seller_input],
-    // Validate Seller Output
+    // Accumulate seller commission
     seller_output_value == value.add(
       seller_input_value,
       ada_policy_id,
       ada_asset_name,
       seller_commission * new_order_count,
     ),
-    seller_output_rs == None,
+    // Validate Seller Output Datum
     seller_output_datum == SellerDatum {
       ..seller_in_datum,
       amount: amount + delta_amount,
@@ -591,6 +452,7 @@ pub fn validate_using_seller(
   }
 }
 
+// Return (delta_amount, delta_penalty)
 pub fn apply_order(
   order_inputs: List<Input>,
   order_outputs: List<Output>,
@@ -624,11 +486,13 @@ pub fn apply_order(
         let Address { payment_credential: owner_payment_credential, .. } = owner
         // validate orders
         expect and {
+            // Ensure Order's Owner authorize transaction
             validate_authorize_by_owner(
               owner_payment_credential: owner_payment_credential,
               extra_signatories: extra_signatories,
               inputs: inputs,
             ),
+            // Order, Treasury share the same ID
             o_base_asset == base_asset,
             o_raise_asset == raise_asset,
           }
@@ -687,7 +551,7 @@ pub fn apply_order(
               // order amount cannot less than minimum_amount
               _ -> amount >= minimum_amount
             },
-            assert(expected_order == order_value, @"Invalid order output value"),
+            expected_order == order_value,
           }
         (acc_amount + amount, acc_penalty + penalty_amount)
       },
@@ -700,16 +564,8 @@ pub fn apply_order(
       total_input_amount: total_input_amount,
       total_output_amount: total_output_amount,
     )
-  expect
-    assert(
-      total_output_penalty == penalty + total_input_penalty,
-      @"Invalid penalty amount",
-    )
-
-  (
-    total_output_amount - total_input_amount,
-    total_output_penalty - total_input_penalty,
-  )
+  expect total_output_penalty == penalty + total_input_penalty
+  (total_output_amount - total_input_amount, penalty)
 }
 
 pub fn validate_seller_outputs(

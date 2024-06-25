@@ -5,7 +5,7 @@ use lb_v2/types.{
   CollectOrder, OrderDatum, OrderRedeemer, RedeemOrder, UpdateOrder, UsingSeller,
   ValidatorHash,
 }
-use lb_v2/utils.{assert}
+use lb_v2/utils.{seller_auth_an}
 use lb_v2/validation
 
 validator(
@@ -32,15 +32,14 @@ validator(
       }
       UpdateOrder -> {
         let Transaction { inputs, redeemers, .. } = transaction
-        assert(
-          validation.has_spend_seller(
-            inputs: inputs,
-            factory_policy_id: factory_policy_id,
-            seller_hash: seller_hash,
-            redeemers: redeemers,
-            expected_redeemer: UsingSeller,
-          ),
-          @"Using-seller: Tx don't have any seller",
+        // Delegate Logic to Seller Spend
+        validation.has_spend(
+          inputs: inputs,
+          auth_policy_id: factory_policy_id,
+          auth_asset_name: seller_auth_an,
+          validator_hash: seller_hash,
+          redeemers: redeemers,
+          expected_redeemer: UsingSeller,
         )
       }
     }

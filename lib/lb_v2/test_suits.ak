@@ -179,7 +179,7 @@ test test_apply_collecting_orders_1() fail {
   let dummy = gen_dummy_object()
   apply_collecting_orders(
     order_inputs: [],
-    order_outputs: [],
+    outputs: [],
     base_asset: dummy.base_asset,
     raise_asset: dummy.raise_asset,
     acc_collect_amount: 0,
@@ -194,7 +194,7 @@ test test_apply_collecting_orders_2() fail {
   let dummy = gen_dummy_object()
   apply_collecting_orders(
     order_inputs: [dummy.order_input],
-    order_outputs: [],
+    outputs: [],
     base_asset: dummy.base_asset,
     raise_asset: dummy.raise_asset,
     acc_collect_amount: 0,
@@ -226,7 +226,7 @@ test test_apply_collecting_orders_3() {
     }
   apply_collecting_orders(
     order_inputs: [dummy.order_input],
-    order_outputs: [order_out],
+    outputs: [order_out],
     base_asset: dummy.base_asset,
     raise_asset: dummy.raise_asset,
     acc_collect_amount: 0,
@@ -257,7 +257,7 @@ test test_apply_collecting_orders_4() {
     }
   apply_collecting_orders(
     order_inputs: [dummy.order_input, dummy.order_input, dummy.order_input],
-    order_outputs: [order_out, order_out, order_out],
+    outputs: [order_out, order_out, order_out],
     base_asset: dummy.base_asset,
     raise_asset: dummy.raise_asset,
     acc_collect_amount: 0,

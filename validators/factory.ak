@@ -79,8 +79,8 @@ validator(
       list.find(
         inputs,
         fn(input) {
-          let Input { output_reference: out_ref, .. } = input
-          out_ref == factory_ref
+          let Input { output_reference: in_out_ref, .. } = input
+          in_out_ref == factory_ref
         },
       )
     // find all Factory Inputs
@@ -374,18 +374,22 @@ validator(
         and {
           when value.flatten(mint_value) is {
             [] ->
-              validation.has_spend_treasury(
+              // Delegate validation logic to the Treasury Validator.
+              validation.has_spend(
                 inputs: inputs,
-                factory_policy_id: factory_policy_id,
-                treasury_hash: treasury_hash,
+                auth_policy_id: factory_policy_id,
+                auth_asset_name: treasury_auth_an,
+                validator_hash: treasury_hash,
                 redeemers: redeemers,
                 expected_redeemer: CollectOrders,
               )
             _ ->
-              validation.has_spend_treasury(
+              // Delegate validation logic to the Treasury Validator.
+              validation.has_spend(
                 inputs: inputs,
-                factory_policy_id: factory_policy_id,
-                treasury_hash: treasury_hash,
+                auth_policy_id: factory_policy_id,
+                auth_asset_name: treasury_auth_an,
+                validator_hash: treasury_hash,
                 redeemers: redeemers,
                 expected_redeemer: RedeemOrders,
               )
@@ -417,45 +421,52 @@ validator(
           //   1 Treasury Output needs to be paid
           // Delegate validation logic to the Treasury Validator.
           MintManager ->
-            validation.has_spend_treasury(
+            // Delegate validation logic to the Treasury Validator.
+            validation.has_spend(
               inputs: inputs,
-              factory_policy_id: factory_policy_id,
-              treasury_hash: treasury_hash,
+              auth_policy_id: factory_policy_id,
+              auth_asset_name: treasury_auth_an,
+              validator_hash: treasury_hash,
               redeemers: redeemers,
               expected_redeemer: CollectManager,
             )
           MintSeller ->
-            validation.has_spend_manager(
+            // Delegate Logic to Manager Spend
+            validation.has_spend(
               inputs: inputs,
-              factory_policy_id: factory_policy_id,
-              manager_hash: manager_hash,
+              auth_policy_id: factory_policy_id,
+              auth_asset_name: manager_auth_an,
+              validator_hash: manager_hash,
               redeemers: redeemers,
               expected_redeemer: AddSellers,
             )
           BurnSeller ->
-            validation.has_spend_manager(
+            // Delegate Logic to Manager Spend
+            validation.has_spend(
               inputs: inputs,
-              factory_policy_id: factory_policy_id,
-              manager_hash: manager_hash,
+              auth_policy_id: factory_policy_id,
+              auth_asset_name: manager_auth_an,
+              validator_hash: manager_hash,
               redeemers: redeemers,
               expected_redeemer: CollectSellers,
             )
           MintOrder ->
-            assert(
-              validation.has_spend_seller(
-                inputs: inputs,
-                factory_policy_id: factory_policy_id,
-                seller_hash: seller_hash,
-                redeemers: redeemers,
-                expected_redeemer: UsingSeller,
-              ),
-              @"Using-seller: Tx don't have any seller",
+            // Delegate Logic to Seller Spend
+            validation.has_spend(
+              inputs: inputs,
+              auth_policy_id: factory_policy_id,
+              auth_asset_name: seller_auth_an,
+              validator_hash: seller_hash,
+              redeemers: redeemers,
+              expected_redeemer: UsingSeller,
             )
           MintRedeemOrders ->
-            validation.has_spend_treasury(
+            // Delegate validation logic to the Treasury Validator.
+            validation.has_spend(
               inputs: inputs,
-              factory_policy_id: factory_policy_id,
-              treasury_hash: treasury_hash,
+              auth_policy_id: factory_policy_id,
+              auth_asset_name: treasury_auth_an,
+              validator_hash: treasury_hash,
               redeemers: redeemers,
               expected_redeemer: RedeemOrders,
             )
@@ -556,15 +567,12 @@ fn has_spend_factory(
       },
     )
   // wrapping Factory Mint Redeemer -> Factory Spend Redeemer
-  let wrapper_redeemer = make_wrapper_redeemer(expected_redeemer)
+  let wrapper_redeemer = Some(make_wrapper_redeemer(expected_redeemer))
   when expected_redeemer is {
     CreateTreasury { .. } -> {
       // CreateTreasury require only 1 Factory Input
       expect [Input { output_reference, .. }] = factory_inputs
-      // finding Factory Input self-redeemer
-      expect Some(raw_redeemer) = dict.get(redeemers, Spend(output_reference))
-      // ensure Factory Input spending with expected redeemer 
-      raw_redeemer == wrapper_redeemer
+      dict.get(redeemers, Spend(output_reference)) == wrapper_redeemer
     }
     CloseTreasury { .. } -> {
       // CloseTreasury require 2 Factory Inputs as Head, Tail node
@@ -572,13 +580,9 @@ fn has_spend_factory(
         Input { output_reference: head_out_ref, .. },
         Input { output_reference: tail_out_ref, .. },
       ] = factory_inputs
-      // finding Factory Input self-redeemer
-      expect Some(head_raw_redeemer) = dict.get(redeemers, Spend(head_out_ref))
-      expect Some(tail_raw_redeemer) = dict.get(redeemers, Spend(tail_out_ref))
-      // ensure 2 Factory Inputs spending with expected redeemer
       and {
-        head_raw_redeemer == wrapper_redeemer,
-        tail_raw_redeemer == wrapper_redeemer,
+        dict.get(redeemers, Spend(head_out_ref)) == wrapper_redeemer,
+        dict.get(redeemers, Spend(tail_out_ref)) == wrapper_redeemer,
       }
     }
     _ -> False

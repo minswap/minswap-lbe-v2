@@ -15,10 +15,9 @@ import {
 } from "../plutus";
 import {
   CREATE_POOL_COMMISSION,
-  DEFAULT_NUMBER_SELLER,
   DUMMY_REDEEMER,
   FACTORY_AUTH_AN,
-  LBE_FEE,
+  ORDER_COMMISSION,
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
   LP_COLATERAL,
@@ -35,6 +34,8 @@ import {
   SELLER_MIN_ADA,
   TREASURY_AUTH_AN,
   TREASURY_MIN_ADA,
+  SELLER_COMMISSION,
+  COLLECT_SELLER_COMMISSION,
 } from "./constants";
 import type {
   DeployMinswapValidators,
@@ -87,8 +88,10 @@ export type BuildInitFactoryOptions = {
 };
 
 export type BuildCreateTreasuryOptions = {
+  sellerAmount: bigint;
   factoryUtxo: UTxO;
   treasuryDatum: TreasuryDatum;
+  sellerOwner: Address;
   validFrom: UnixTime;
   validTo: UnixTime;
   extraDatum?: Datum; // the datum of treasuryDatum.receiverDatum
@@ -100,6 +103,7 @@ export type BuildAddSellersOptions = {
   addSellerCount: bigint;
   validFrom: UnixTime;
   validTo: UnixTime;
+  owner: Address;
 };
 
 export type BuildUsingSellerOptions = {
@@ -357,13 +361,20 @@ export class WarehouseBuilder {
   public buildCreateTreasury(
     options: BuildCreateTreasuryOptions,
   ): WarehouseBuilder {
-    const { factoryUtxo, treasuryDatum, validFrom, validTo, extraDatum } =
-      options;
+    const {
+      factoryUtxo,
+      treasuryDatum,
+      sellerOwner,
+      validFrom,
+      validTo,
+      extraDatum,
+      sellerAmount,
+    } = options;
     const managerDatum: ManagerDatum = {
       factoryPolicyId: this.factoryHash,
       baseAsset: treasuryDatum.baseAsset,
       raiseAsset: treasuryDatum.raiseAsset,
-      sellerCount: DEFAULT_NUMBER_SELLER,
+      sellerCount: sellerAmount,
       reserveRaise: 0n,
       totalPenalty: 0n,
     };
@@ -393,13 +404,16 @@ export class WarehouseBuilder {
         this.mintingTreasuryToken();
       },
       () => {
-        this.mintingSellerToken(DEFAULT_NUMBER_SELLER);
+        this.mintingSellerToken(sellerAmount);
       },
       () => {
         this.payingManagerOutput(managerDatum);
       },
       () => {
-        this.payingSellerOutput();
+        this.payingSellerOutput({
+          addSellerCount: sellerAmount,
+          owner: sellerOwner,
+        });
       },
       () => {
         this.mintingManagerToken();
@@ -425,14 +439,21 @@ export class WarehouseBuilder {
   }
 
   public buildAddSeller(options: BuildAddSellersOptions): WarehouseBuilder {
-    const { addSellerCount, validFrom, validTo, treasuryRefUtxo, managerUtxo } =
-      options;
+    const {
+      addSellerCount,
+      validFrom,
+      validTo,
+      treasuryRefUtxo,
+      managerUtxo,
+      owner,
+    } = options;
     invariant(managerUtxo.datum);
     const managerInDatum = this.fromDatumManager(managerUtxo.datum);
     const managerOutDatum = {
       ...managerInDatum,
       sellerCount: managerInDatum.sellerCount + addSellerCount,
     };
+    this.setInnerAssets(managerInDatum.baseAsset, managerInDatum.raiseAsset);
 
     this.tasks.push(
       () => {
@@ -450,7 +471,7 @@ export class WarehouseBuilder {
         this.payingManagerOutput(managerOutDatum);
       },
       () => {
-        this.payingSellerOutput({ addSellerCount });
+        this.payingSellerOutput({ addSellerCount, owner });
       },
       () => {
         this.tx
@@ -474,6 +495,7 @@ export class WarehouseBuilder {
     } = options;
     invariant(sellerUtxo.datum);
     const sellerInDatum = this.fromDatumSeller(sellerUtxo.datum);
+    this.setInnerAssets(sellerInDatum.baseAsset, sellerInDatum.raiseAsset);
     let inputAmount = 0n;
     let inputPenaltyAmount = 0n;
     let outputAmount = 0n;
@@ -498,7 +520,9 @@ export class WarehouseBuilder {
     const mintingSellerCount = BigInt(
       orderOutputDatums.length - orderInputs.length,
     );
-
+    const newOrderCount = BigInt(
+      Math.max(0, orderOutputDatums.length - orderInputs.length),
+    );
     this.tasks.push(
       () => {
         this.sellerInputs = [sellerUtxo];
@@ -523,7 +547,10 @@ export class WarehouseBuilder {
         this.mintingOrderToken(mintingSellerCount);
       },
       () => {
-        this.payingSellerOutput({ outDatum: sellerOutDatum });
+        this.payingSellerOutput({
+          outDatum: sellerOutDatum,
+          newOrderCount: newOrderCount,
+        });
       },
       () => {
         this.payingOrderOutput(...orderOutputDatums);
@@ -820,6 +847,13 @@ export class WarehouseBuilder {
         this.mintRedeemer = "MintRedeemOrders";
       },
       () => {
+        this.payingTreasuryOutput({
+          treasuryOutDatum,
+          deltaLp: totalLiquidity,
+          deltaRaise: totalBonusRaise,
+        });
+      },
+      () => {
         for (const output of userOutputs) {
           this.tx.payToAddress(output.address, output.assets);
         }
@@ -829,13 +863,6 @@ export class WarehouseBuilder {
       },
       () => {
         this.spendingOrderInput();
-      },
-      () => {
-        this.payingTreasuryOutput({
-          treasuryOutDatum,
-          deltaLp: totalLiquidity,
-          deltaRaise: totalBonusRaise,
-        });
       },
       () => {
         this.mintingOrderToken(-1n * BigInt(orderInputs.length));
@@ -897,6 +924,13 @@ export class WarehouseBuilder {
         this.mintRedeemer = "MintRedeemOrders";
       },
       () => {
+        this.payingTreasuryOutput({
+          treasuryOutDatum,
+          deltaLp: 0n,
+          deltaRaise: totalRaise + totalPenalty,
+        });
+      },
+      () => {
         for (const output of userOutputs) {
           this.tx.payToAddress(output.address, output.assets);
         }
@@ -906,13 +940,6 @@ export class WarehouseBuilder {
       },
       () => {
         this.spendingOrderInput();
-      },
-      () => {
-        this.payingTreasuryOutput({
-          treasuryOutDatum,
-          deltaLp: 0n,
-          deltaRaise: totalRaise + totalPenalty,
-        });
       },
       () => {
         this.mintingOrderToken(-1n * BigInt(orderInputs.length));
@@ -1073,6 +1100,18 @@ export class WarehouseBuilder {
       },
       () => {
         this.payingManagerOutput(managerOutDatum);
+      },
+      () => {
+        for (const utxo of sellerInputs) {
+          const sellerDatum = this.fromDatumSeller(utxo.datum!);
+          const assets = {
+            lovelace: utxo.assets["lovelace"] - COLLECT_SELLER_COMMISSION,
+          };
+          this.tx.payToAddress(
+            plutusAddress2Address(this.t.network, sellerDatum.owner),
+            assets,
+          );
+        }
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
@@ -1384,7 +1423,9 @@ export class WarehouseBuilder {
     const innerPay = (datum: OrderDatum) => {
       const assets = {
         [this.orderToken]: 1n,
-        lovelace: ORDER_MIN_ADA + (datum.isCollected ? LBE_FEE : LBE_FEE * 2n),
+        lovelace:
+          ORDER_MIN_ADA +
+          (datum.isCollected ? ORDER_COMMISSION : ORDER_COMMISSION * 2n),
       };
       const raiseAsset = toUnit(
         datum.raiseAsset.policyId,
@@ -1409,62 +1450,64 @@ export class WarehouseBuilder {
     }
   }
 
-  innerPaySeller(datum: SellerDatum) {
-    this.tx.payToAddressWithData(
-      this.sellerAddress,
-      {
-        inline: this.toDatumSeller(datum),
-      },
-      {
-        [this.sellerToken]: 1n,
-        lovelace: SELLER_MIN_ADA,
-      },
-    );
+  innerPaySeller(datum: SellerDatum, newOrderCount?: bigint) {
+    if (newOrderCount === undefined) {
+      this.tx.payToAddressWithData(
+        this.sellerAddress,
+        {
+          inline: this.toDatumSeller(datum),
+        },
+        {
+          [this.sellerToken]: 1n,
+          lovelace: SELLER_MIN_ADA,
+        },
+      );
+    } else {
+      const sellerInput = this.sellerInputs[0];
+      const assets = { ...sellerInput.assets };
+      assets["lovelace"] =
+        assets["lovelace"] + (newOrderCount ?? 0n) * SELLER_COMMISSION;
+      this.tx.payToAddressWithData(
+        this.sellerAddress,
+        {
+          inline: this.toDatumSeller(datum),
+        },
+        assets,
+      );
+    }
   }
 
   payingSellerOutput(
     option: {
+      owner?: Address;
       addSellerCount?: bigint;
       outDatum?: SellerDatum;
-    } = { addSellerCount: undefined, outDatum: undefined },
+      newOrderCount?: bigint;
+    } = {
+      addSellerCount: undefined,
+      outDatum: undefined,
+      owner: undefined,
+      newOrderCount: 0n,
+    },
   ) {
-    const { addSellerCount, outDatum } = option;
+    const { addSellerCount, outDatum, owner, newOrderCount } = option;
     if (this.sellerInputs.length) {
       // Using seller
       invariant(outDatum);
-      this.innerPaySeller(outDatum);
-    } else if (this.managerInputs.length) {
-      // collecting sellers
-      invariant(this.managerInputs.length == 1);
-      invariant(this.managerInputs[0].datum);
-      const managerDatum = this.fromDatumManager(this.managerInputs[0].datum);
+      this.innerPaySeller(outDatum, newOrderCount);
+    } else {
+      // adding sellers
+      invariant(owner);
       const sellerDatum: SellerDatum = {
         factoryPolicyId: this.factoryHash,
-        baseAsset: managerDatum.baseAsset,
-        raiseAsset: managerDatum.raiseAsset,
+        baseAsset: this.baseAsset!,
+        raiseAsset: this.raiseAsset!,
         amount: 0n,
         penaltyAmount: 0n,
+        owner: address2PlutusAddress(owner),
       };
       invariant(addSellerCount);
       for (let i = 0n; i < addSellerCount; i++) {
-        this.innerPaySeller(sellerDatum);
-      }
-    } else {
-      // create new treasury
-      invariant(this.treasuryInputs.length === 0);
-      invariant(this.factoryRedeemer);
-      const baseAsset = (this.factoryRedeemer.wrapper as any)["CreateTreasury"]
-        .baseAsset;
-      const raiseAsset = (this.factoryRedeemer.wrapper as any)["CreateTreasury"]
-        .raiseAsset;
-      const sellerDatum: SellerDatum = {
-        factoryPolicyId: this.factoryHash,
-        baseAsset,
-        raiseAsset,
-        amount: 0n,
-        penaltyAmount: 0n,
-      };
-      for (let i = 0; i < DEFAULT_NUMBER_SELLER; i++) {
         this.innerPaySeller(sellerDatum);
       }
     }

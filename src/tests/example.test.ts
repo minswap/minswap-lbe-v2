@@ -233,6 +233,8 @@ test("example flow", async () => {
     validFrom: t.utils.slotToUnixTime(emulator.slot),
     validTo: t.utils.slotToUnixTime(emulator.slot + 60),
     extraDatum,
+    sellerAmount: 20n,
+    sellerOwner: ACCOUNT_0.address,
   });
   const createTreasuryTx = await quickSubmitBuilder(emulator)({
     txBuilder: builder.complete(),
@@ -273,6 +275,7 @@ test("example flow", async () => {
       addSellerCount,
       validFrom: t.utils.slotToUnixTime(emulator.slot),
       validTo: t.utils.slotToUnixTime(emulator.slot + 100),
+      owner: ACCOUNT_0.address,
     };
     builder = new WarehouseBuilder(warehouseOptions);
     builder.buildAddSeller(buildAddSellersOptions);

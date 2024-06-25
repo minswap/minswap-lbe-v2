@@ -35,6 +35,7 @@ import { WarehouseBuilder, type BuildCollectSellersOptions } from "../build-tx";
 import {
   MANAGER_MIN_ADA,
   MINIMUM_SELLER_COLLECTED,
+  SELLER_COMMISSION,
   SELLER_MIN_ADA,
   TREASURY_MIN_ADA,
 } from "../constants";
@@ -165,12 +166,13 @@ beforeEach(async () => {
 });
 
 function genSellerUTxO(datum: SellerDatum, builder: WarehouseBuilder): UTxO {
+  const rand = Math.floor(Math.random() * 100);
   return {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
     outputIndex: ++utxoIndex,
     assets: {
       [builder.sellerToken]: 1n,
-      lovelace: SELLER_MIN_ADA,
+      lovelace: SELLER_MIN_ADA + BigInt(rand) * SELLER_COMMISSION,
     },
     address: builder.sellerAddress,
     datum: builder.toDatumSeller(datum),

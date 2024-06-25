@@ -38,8 +38,9 @@ FAIL:
 */
 import { WarehouseBuilder, type BuildUsingSellerOptions } from "../build-tx";
 import {
-  LBE_FEE,
+  ORDER_COMMISSION,
   ORDER_MIN_ADA,
+  SELLER_COMMISSION,
   SELLER_MIN_ADA,
   TREASURY_MIN_ADA,
 } from "../constants";
@@ -102,7 +103,7 @@ async function genTestWarehouse() {
     outputIndex: ++utxoIndex,
     assets: {
       [builder.sellerToken]: 1n,
-      lovelace: SELLER_MIN_ADA,
+      lovelace: SELLER_MIN_ADA + SELLER_COMMISSION * 5n,
     },
     address: builder.sellerAddress,
     datum: builder.toDatumSeller(sellerDatum),
@@ -183,7 +184,10 @@ function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): UTxO {
     assets: {
       [builder.orderToken]: 1n,
       lovelace:
-        ORDER_MIN_ADA + 2n * LBE_FEE + datum.amount + datum.penaltyAmount,
+        ORDER_MIN_ADA +
+        2n * ORDER_COMMISSION +
+        datum.amount +
+        datum.penaltyAmount,
     },
     address: builder.orderAddress,
     datum: builder.toDatumOrder(datum),
@@ -338,7 +342,7 @@ test("using-seller | FAIL | update orders: Invalid order output value", async ()
       // raise asset is ADA
       const assets = {
         [builder.orderToken]: 1n,
-        lovelace: ORDER_MIN_ADA + LBE_FEE * 2n + datum.amount - 1n,
+        lovelace: ORDER_MIN_ADA + ORDER_COMMISSION * 2n + datum.amount - 1n,
       };
 
       builder.tx.payToAddressWithData(

@@ -4,6 +4,7 @@ use lb_v2/types.{
   CollectSellers, CountingSeller, SellerDatum, SellerRedeemer, UsingSeller,
   ValidatorHash,
 }
+use lb_v2/utils.{manager_auth_an}
 use lb_v2/validation
 
 validator(treasury_hash: ValidatorHash, manager_hash: ValidatorHash) {
@@ -17,10 +18,12 @@ validator(treasury_hash: ValidatorHash, manager_hash: ValidatorHash) {
     when redeemer is {
       CountingSeller -> {
         let Transaction { inputs, redeemers, .. } = transaction
-        validation.has_spend_manager(
+        // Delegate Logic to Manager Spend
+        validation.has_spend(
           inputs: inputs,
-          factory_policy_id: factory_policy_id,
-          manager_hash: manager_hash,
+          auth_policy_id: factory_policy_id,
+          auth_asset_name: manager_auth_an,
+          validator_hash: manager_hash,
           redeemers: redeemers,
           expected_redeemer: CollectSellers,
         )

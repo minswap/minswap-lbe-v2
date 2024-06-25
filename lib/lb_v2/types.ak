@@ -198,9 +198,7 @@ pub type OrderDatum {
 pub type OrderRedeemer {
   // Update Order Amount 
   UpdateOrder
-  // Feed Type
   CollectOrder
-  // Feed Type
   RedeemOrder
 }
 

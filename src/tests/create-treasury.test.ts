@@ -1,7 +1,6 @@
 import { WarehouseBuilder, type BuildCreateTreasuryOptions } from "../build-tx";
 import {
   CREATE_POOL_COMMISSION,
-  DEFAULT_NUMBER_SELLER,
   MANAGER_MIN_ADA,
   MAX_PENALTY_RATE,
   TREASURY_MIN_ADA,
@@ -11,6 +10,7 @@ import { assertValidator, assertValidatorFail, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
 
 let W: any;
+const DEFAULT_SELLER_AMOUNT = 20n;
 
 beforeAll(async () => {
   await loadModule();
@@ -37,8 +37,11 @@ beforeEach(async () => {
     datum: builder.toDatumFactory(defaultFactoryDatum),
     address: builder.factoryAddress,
   };
+  const owner = await t.wallet.address();
   let options: BuildCreateTreasuryOptions = {
+    sellerAmount: DEFAULT_SELLER_AMOUNT,
     factoryUtxo,
+    sellerOwner: owner,
     treasuryDatum: defaultTreasuryDatum,
     validFrom: t.utils.slotToUnixTime(emulator.slot),
     validTo: t.utils.slotToUnixTime(emulator.slot + 60),
@@ -343,6 +346,12 @@ test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | reserveRai
   assertValidatorFail(remixTreasuryDatum({ reserveRaise: 12n }));
 });
 
+test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | hihi discovery phase > 30 days", async () => {
+  let endTime =
+    W.defaultTreasuryDatum.startTime + BigInt(35 * 24 * 60 * 60 * 1000);
+  assertValidatorFail(remixTreasuryDatum({ endTime }));
+});
+
 test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | startTime", async () => {
   // LBE start time < current
   let startTime = BigInt(W.emulator.now() - 60 * 60 * 1000);
@@ -435,7 +444,7 @@ test("create-treasury | FAIL | Minting incorrect! | X | Seller Token", async () 
   let builder: WarehouseBuilder = W.builder;
   builder = builder.buildCreateTreasury(W.options);
   builder.tasks[4] = () => {
-    builder.mintingSellerToken(DEFAULT_NUMBER_SELLER + 10n);
+    builder.mintingSellerToken(DEFAULT_SELLER_AMOUNT + 10n);
   };
   // Mint Value must be correct!
   assertValidatorFail(builder);
