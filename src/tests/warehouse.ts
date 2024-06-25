@@ -67,7 +67,7 @@ export const genWarehouse = async (maxTxSize?: number) => {
   };
   const emulator = new T.Emulator([ACCOUNT_0], protocolParameters);
   let t = await T.Translucent.new(emulator);
-  emulator.awaitBlock(10_000); // For validity ranges to be valid
+  // emulator.awaitBlock(10_000); // For validity ranges to be valid
   t.selectWalletFromPrivateKey(ACCOUNT_0.privateKey);
   const warehouseOptions = await genWarehouseOptions(t);
 
@@ -178,6 +178,13 @@ export const genWarehouse = async (maxTxSize?: number) => {
     ) as UTxO;
   };
 
+  let findSellers = async (): Promise<UTxO[]> => {
+    return await emulator.getUtxosWithUnit(
+      builder.sellerAddress,
+      builder.sellerToken,
+    );
+  };
+
   let defaultManagerInput: UTxO = {
     txHash: "00".repeat(32),
     outputIndex: outputIndex++,
@@ -240,6 +247,7 @@ export const genWarehouse = async (maxTxSize?: number) => {
     defaultOrderDatum,
     ammPoolInput,
     findTreasuryInput,
+    findSellers,
     ammPoolDatum,
     builder,
     outputIndex,

@@ -224,3 +224,15 @@ export function calculateInitialLiquidity(
   }
   return x;
 }
+
+export function catchWrapper<T, R>(
+  func: (t: T) => R,
+  arg0: T,
+  defaultValue: R,
+): R {
+  try {
+    return func(arg0);
+  } catch {
+    return defaultValue;
+  }
+}
