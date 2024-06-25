@@ -16,7 +16,7 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  assert, calculate_penalty, is_equal_data, manager_auth_an, manager_minimum_ada,
+  assert, calculate_penalty, manager_auth_an, manager_minimum_ada,
   must_get_start_end_validity, order_auth_an, order_commission,
   order_minimum_ada, seller_auth_an, seller_commission, seller_minimum_ada,
   treasury_auth_an,
@@ -45,10 +45,7 @@ pub fn has_spend(
     input
   and {
     value.quantity_of(out_value, auth_policy_id, auth_asset_name) == 1,
-    is_equal_data(
-      dict.get(redeemers, Spend(output_reference)),
-      Some(expected_redeemer),
-    ),
+    dict.get(redeemers, Spend(output_reference)) == Some(expected_redeemer),
   }
 }
 

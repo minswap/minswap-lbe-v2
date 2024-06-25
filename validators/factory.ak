@@ -15,9 +15,9 @@ use lb_v2/types.{
   MintSeller, RedeemOrders, TreasuryDatum, UsingSeller, ValidatorHash,
 }
 use lb_v2/utils.{
-  assert, compute_lp_asset_name, factory_auth_an, is_equal_data,
-  make_wrapper_redeemer, manager_auth_an, manager_minimum_ada,
-  minimum_number_seller, must_get_end_validity, seller_auth_an, treasury_auth_an,
+  assert, compute_lp_asset_name, factory_auth_an, make_wrapper_redeemer,
+  manager_auth_an, manager_minimum_ada, minimum_number_seller,
+  must_get_end_validity, seller_auth_an, treasury_auth_an,
 }
 use lb_v2/validation
 
@@ -572,10 +572,7 @@ fn has_spend_factory(
     CreateTreasury { .. } -> {
       // CreateTreasury require only 1 Factory Input
       expect [Input { output_reference, .. }] = factory_inputs
-      is_equal_data(
-        dict.get(redeemers, Spend(output_reference)),
-        wrapper_redeemer,
-      )
+      dict.get(redeemers, Spend(output_reference)) == wrapper_redeemer
     }
     CloseTreasury { .. } -> {
       // CloseTreasury require 2 Factory Inputs as Head, Tail node
@@ -584,14 +581,8 @@ fn has_spend_factory(
         Input { output_reference: tail_out_ref, .. },
       ] = factory_inputs
       and {
-        is_equal_data(
-          dict.get(redeemers, Spend(head_out_ref)),
-          wrapper_redeemer,
-        ),
-        is_equal_data(
-          dict.get(redeemers, Spend(tail_out_ref)),
-          wrapper_redeemer,
-        ),
+        dict.get(redeemers, Spend(head_out_ref)) == wrapper_redeemer,
+        dict.get(redeemers, Spend(tail_out_ref)) == wrapper_redeemer,
       }
     }
     _ -> False
