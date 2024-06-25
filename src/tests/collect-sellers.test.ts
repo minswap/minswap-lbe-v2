@@ -379,7 +379,7 @@ test("collect sellers | FAIL | Stupid Manager datum output(totalPenalty)", async
 test("collect sellers | FAIL | No manager input", async () => {
   const { builder, options } = warehouse;
   builder.buildCollectSeller(options);
-  builder.tasks[5] = () => {};
+  builder.tasks[4] = () => {};
   assertValidatorFail(builder);
 });
 

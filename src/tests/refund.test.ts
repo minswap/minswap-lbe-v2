@@ -165,7 +165,7 @@ test("Refund | PASS | success", async () => {
 test("Refund | FAIL | not enough n user output", async () => {
   const { builder, options, userOutputs } = warehouse;
   builder.buildRefundOrders(options);
-  builder.tasks[1] = () => {
+  builder.tasks[2] = () => {
     for (let i = 0; i < userOutputs.length - 1; ++i) {
       const output = userOutputs[i];
       builder.tx.payToAddress(output.address, output.assets);
@@ -176,7 +176,7 @@ test("Refund | FAIL | not enough n user output", async () => {
 test("Refund | FAIL | Invalid user out value ", async () => {
   const { builder, options, userOutputs } = warehouse;
   builder.buildRefundOrders(options);
-  builder.tasks[1] = () => {
+  builder.tasks[2] = () => {
     for (let i = 0; i < userOutputs.length - 1; ++i) {
       const output = userOutputs[i];
       builder.tx.payToAddress(output.address, output.assets);
@@ -190,7 +190,7 @@ test("Refund | FAIL | Invalid user out value ", async () => {
 test("Refund | FAIL | not Treasury out", async () => {
   const { builder, options } = warehouse;
   builder.buildRefundOrders(options);
-  builder.tasks[4] = () => {};
+  builder.tasks[1] = () => {};
   assertValidatorFail(builder);
 });
 
@@ -242,7 +242,7 @@ test("Refund | FAIL | Not collected all orders", async () => {
 test("Refund | FAIL | No treasury input", async () => {
   const { builder, options, treasuryUTxO } = warehouse;
   builder.buildRefundOrders(options);
-  builder.tasks[2] = () => {};
+  builder.tasks[3] = () => {};
   attachValueToInput(treasuryUTxO.assets);
 
   assertValidatorFail(builder);

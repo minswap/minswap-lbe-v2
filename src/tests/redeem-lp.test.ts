@@ -193,14 +193,14 @@ function attachValueToInput(value: Assets): void {
 test("Redeem LP | FAIL | No treasury input", async () => {
   const { builder, options, treasuryUTxO } = warehouse;
   builder.buildRedeemOrders(options);
-  builder.tasks[2] = () => {};
+  builder.tasks[3] = () => {};
   attachValueToInput(treasuryUTxO.assets);
   assertValidatorFail(builder);
 });
 test("Redeem LP | FAIL | Invalid user out value", async () => {
   const { builder, options, userOutputs } = warehouse;
   builder.buildRefundOrders(options);
-  builder.tasks[1] = () => {
+  builder.tasks[2] = () => {
     for (let i = 0; i < userOutputs.length - 1; ++i) {
       const output = userOutputs[i];
       builder.tx.payToAddress(output.address, output.assets);
