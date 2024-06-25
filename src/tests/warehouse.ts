@@ -167,7 +167,7 @@ export const genWarehouse = async (maxTxSize?: number) => {
     assets: {
       [builder.ammPoolToken]: 1n,
     },
-    datum: builder.toDatumAmmPool(ammPoolDatum),
+    datum: WarehouseBuilder.toDatumAmmPool(ammPoolDatum),
     txHash: "01".repeat(32),
     outputIndex: outputIndex++,
   };
@@ -186,7 +186,7 @@ export const genWarehouse = async (maxTxSize?: number) => {
       lovelace: MANAGER_MIN_ADA,
     },
     address: builder.managerAddress,
-    datum: builder.toDatumManager(defaultManagerDatum),
+    datum: WarehouseBuilder.toDatumManager(defaultManagerDatum),
   };
 
   let defaultSellerInput: UTxO = {
@@ -197,7 +197,7 @@ export const genWarehouse = async (maxTxSize?: number) => {
       lovelace: SELLER_MIN_ADA,
     },
     address: builder.sellerAddress,
-    datum: builder.toDatumSeller(defaultSellerDatum),
+    datum: WarehouseBuilder.toDatumSeller(defaultSellerDatum),
   };
 
   let defaultOrderInput: UTxO = {
@@ -208,7 +208,7 @@ export const genWarehouse = async (maxTxSize?: number) => {
       lovelace: ORDER_MIN_ADA,
     },
     address: builder.orderAddress,
-    datum: builder.toDatumOrder(defaultOrderDatum),
+    datum: WarehouseBuilder.toDatumOrder(defaultOrderDatum),
   };
 
   let defaultTreasuryInput: UTxO = {
@@ -223,7 +223,7 @@ export const genWarehouse = async (maxTxSize?: number) => {
       )]: defaultTreasuryDatum.reserveBase,
     },
     address: builder.treasuryAddress,
-    datum: builder.toDatumTreasury(defaultTreasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(defaultTreasuryDatum),
   };
 
   return {

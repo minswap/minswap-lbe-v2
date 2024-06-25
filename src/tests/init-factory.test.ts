@@ -94,7 +94,7 @@ test("init-factory | FAIL | missing Factory Token", async () => {
     builder.tx.payToAddressWithData(
       builder.factoryAddress,
       {
-        inline: builder.toDatumFactory(factoryDatum),
+        inline: WarehouseBuilder.toDatumFactory(factoryDatum),
       },
       {
         lovelace: 2_000_000n,
@@ -117,7 +117,7 @@ test("init-factory | FAIL | Factory Datum is not correct", async () => {
     builder.tx.payToAddressWithData(
       builder.factoryAddress,
       {
-        inline: builder.toDatumFactory(factoryDatum),
+        inline: WarehouseBuilder.toDatumFactory(factoryDatum),
       },
       {
         [builder.factoryToken]: 1n,
