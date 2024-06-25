@@ -16,9 +16,7 @@ use lb_v2/types.{
   CancelLBE, CloseEvent, CollectManager, CollectOrders, CreateAmmPool, PoolDatum,
   RedeemOrders, TreasuryDatum, TreasuryRedeemer, UpdateLBE,
 }
-use lb_v2/utils.{
-  assert, factory_auth_an, must_get_end_validity, treasury_auth_an,
-}
+use lb_v2/utils.{factory_auth_an, must_get_end_validity, treasury_auth_an}
 use lb_v2/validation
 
 validator {
@@ -67,30 +65,21 @@ validator {
     let mint_value = value.from_minted_value(mint)
     let end_valid_time_range = must_get_end_validity(validity_range)
     expect and {
-        assert(
-          value.quantity_of(
-            treasury_in_value,
-            factory_policy_id,
-            treasury_auth_an,
-          ) == 1,
-          @"Treasury Input must contains 1 Treasury Token",
-        ),
-        assert(
-          list.filter(
-            inputs,
-            fn(input) {
-              let Input {
-                output: Output {
-                  address: Address { payment_credential, .. },
-                  ..
-                },
-                ..
-              } = input
-              payment_credential == ScriptCredential(treasury_hash)
-            },
-          ) == [treasury_input],
-          @"Always spend exactly 1 Treasury Input!",
-        ),
+        value.quantity_of(
+          treasury_in_value,
+          factory_policy_id,
+          treasury_auth_an,
+        ) == 1,
+        list.filter(
+          inputs,
+          fn(input) {
+            let Input {
+              output: Output { address: Address { payment_credential, .. }, .. },
+              ..
+            } = input
+            payment_credential == ScriptCredential(treasury_hash)
+          },
+        ) == [treasury_input],
       }
     when redeemer is {
       // UpdateLBE before discovery phase

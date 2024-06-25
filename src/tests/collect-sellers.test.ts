@@ -32,16 +32,22 @@ import invariant from "@minswap/tiny-invariant";
 import * as T from "@minswap/translucent";
 import { ManagerValidateManagerSpending } from "../../plutus";
 import { WarehouseBuilder, type BuildCollectSellersOptions } from "../build-tx";
-import { MANAGER_MIN_ADA, TREASURY_MIN_ADA } from "../constants";
+import {
+  MANAGER_MIN_ADA,
+  MINIMUM_SELLER_COLLECTED,
+  SELLER_COMMISSION,
+  SELLER_MIN_ADA,
+  TREASURY_MIN_ADA,
+} from "../constants";
 import type { Assets, ManagerDatum, SellerDatum, UTxO } from "../types";
 import { plutusAddress2Address, toUnit } from "../utils";
 import {
-  assertValidator,
   assertValidatorFail,
   genWarehouseOptions,
   loadModule,
+  quickSubmitBuilder,
 } from "./utils";
-import { genWarehouse } from "./warehouse";
+import { genWarehouse, skipToCountingPhase } from "./warehouse";
 
 let utxoIndex: number;
 
@@ -57,13 +63,14 @@ beforeAll(async () => {
 });
 
 async function genTestWarehouse() {
+  let W = await genWarehouse();
   const {
     t,
     minswapToken,
     defaultTreasuryDatum,
     defaultSellerDatum,
     defaultManagerDatum,
-  } = await genWarehouse();
+  } = W;
   utxoIndex = 0;
   const baseAsset = minswapToken;
   const warehouseOptions = await genWarehouseOptions(t);
@@ -127,7 +134,7 @@ async function genTestWarehouse() {
     managerInput: managerUTxO,
     sellerInputs: sellerUTxOs,
     validFrom: Number(treasuryDatum.endTime + 1000n),
-    validTo: Number(treasuryDatum.endTime + 5000n),
+    validTo: Number(treasuryDatum.endTime + BigInt(3 * 60 * 60 * 1000)),
   };
   const expectedManagerDatumOut = {
     ...managerDatum,
@@ -150,6 +157,7 @@ async function genTestWarehouse() {
     sellerUTxOs,
     defaultSellerDatum,
     owner: plutusAddress2Address(t.network, treasuryDatum.owner),
+    W,
   };
 }
 
@@ -158,11 +166,13 @@ beforeEach(async () => {
 });
 
 function genSellerUTxO(datum: SellerDatum, builder: WarehouseBuilder): UTxO {
+  const rand = Math.floor(Math.random() * 100);
   return {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
     outputIndex: ++utxoIndex,
     assets: {
       [builder.sellerToken]: 1n,
+      lovelace: SELLER_MIN_ADA + BigInt(rand) * SELLER_COMMISSION,
     },
     address: builder.sellerAddress,
     datum: builder.toDatumSeller(datum),
@@ -186,6 +196,7 @@ function attachValueToInput(value: Assets): void {
 }
 
 test("collect sellers | PASS | happy case 1", async () => {
+  // collect all sellers
   const { builder, options } = warehouse;
   builder.buildCollectSeller(options);
   const tx = builder.complete();
@@ -211,6 +222,43 @@ test("collect sellers | PASS | happy case 2", async () => {
   });
   const tx = builder1.complete();
   await tx.complete();
+});
+
+test("collect sellers | PASS | happy case 3", async () => {
+  // collect MINIMUM_SELLER_COLLECTED sellers
+  let { builder, W, defaultSellerDatum, options, treasuryDatum } = warehouse;
+  let managerDatum: ManagerDatum = {
+    ...builder.fromDatumManager(options.managerInput.datum!),
+    sellerCount: 100n,
+  };
+  let managerInput = {
+    ...options.managerInput,
+    datum: builder.toDatumManager(managerDatum),
+  };
+  let sellerInputs: UTxO[] = [];
+  for (let i = 0; i <= MINIMUM_SELLER_COLLECTED; i++) {
+    let utxo = genSellerUTxO(
+      { ...defaultSellerDatum, amount: 1000n, penaltyAmount: 20_000n },
+      builder,
+    );
+    sellerInputs.push(utxo);
+  }
+  options = {
+    ...options,
+    managerInput,
+    sellerInputs,
+  };
+  builder.buildCollectSeller(options);
+
+  W.emulator.addUTxO(options.treasuryRefInput);
+  W.emulator.addUTxO(options.managerInput);
+  for (let s of sellerInputs) W.emulator.addUTxO(s);
+  skipToCountingPhase({ t: builder.t, e: W.emulator, datum: treasuryDatum });
+
+  const tx = await quickSubmitBuilder(W.emulator)({
+    txBuilder: builder.complete(),
+  });
+  expect(tx).toBeTruthy();
 });
 
 test("collect sellers | FAIL | Before end of discovery phase", async () => {
@@ -287,21 +335,21 @@ test("collect sellers | FAIL | Stupid Manager datum output(baseAsset)", async ()
   const builder = stupidManagerDatumOut({
     baseAsset: MINt,
   });
-  assertValidator(builder, "Collect sellers: Invalid manager datum");
+  assertValidatorFail(builder);
 });
 
 test("collect sellers | FAIL | Stupid Manager datum output(raiseAsset)", async () => {
   const builder = stupidManagerDatumOut({
     raiseAsset: MINt,
   });
-  assertValidator(builder, "Collect sellers: Invalid manager datum");
+  assertValidatorFail(builder);
 });
 
 test("collect sellers | FAIL | Stupid Manager datum output(factoryPolicyId)", async () => {
   const builder = stupidManagerDatumOut({
     factoryPolicyId: "1234567890",
   });
-  assertValidator(builder, "Collect sellers: Invalid manager datum");
+  assertValidatorFail(builder);
 });
 
 test("collect sellers | FAIL | Stupid Manager datum output(sellerCount)", async () => {
@@ -309,7 +357,7 @@ test("collect sellers | FAIL | Stupid Manager datum output(sellerCount)", async 
   const builder = stupidManagerDatumOut({
     sellerCount: expectedManagerDatumOut.sellerCount + 1n,
   });
-  assertValidator(builder, "Collect sellers: Invalid manager datum");
+  assertValidatorFail(builder);
 });
 
 test("collect sellers | FAIL | Stupid Manager datum output(reserveRaise)", async () => {
@@ -317,7 +365,7 @@ test("collect sellers | FAIL | Stupid Manager datum output(reserveRaise)", async
   const builder = stupidManagerDatumOut({
     reserveRaise: expectedManagerDatumOut.reserveRaise + 1n,
   });
-  assertValidator(builder, "Collect sellers: Invalid manager datum");
+  assertValidatorFail(builder);
 });
 
 test("collect sellers | FAIL | Stupid Manager datum output(totalPenalty)", async () => {
@@ -325,28 +373,13 @@ test("collect sellers | FAIL | Stupid Manager datum output(totalPenalty)", async
   const builder = stupidManagerDatumOut({
     totalPenalty: expectedManagerDatumOut.totalPenalty + 1n,
   });
-  assertValidator(builder, "Collect sellers: Invalid manager datum");
+  assertValidatorFail(builder);
 });
 
 test("collect sellers | FAIL | No manager input", async () => {
   const { builder, options } = warehouse;
   builder.buildCollectSeller(options);
   builder.tasks[4] = () => {};
-  assertValidatorFail(builder);
-});
-
-test("collect sellers | FAIL | Managre input value dont have any manager token", async () => {
-  const { builder, options } = warehouse;
-  builder.buildCollectSeller({
-    ...options,
-    managerInput: {
-      ...options.managerInput,
-      assets: {
-        lovelace: MANAGER_MIN_ADA,
-      },
-    },
-  });
-  attachValueToInput({ [builder.managerToken]: 1n });
   assertValidatorFail(builder);
 });
 
@@ -396,7 +429,8 @@ test("collect sellers | FAIL | Seller Input: Invalid LBE ID", async () => {
     ...options,
     sellerInputs,
   });
-  assertValidator(builder, "Collect Sellers: invalid seller inputs' LBE ID");
+  // Collect Sellers: invalid seller inputs' LBE ID
+  assertValidatorFail(builder);
 });
 
 test("collect sellers | FAIL | Manager Input: Invalid LBE ID", async () => {
@@ -429,4 +463,28 @@ test("collect sellers | FAIL | More than 1 manager input", async () => {
       );
   });
   assertValidatorFail(builder);
+});
+
+test("collect sellers | FAIL | spam collect sellers", async () => {
+  let { builder, options } = warehouse;
+  let managerDatum: ManagerDatum = {
+    ...builder.fromDatumManager(options.managerInput.datum!),
+    sellerCount: 100n,
+  };
+  let managerInput = {
+    ...options.managerInput,
+    datum: builder.toDatumManager(managerDatum),
+  };
+  options = {
+    ...options,
+    managerInput,
+  };
+  let task = async () => {
+    builder.buildCollectSeller(options);
+    const tx = builder.complete();
+    await tx.complete();
+  };
+  expect(async () => await task()).toThrow(
+    `Collect all sellers or at least ${MINIMUM_SELLER_COLLECTED}`,
+  );
 });

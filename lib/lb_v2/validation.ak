@@ -7,27 +7,30 @@ use aiken/transaction.{
 use aiken/transaction/credential.{
   Address, PaymentCredential, ScriptCredential, VerificationKeyCredential,
 }
-use aiken/transaction/value.{PolicyId, Value}
+use aiken/transaction/value.{
+  AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
+}
 use lb_v2/types.{
-  Asset, ManagerDatum, ManagerRedeemer, OrderDatum, PenaltyConfig, PubKeyHash,
-  SellerDatum, SellerRedeemer, TreasuryDatum, TreasuryRedeemer, ValidatorHash,
+  Asset, ManagerDatum, OrderDatum, PenaltyConfig, PubKeyHash, SellerDatum,
+  TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  assert, calculate_penalty, get_order_value, manager_auth_an,
-  must_get_start_end_validity, order_auth_an, seller_auth_an, seller_minimum_ada,
+  assert, calculate_penalty, manager_auth_an, manager_minimum_ada,
+  must_get_start_end_validity, order_auth_an, order_commission,
+  order_minimum_ada, seller_auth_an, seller_commission, seller_minimum_ada,
   treasury_auth_an,
 }
 
-pub fn has_spend_treasury(
+pub fn has_spend(
   inputs: List<Input>,
-  factory_policy_id: PolicyId,
-  treasury_hash: ValidatorHash,
+  auth_policy_id: PolicyId,
+  auth_asset_name: AssetName,
+  validator_hash: ValidatorHash,
   redeemers: Dict<ScriptPurpose, Redeemer>,
-  expected_redeemer: TreasuryRedeemer,
+  expected_redeemer: Data,
 ) -> Bool {
-  // Transaction always contain exactly 1 Treasury Input
-  expect [treasury_input] =
+  expect [input] =
     list.filter(
       inputs,
       fn(input) {
@@ -35,82 +38,15 @@ pub fn has_spend_treasury(
           output: Output { address: Address { payment_credential, .. }, .. },
           ..
         } = input
-        payment_credential == ScriptCredential(treasury_hash)
+        payment_credential == ScriptCredential(validator_hash)
       },
     )
-  let Input {
-    output_reference: treasury_out_ref,
-    output: Output { value: out_value, .. },
-  } = treasury_input
-  expect Some(raw_redeemer) = dict.get(redeemers, Spend(treasury_out_ref))
-  expect redeemer: TreasuryRedeemer = raw_redeemer
+  let Input { output_reference, output: Output { value: out_value, .. } } =
+    input
   and {
-    assert(
-      value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
-      @"Treasury UTxO must contain 1 Treasury Token",
-    ),
-    assert(
-      expected_redeemer == redeemer,
-      @"Spending Treasury must be correct redeemer!",
-    ),
+    value.quantity_of(out_value, auth_policy_id, auth_asset_name) == 1,
+    dict.get(redeemers, Spend(output_reference)) == Some(expected_redeemer),
   }
-}
-
-pub fn has_spend_manager(
-  inputs: List<Input>,
-  factory_policy_id: PolicyId,
-  manager_hash: ValidatorHash,
-  redeemers: Dict<ScriptPurpose, Redeemer>,
-  expected_redeemer: ManagerRedeemer,
-) -> Bool {
-  expect [manager_input] =
-    list.filter(
-      inputs,
-      fn(input) {
-        let Input {
-          output: Output { address: Address { payment_credential, .. }, .. },
-          ..
-        } = input
-        payment_credential == ScriptCredential(manager_hash)
-      },
-    )
-  let Input {
-    output_reference: manager_out_ref,
-    output: Output { value: out_value, .. },
-  } = manager_input
-  expect value.quantity_of(out_value, factory_policy_id, manager_auth_an) == 1
-  expect Some(raw_redeemer) = dict.get(redeemers, Spend(manager_out_ref))
-  expect redeemer: ManagerRedeemer = raw_redeemer
-  expected_redeemer == redeemer
-}
-
-pub fn has_spend_seller(
-  inputs: List<Input>,
-  factory_policy_id: PolicyId,
-  seller_hash: ValidatorHash,
-  redeemers: Dict<ScriptPurpose, Redeemer>,
-  expected_redeemer: SellerRedeemer,
-) -> Bool {
-  expect [seller_input] =
-    list.filter(
-      inputs,
-      fn(input) {
-        let Input {
-          output: Output { address: Address { payment_credential, .. }, .. },
-          ..
-        } = input
-        payment_credential == ScriptCredential(seller_hash)
-      },
-    )
-  let Input {
-    output_reference: seller_out_ref,
-    output: Output { value: seller_out_value, .. },
-  } = seller_input
-  expect
-    value.quantity_of(seller_out_value, factory_policy_id, seller_auth_an) == 1
-  expect Some(raw_redeemer) = dict.get(redeemers, Spend(seller_out_ref))
-  expect redeemer: SellerRedeemer = raw_redeemer
-  expected_redeemer == redeemer
 }
 
 pub fn get_seller_inputs(
@@ -180,7 +116,10 @@ pub fn get_manager_inputs(
       } = input
       and {
         // Has 1 Manager Token
-        value.quantity_of(in_value, factory_policy_id, manager_auth_an) == 1,
+        value.flatten(in_value) == [
+          (ada_policy_id, ada_asset_name, manager_minimum_ada),
+          (factory_policy_id, manager_auth_an, 1),
+        ],
         // output belongs Manager Address
         payment_credential == ScriptCredential(manager_hash),
       }
@@ -212,37 +151,20 @@ pub fn get_treasury_ref_inputs(
   )
 }
 
-pub fn get_treasury_input_by_out_ref(
-  inputs: List<Input>,
-  factory_policy_id: PolicyId,
-  out_ref: OutputReference,
-) -> Input {
-  expect [treasury_input] =
-    list.filter(
-      inputs,
-      fn(input) {
-        let Input { output_reference, output: Output { value: out_value, .. } } =
-          input
-        and {
-          value.quantity_of(out_value, factory_policy_id, treasury_auth_an) == 1,
-          output_reference == out_ref,
-        }
-      },
-    )
-  treasury_input
-}
-
 pub fn get_amm_pool_output(outputs: List<Output>) -> Output {
   expect [pool_output] =
     list.filter(
       outputs,
       fn(output) {
-        let Output { address: Address { payment_credential, .. }, value, .. } =
-          output
+        let Output {
+          address: Address { payment_credential, .. },
+          value: pool_value,
+          ..
+        } = output
         and {
           payment_credential == ScriptCredential(amm_pool_validation_hash),
           value.quantity_of(
-            value,
+            pool_value,
             amm_authen_policy_id,
             amm_pool_auth_asset_name,
           ) == 1,
@@ -282,55 +204,15 @@ pub fn get_treasury_output(
   treasury_output
 }
 
-// If a transaction needs to pay the Manager,
-// its outputs must contain exactly 1 Legit Manager Output.
-pub fn get_manager_output(
-  outputs: List<Output>,
-  factory_policy_id: PolicyId,
-  manager_hash: ValidatorHash,
-) -> Output {
-  expect [manager_output] =
-    list.filter(
-      outputs,
-      fn(output) {
-        let Output {
-          address: Address { payment_credential, .. },
-          value: out_value,
-          reference_script,
-          ..
-        } = output
-        and {
-          // output belongs Manager Address
-          payment_credential == ScriptCredential(manager_hash),
-          // No ref_script to avoid increase minimum ADA
-          reference_script == None,
-          // Has 1 Manager Token
-          value.quantity_of(out_value, factory_policy_id, manager_auth_an) == 1,
-        }
-      },
-    )
-  manager_output
-}
-
 pub fn get_order_outputs(
   outputs: List<Output>,
-  factory_policy_id: PolicyId,
   order_hash: ValidatorHash,
 ) -> List<Output> {
   list.filter(
     outputs,
     fn(output) {
-      let Output {
-        address: Address { payment_credential, .. },
-        value: out_value,
-        reference_script,
-        ..
-      } = output
-      and {
-        payment_credential == ScriptCredential(order_hash),
-        value.quantity_of(out_value, factory_policy_id, order_auth_an) == 1,
-        reference_script == None,
-      }
+      let Output { address: Address { payment_credential, .. }, .. } = output
+      payment_credential == ScriptCredential(order_hash)
     },
   )
 }
@@ -491,7 +373,7 @@ pub fn validate_using_seller(
   expect Output {
     value: seller_output_value,
     datum: InlineDatum(seller_output_raw_datum),
-    reference_script: seller_output_rs,
+    reference_script: None,
     ..
   } = seller_output
   expect seller_output_datum: SellerDatum = seller_output_raw_datum
@@ -502,11 +384,7 @@ pub fn validate_using_seller(
       order_hash: order_hash,
     )
   let order_outputs =
-    get_order_outputs(
-      outputs: outputs,
-      factory_policy_id: factory_policy_id,
-      order_hash: order_hash,
-    )
+    get_order_outputs(outputs: outputs, order_hash: order_hash)
   let (delta_amount, delta_penalty) =
     apply_order(
       order_inputs: order_inputs,
@@ -522,11 +400,18 @@ pub fn validate_using_seller(
     )
   let order_input_count = list.length(order_inputs)
   let order_output_count = list.length(order_outputs)
+  let new_order_count =
+    if order_output_count > order_input_count {
+      order_output_count - order_input_count
+    } else {
+      0
+    }
   and {
     // prevent spam
     order_input_count + order_output_count > 0,
     // Validate Seller Input
     value.quantity_of(seller_input_value, factory_policy_id, seller_auth_an) == 1,
+    // Seller, Treasury share the same LBE ID
     s_base_asset == base_asset,
     s_raise_asset == raise_asset,
     // Spending exactly 1 Legit Seller Input
@@ -540,9 +425,14 @@ pub fn validate_using_seller(
         payment_credential == ScriptCredential(seller_hash)
       },
     ) == [seller_input],
-    // Validate Seller Output
-    seller_output_value == seller_input_value,
-    seller_output_rs == None,
+    // Accumulate seller commission
+    seller_output_value == value.add(
+      seller_input_value,
+      ada_policy_id,
+      ada_asset_name,
+      seller_commission * new_order_count,
+    ),
+    // Validate Seller Output Datum
     seller_output_datum == SellerDatum {
       ..seller_in_datum,
       amount: amount + delta_amount,
@@ -562,6 +452,7 @@ pub fn validate_using_seller(
   }
 }
 
+// Return (delta_amount, delta_penalty)
 pub fn apply_order(
   order_inputs: List<Input>,
   order_outputs: List<Output>,
@@ -595,11 +486,13 @@ pub fn apply_order(
         let Address { payment_credential: owner_payment_credential, .. } = owner
         // validate orders
         expect and {
+            // Ensure Order's Owner authorize transaction
             validate_authorize_by_owner(
               owner_payment_credential: owner_payment_credential,
               extra_signatories: extra_signatories,
               inputs: inputs,
             ),
+            // Order, Treasury share the same ID
             o_base_asset == base_asset,
             o_raise_asset == raise_asset,
           }
@@ -628,12 +521,17 @@ pub fn apply_order(
           ..
         }: OrderDatum = raw_o_datum
         let expected_order =
-          get_order_value(
-            amount: amount,
-            penalty_amount: penalty_amount,
-            factory_policy_id: factory_policy_id,
-            raise_asset: raise_asset,
-          )
+          value.from_asset(factory_policy_id, order_auth_an, 1)
+            |> value.add(
+                raise_asset.policy_id,
+                raise_asset.asset_name,
+                amount + penalty_amount,
+              )
+            |> value.add(
+                ada_policy_id,
+                ada_asset_name,
+                order_minimum_ada + order_commission * 2,
+              )
         let minimum_amount =
           when minimum_order_raise is {
             Some(minn) -> minn
@@ -653,7 +551,7 @@ pub fn apply_order(
               // order amount cannot less than minimum_amount
               _ -> amount >= minimum_amount
             },
-            assert(expected_order == order_value, @"Invalid order output value"),
+            expected_order == order_value,
           }
         (acc_amount + amount, acc_penalty + penalty_amount)
       },
@@ -666,45 +564,80 @@ pub fn apply_order(
       total_input_amount: total_input_amount,
       total_output_amount: total_output_amount,
     )
-  expect
-    assert(
-      total_output_penalty == penalty + total_input_penalty,
-      @"Invalid penalty amount",
-    )
-
-  (
-    total_output_amount - total_input_amount,
-    total_output_penalty - total_input_penalty,
-  )
+  expect total_output_penalty == penalty + total_input_penalty
+  (total_output_amount - total_input_amount, penalty)
 }
 
-// return Seller Output when creating Treasury
-pub fn build_default_seller_output(
+pub fn validate_seller_outputs(
+  outputs: List<Output>,
   factory_policy_id: ValidatorHash,
   base_asset: Asset,
   raise_asset: Asset,
   seller_hash: ValidatorHash,
-) -> Output {
-  let seller_address = credential.from_script(seller_hash)
-  // build default seller datum
-  let seller_datum =
-    SellerDatum {
+  seller_count: Int,
+) -> Bool {
+  expect Some(seller_output) =
+    list.find(
+      outputs,
+      fn(output) {
+        let Output { address: Address { payment_credential, .. }, .. } = output
+        payment_credential == ScriptCredential(seller_hash)
+      },
+    )
+  expect Output {
+    datum: InlineDatum(raw_datum),
+    value: seller_value,
+    reference_script: None,
+    ..
+  } = seller_output
+  expect datum: SellerDatum = raw_datum
+  let SellerDatum { owner, .. } = datum
+  expect
+    datum == SellerDatum {
       factory_policy_id,
       base_asset,
       raise_asset,
       amount: 0,
       penalty_amount: 0,
+      owner,
     }
-  // build default seller value
-  let seller_value =
-    value.from_lovelace(seller_minimum_ada)
-      |> value.add(factory_policy_id, seller_auth_an, 1)
-  Output {
-    address: seller_address,
-    value: seller_value,
-    datum: InlineDatum(seller_datum),
-    reference_script: None,
+  // all sellers have the same owner
+  and {
+    value.flatten(seller_value) == [
+      (ada_policy_id, ada_asset_name, seller_minimum_ada),
+      (factory_policy_id, seller_auth_an, 1),
+    ],
+    datum == SellerDatum {
+      factory_policy_id,
+      base_asset,
+      raise_asset,
+      amount: 0,
+      penalty_amount: 0,
+      owner,
+    },
+    seller_count == list.foldl(
+      outputs,
+      0,
+      fn(output, cnt) {
+        if output == seller_output {
+          cnt + 1
+        } else {
+          cnt
+        }
+      },
+    ),
   }
+}
+
+pub fn build_default_collected_order_value(
+  factory_policy_id: ValidatorHash,
+) -> Value {
+  value.from_asset(factory_policy_id, order_auth_an, 1)
+    |> value.add(
+        ada_policy_id,
+        ada_asset_name,
+        order_minimum_ada + order_commission,
+      )
 }
 
 // Check if the owner authorizes the transaction

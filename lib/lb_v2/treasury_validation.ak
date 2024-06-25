@@ -12,8 +12,8 @@ use lb_v2/types.{
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
   create_pool_comission, default_burn_liquidity, max_base_fee_numerator,
-  max_penalty, min_base_fee_numerator, min_pool_allocation, treasury_auth_an,
-  treasury_minimum_ada, two_day_ms,
+  max_penalty, min_base_fee_numerator, min_pool_allocation, one_month_ms,
+  treasury_auth_an, treasury_minimum_ada, two_day_ms,
 }
 
 pub fn validate_creating_treasury_out(
@@ -82,6 +82,7 @@ pub fn validate_creating_treasury_out(
     t_raise_asset == raise_asset,
     start_time > end_valid_time_range,
     start_time < end_time,
+    end_time - start_time <= one_month_ms,
     // Make sure that datum with datum_hash has appeared on the blockchain, \
     // later we can use methods such as db_sync, kupo to rebuild the datum.
     when receiver_datum is {

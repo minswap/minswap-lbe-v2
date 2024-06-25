@@ -10,9 +10,10 @@ use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
 use lb_v2/order_validation.{apply_collecting_orders}
 use lb_v2/types.{Asset, FactoryDatum, OrderDatum, PenaltyConfig, UsingSeller}
 use lb_v2/utils.{
-  calculate_penalty, fee_ada, make_wrapper_redeemer, order_auth_an,
+  calculate_penalty, make_wrapper_redeemer, order_auth_an, order_commission,
   order_minimum_ada, sort_two_consecutive_factory_datum,
 }
+use lb_v2/validation.{build_default_collected_order_value}
 
 type DummyObject {
   owner: Address,
@@ -178,11 +179,13 @@ test test_apply_collecting_orders_1() fail {
   let dummy = gen_dummy_object()
   apply_collecting_orders(
     order_inputs: [],
-    order_outputs: [],
+    outputs: [],
     base_asset: dummy.base_asset,
     raise_asset: dummy.raise_asset,
-    factory_policy_id: dummy.factory_policy_id,
     acc_collect_amount: 0,
+    default_order_output_value: build_default_collected_order_value(
+      dummy.factory_policy_id,
+    ),
   ) == 0
 }
 
@@ -191,11 +194,13 @@ test test_apply_collecting_orders_2() fail {
   let dummy = gen_dummy_object()
   apply_collecting_orders(
     order_inputs: [dummy.order_input],
-    order_outputs: [],
+    outputs: [],
     base_asset: dummy.base_asset,
     raise_asset: dummy.raise_asset,
-    factory_policy_id: dummy.factory_policy_id,
     acc_collect_amount: 0,
+    default_order_output_value: build_default_collected_order_value(
+      dummy.factory_policy_id,
+    ),
   ) == 0
 }
 
@@ -207,7 +212,11 @@ test test_apply_collecting_orders_3() {
   let order_out_datum = OrderDatum { ..dummy.order_datum, is_collected: True }
   let order_out_value =
     value.from_asset(dummy.factory_policy_id, order_auth_an, 1)
-      |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
+      |> value.add(
+          ada_policy_id,
+          ada_asset_name,
+          order_minimum_ada + order_commission,
+        )
   let order_out =
     Output {
       address: dummy.order_input.output.address,
@@ -217,11 +226,13 @@ test test_apply_collecting_orders_3() {
     }
   apply_collecting_orders(
     order_inputs: [dummy.order_input],
-    order_outputs: [order_out],
+    outputs: [order_out],
     base_asset: dummy.base_asset,
     raise_asset: dummy.raise_asset,
-    factory_policy_id: dummy.factory_policy_id,
     acc_collect_amount: 0,
+    default_order_output_value: build_default_collected_order_value(
+      dummy.factory_policy_id,
+    ),
   ) == collect_amount
 }
 
@@ -232,7 +243,11 @@ test test_apply_collecting_orders_4() {
   let order_out_datum = OrderDatum { ..dummy.order_datum, is_collected: True }
   let order_out_value =
     value.from_asset(dummy.factory_policy_id, order_auth_an, 1)
-      |> value.add(ada_policy_id, ada_asset_name, order_minimum_ada + fee_ada)
+      |> value.add(
+          ada_policy_id,
+          ada_asset_name,
+          order_minimum_ada + order_commission,
+        )
   let order_out =
     Output {
       address: dummy.order_input.output.address,
@@ -242,11 +257,13 @@ test test_apply_collecting_orders_4() {
     }
   apply_collecting_orders(
     order_inputs: [dummy.order_input, dummy.order_input, dummy.order_input],
-    order_outputs: [order_out, order_out, order_out],
+    outputs: [order_out, order_out, order_out],
     base_asset: dummy.base_asset,
     raise_asset: dummy.raise_asset,
-    factory_policy_id: dummy.factory_policy_id,
     acc_collect_amount: 0,
+    default_order_output_value: build_default_collected_order_value(
+      dummy.factory_policy_id,
+    ),
   ) == collect_amount * 3
 }
 

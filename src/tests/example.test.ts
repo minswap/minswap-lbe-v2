@@ -17,15 +17,16 @@ import {
   type BuildUsingSellerOptions,
   type WarehouseBuilderOptions,
 } from "../build-tx";
+import { MINIMUM_ORDER_REDEEMED, MINIMUM_SELLER_COLLECTED } from "../constants";
 import {
   collectMinswapValidators,
   collectValidators,
   deployMinswapValidators,
   deployValidators,
+  type DeployMinswapValidators,
   type DeployedValidators,
   type MinswapValidators,
   type Validators,
-  type DeployMinswapValidators,
 } from "../deploy-validators";
 import type {
   Address,
@@ -44,12 +45,12 @@ import {
   calculateInitialLiquidity,
   toUnit,
 } from "../utils";
+import params from "./../../params.json";
 import {
   generateAccount,
   quickSubmitBuilder,
   type GeneratedAccount,
 } from "./utils";
-import params from "./../../params.json";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -232,6 +233,8 @@ test("example flow", async () => {
     validFrom: t.utils.slotToUnixTime(emulator.slot),
     validTo: t.utils.slotToUnixTime(emulator.slot + 60),
     extraDatum,
+    sellerAmount: 20n,
+    sellerOwner: ACCOUNT_0.address,
   });
   const createTreasuryTx = await quickSubmitBuilder(emulator)({
     txBuilder: builder.complete(),
@@ -272,6 +275,7 @@ test("example flow", async () => {
       addSellerCount,
       validFrom: t.utils.slotToUnixTime(emulator.slot),
       validTo: t.utils.slotToUnixTime(emulator.slot + 100),
+      owner: ACCOUNT_0.address,
     };
     builder = new WarehouseBuilder(warehouseOptions);
     builder.buildAddSeller(buildAddSellersOptions);
@@ -392,10 +396,10 @@ test("example flow", async () => {
     });
     console.info(`collect sellers ${maxCount} done.`);
   };
-  await collectingSeller(15);
-  await collectingSeller(15);
-  await collectingSeller(15);
-  await collectingSeller(15);
+  await collectingSeller(Number(MINIMUM_SELLER_COLLECTED));
+  await collectingSeller(Number(MINIMUM_SELLER_COLLECTED));
+  await collectingSeller(Number(MINIMUM_SELLER_COLLECTED));
+  await collectingSeller(Number(MINIMUM_SELLER_COLLECTED));
 
   const collectingManager = async () => {
     const managerUtxo: UTxO = (
@@ -455,9 +459,11 @@ test("example flow", async () => {
     });
     console.info(`collect order ${maxCount} done.`);
   };
-  await collectingOrders(25);
-  await collectingOrders(25);
-  await collectingOrders(15);
+
+  await collectingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await collectingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await collectingOrders(Number(MINIMUM_ORDER_REDEEMED));
+
   const creatingPool = async () => {
     const ammFactoryInput: UTxO = (
       await emulator.getUtxos(ammFactoryAddress)
@@ -559,8 +565,8 @@ test("example flow", async () => {
     });
     console.info(`Redeem order ${maxCount} done.`);
   };
-  await redeemingOrders(20);
-  await redeemingOrders(20);
-  await redeemingOrders(20);
-  await redeemingOrders(1);
+  await redeemingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await redeemingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await redeemingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await redeemingOrders(Number(MINIMUM_ORDER_REDEEMED));
 });

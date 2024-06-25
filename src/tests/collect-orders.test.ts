@@ -4,7 +4,7 @@ import {
   type BuildCollectOrdersOptions,
 } from "../build-tx";
 import {
-  LBE_FEE,
+  ORDER_COMMISSION,
   MINIMUM_ORDER_COLLECTED,
   ORDER_MIN_ADA,
   TREASURY_MIN_ADA,
@@ -14,7 +14,6 @@ import { assertValidator, loadModule, quickSubmitBuilder } from "./utils";
 import { genWarehouse } from "./warehouse";
 
 let W: GenTestWarehouse;
-const MAX_SIZE = 15;
 
 beforeAll(async () => {
   await loadModule();
@@ -53,7 +52,7 @@ async function genTestWarehouse() {
     outputIndex: 2,
     assets: {
       [builder.orderToken]: 1n,
-      lovelace: ORDER_MIN_ADA + 2n * LBE_FEE + orderAmount,
+      lovelace: ORDER_MIN_ADA + 2n * ORDER_COMMISSION + orderAmount,
     },
     address: builder.orderAddress,
     datum: builder.toDatumOrder(orderDatum),
@@ -118,9 +117,9 @@ test("collect-orders | PASS | LBE was cancelled", async () => {
   assertValidator(builder.buildCollectOrders(options), "");
 });
 
-test(`collect-orders | PASS | collect ${MAX_SIZE} orders`, async () => {
+test(`collect-orders | PASS | collect ${MINIMUM_ORDER_COLLECTED} orders`, async () => {
   let orderInputs: UTxO[] = [];
-  for (let i = 0; i < MAX_SIZE; i++) {
+  for (let i = 0; i < MINIMUM_ORDER_COLLECTED; i++) {
     let orderInput: UTxO = {
       ...W.orderInput,
       outputIndex: i * 10,
@@ -129,8 +128,9 @@ test(`collect-orders | PASS | collect ${MAX_SIZE} orders`, async () => {
   }
   let options = remixOptions({
     treasuryDatum: {
-      reserveRaise: W.orderAmount * BigInt(MAX_SIZE),
-      totalPenalty: W.orderDatum.penaltyAmount * BigInt(MAX_SIZE),
+      reserveRaise: W.orderAmount * BigInt(MINIMUM_ORDER_COLLECTED),
+      totalPenalty:
+        W.orderDatum.penaltyAmount * BigInt(MINIMUM_ORDER_COLLECTED),
     },
   });
   options = { ...options, orderInputs };

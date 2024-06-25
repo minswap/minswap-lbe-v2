@@ -1,5 +1,5 @@
 import { WarehouseBuilder, type BuildUpdateLBEOptions } from "../build-tx";
-import { CREATE_POOL_COMMISION, TREASURY_MIN_ADA } from "../constants";
+import { CREATE_POOL_COMMISSION, TREASURY_MIN_ADA } from "../constants";
 import type { TreasuryDatum, UTxO } from "../types";
 import { toUnit } from "../utils";
 import { assertValidator, assertValidatorFail, loadModule } from "./utils";
@@ -22,7 +22,7 @@ async function genTestWarehouse() {
     assets: {
       [builder.treasuryToken]: 1n,
       [minswapTokenRaw]: treasuryDatum.reserveBase,
-      lovelace: TREASURY_MIN_ADA + CREATE_POOL_COMMISION,
+      lovelace: TREASURY_MIN_ADA + CREATE_POOL_COMMISSION,
     },
     address: builder.treasuryAddress,
     datum: builder.toDatumTreasury(treasuryDatum),

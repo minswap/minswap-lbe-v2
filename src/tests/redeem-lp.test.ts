@@ -17,7 +17,7 @@ Validation:
 */
 import { WarehouseBuilder, type BuildRedeemOrdersOptions } from "../build-tx";
 import {
-  LBE_FEE,
+  ORDER_COMMISSION,
   LP_COLATERAL,
   ORDER_MIN_ADA,
   TREASURY_MIN_ADA,
@@ -162,7 +162,7 @@ function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): UTxO {
     outputIndex: ++utxoIndex,
     assets: {
       [builder.orderToken]: 1n,
-      lovelace: ORDER_MIN_ADA + LBE_FEE,
+      lovelace: ORDER_MIN_ADA + ORDER_COMMISSION,
     },
     address: builder.orderAddress,
     datum: builder.toDatumOrder(datum),
@@ -193,14 +193,14 @@ function attachValueToInput(value: Assets): void {
 test("Redeem LP | FAIL | No treasury input", async () => {
   const { builder, options, treasuryUTxO } = warehouse;
   builder.buildRedeemOrders(options);
-  builder.tasks[2] = () => {};
+  builder.tasks[3] = () => {};
   attachValueToInput(treasuryUTxO.assets);
   assertValidatorFail(builder);
 });
 test("Redeem LP | FAIL | Invalid user out value", async () => {
   const { builder, options, userOutputs } = warehouse;
   builder.buildRefundOrders(options);
-  builder.tasks[1] = () => {
+  builder.tasks[2] = () => {
     for (let i = 0; i < userOutputs.length - 1; ++i) {
       const output = userOutputs[i];
       builder.tx.payToAddress(output.address, output.assets);
