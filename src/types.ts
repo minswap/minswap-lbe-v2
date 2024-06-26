@@ -15,6 +15,7 @@ export type Assets = T.Assets;
 export type BluePrintAsset = { policyId: string; assetName: string };
 export type Credential = T.Credential;
 export type CTransactionHash = T.CTransactionHash;
+export type CTransactionOutput = T.CTransactionOutput;
 export type CTransactionOutputs = T.CTransactionOutputs;
 export type CTransactionUnspentOutputs = T.CTransactionUnspentOutputs;
 export type Datum = T.Datum;
