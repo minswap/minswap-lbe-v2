@@ -190,6 +190,9 @@ function attachValueToInput(value: Assets): void {
     ]);
   });
 }
+
+test("Redeem LP | PASS | penalty orders", async () => {});
+
 test("Redeem LP | FAIL | No treasury input", async () => {
   const { builder, options, treasuryUTxO } = warehouse;
   builder.buildRedeemOrders(options);

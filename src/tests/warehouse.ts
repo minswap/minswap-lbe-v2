@@ -72,6 +72,7 @@ export const genWarehouse = async (maxTxSize?: number) => {
   const warehouseOptions = await genWarehouseOptions(t);
 
   // registerStake
+  // Need to register Stake Factory Validator because it supports WithdrawFrom
   await quickSubmitBuilder(emulator)({
     txBuilder: t
       .newTx()

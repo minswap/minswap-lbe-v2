@@ -151,13 +151,7 @@ beforeEach(async () => {
   ammDeployedValidators = await deployMinswapValidators(t, ammValidators);
 
   // registerStake
-  await quickSubmitBuilder(emulator)({
-    txBuilder: t
-      .newTx()
-      .registerStake(
-        t.utils.validatorToRewardAddress(validators.sellerValidator),
-      ),
-  });
+  // Need to register Stake Factory Validator because it supports WithdrawFrom
   await quickSubmitBuilder(emulator)({
     txBuilder: t
       .newTx()
