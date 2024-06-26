@@ -34,7 +34,7 @@ beforeEach(async () => {
       lovelace: 2_000_000n,
       [builder.factoryToken]: 1n,
     },
-    datum: builder.toDatumFactory(defaultFactoryDatum),
+    datum: WarehouseBuilder.toDatumFactory(defaultFactoryDatum),
     address: builder.factoryAddress,
   };
   const owner = await t.wallet.address();
@@ -87,7 +87,7 @@ test("create-treasury | PASS | Penalty Config", async () => {
 test("create-treasury | PASS | Receiver Datum: DatumHash", async () => {
   let { defaultTreasuryDatum, options } = W;
   let builder: WarehouseBuilder = W.builder;
-  let extraDatum = builder.toDatumFactory({ head: "00", tail: "ff" });
+  let extraDatum = WarehouseBuilder.toDatumFactory({ head: "00", tail: "ff" });
   let extraDatumHash = builder.t.utils.datumToHash(extraDatum);
   let treasuryDatum: TreasuryDatum = {
     ...defaultTreasuryDatum,
@@ -105,7 +105,7 @@ test("create-treasury | PASS | Receiver Datum: DatumHash", async () => {
 test("create-treasury | PASS | Receiver Datum: InlineDatum", async () => {
   let { defaultTreasuryDatum, options } = W;
   let builder: WarehouseBuilder = W.builder;
-  let extraDatum = builder.toDatumFactory({ head: "00", tail: "ff" });
+  let extraDatum = WarehouseBuilder.toDatumFactory({ head: "00", tail: "ff" });
   let extraDatumHash = builder.t.utils.datumToHash(extraDatum);
   let treasuryDatum: TreasuryDatum = {
     ...defaultTreasuryDatum,
@@ -147,7 +147,7 @@ test("create-treasury | FAIL | have 2 Factory Inputs", async () => {
   builder.tasks.push(() => {
     builder.tx.collectFrom(
       [dummyFactoryInput],
-      builder.toRedeemerFactory(builder.factoryRedeemer),
+      WarehouseBuilder.toRedeemerFactory(builder.factoryRedeemer),
     );
   });
   assertValidatorFail(txBuilder);
@@ -168,7 +168,7 @@ test("create-treasury | FAIL | have 3 Factory Outs", async () => {
     builder.tx.payToAddressWithData(
       builder.factoryAddress,
       {
-        inline: builder.toDatumFactory({ head: "00", tail: "ff" }),
+        inline: WarehouseBuilder.toDatumFactory({ head: "00", tail: "ff" }),
       },
       {
         lovelace: 1_000_000n,
@@ -183,7 +183,7 @@ test("create-treasury | FAIL | Factory Out Tail Datum incorrect!", async () => {
   let builder: WarehouseBuilder = W.builder;
   builder = builder.buildCreateTreasury(W.options);
   builder.tasks[1] = () => {
-    const factoryDatum = builder.fromDatumFactory(
+    const factoryDatum = WarehouseBuilder.fromDatumFactory(
       builder.factoryInputs[0].datum!,
     );
     const newFactoryHeadDatum = {
@@ -206,7 +206,7 @@ test("create-treasury | FAIL | Factory Out Head Datum incorrect!", async () => {
   let builder: WarehouseBuilder = W.builder;
   builder = builder.buildCreateTreasury(W.options);
   builder.tasks[1] = () => {
-    const factoryDatum = builder.fromDatumFactory(
+    const factoryDatum = WarehouseBuilder.fromDatumFactory(
       builder.factoryInputs[0].datum!,
     );
     const newFactoryHeadDatum = {
@@ -232,7 +232,7 @@ const remixManagerDatum = (remixDatum: any) => {
     builder.tx.payToAddressWithData(
       builder.managerAddress,
       {
-        inline: builder.toDatumManager({
+        inline: WarehouseBuilder.toDatumManager({
           ...W.defaultManagerDatum,
           ...remixDatum,
         }),
@@ -266,7 +266,7 @@ const remixTreasuryValue = (assets: Assets) => {
     builder.tx.payToAddressWithData(
       builder.treasuryAddress,
       {
-        inline: builder.toDatumTreasury(W.defaultTreasuryDatum),
+        inline: WarehouseBuilder.toDatumTreasury(W.defaultTreasuryDatum),
       },
       assets,
     );

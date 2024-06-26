@@ -111,8 +111,8 @@ export const loadModule = async () => {
 };
 
 export const DUMMY_SEED_UTXO: UTxO = {
-  txHash: "5428517bd92102ce1af705f8b66560d445e620aead488b47fb824426484912f8",
-  outputIndex: 0,
+  txHash: params.seedOutRef.txHash,
+  outputIndex: params.seedOutRef.outputIndex,
   assets: { lovelace: 5_000_000n },
   address: "addr_test1vqtx6ahdpzm0nm9qa4wh4avhze8gv3j6jv6v3gmrukdxfrqm6m8d3",
 };
@@ -123,7 +123,13 @@ export const DUMMY_SEED_AMM_UTXO: UTxO = {
   assets: { lovelace: 5_000_000n },
   address: "addr_test1vqtx6ahdpzm0nm9qa4wh4avhze8gv3j6jv6v3gmrukdxfrqm6m8d3",
 };
-
+export function hexToUtxo(hexUtxo: string): UTxO {
+  let C = T.CModuleLoader.get;
+  let cUtxo = C.TransactionUnspentOutput.from_bytes(T.fromHex(hexUtxo));
+  let utxo = T.coreToUtxo(cUtxo);
+  cUtxo.free();
+  return utxo;
+}
 const genAmmValidators = async (t: Translucent) => {
   (t.provider as Emulator).addUTxO(DUMMY_SEED_AMM_UTXO);
   const ammValidators = collectMinswapValidators({

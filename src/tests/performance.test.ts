@@ -1,8 +1,9 @@
 import * as T from "@minswap/translucent";
-import type {
-  BuildCollectOrdersOptions,
-  BuildCollectSellersOptions,
-  BuildRedeemOrdersOptions,
+import {
+  WarehouseBuilder,
+  type BuildCollectOrdersOptions,
+  type BuildCollectSellersOptions,
+  type BuildRedeemOrdersOptions,
 } from "../build-tx";
 import type {
   Assets,
@@ -44,7 +45,7 @@ test("performance | collect-seller", async () => {
   };
   let managerInput = {
     ...warehouse.defaultManagerInput,
-    datum: builder.toDatumManager(managerDatum),
+    datum: WarehouseBuilder.toDatumManager(managerDatum),
   };
   let sellerInputs: UTxO[] = [];
   for (let i = 0; i < MAX_COLLECT_SELLER_COUNT; i++) {
@@ -98,7 +99,7 @@ test("performance | collect-order", async () => {
   };
   let treasuryInput: UTxO = {
     ...warehouse.defaultTreasuryInput,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
   };
   let options: BuildCollectOrdersOptions = {
     validFrom,
@@ -137,7 +138,7 @@ test("performance | refund-order", async () => {
     let utxo: UTxO = {
       ...warehouse.defaultOrderInput,
       outputIndex: warehouse.outputIndex++,
-      datum: builder.toDatumOrder(orderDatum),
+      datum: WarehouseBuilder.toDatumOrder(orderDatum),
     };
     orderInputs.push(utxo);
     collectedFund += orderDatum.amount + orderDatum.penaltyAmount;
@@ -157,7 +158,7 @@ test("performance | refund-order", async () => {
   let treasuryAssets = warehouse.defaultTreasuryInput.assets;
   let treasuryInput: UTxO = {
     ...warehouse.defaultTreasuryInput,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
     assets: {
       ...treasuryAssets,
       [raiseAsset]: (treasuryAssets[raiseAsset] ?? 0n) + collectedFund,
@@ -196,7 +197,7 @@ test("performance | redeem-order", async () => {
     let utxo: UTxO = {
       ...warehouse.defaultOrderInput,
       outputIndex: warehouse.outputIndex++,
-      datum: builder.toDatumOrder(orderDatum),
+      datum: WarehouseBuilder.toDatumOrder(orderDatum),
     };
     orderInputs.push(utxo);
     collectedFund += orderDatum.amount + orderDatum.penaltyAmount;
@@ -226,7 +227,7 @@ test("performance | redeem-order", async () => {
   };
   let treasuryInput: UTxO = {
     ...warehouse.defaultTreasuryInput,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
     assets: treasuryAssets,
   };
   let options: BuildRedeemOrdersOptions = {
