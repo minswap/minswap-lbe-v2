@@ -10,7 +10,13 @@ import type {
   Tx,
   UTxO,
   Unit,
+  LbeScript,
 } from "./types";
+import lbeV2Script from "./../lbe-v2-script.json";
+
+export function getLbeScript(): LbeScript {
+  return lbeV2Script as LbeScript;
+}
 
 export function toUnit(
   policyId: PolicyId,

@@ -26,6 +26,14 @@ export const MINIMUM_SELLER_COLLECTED = 20n;
 export const MINIMUM_ORDER_COLLECTED = 30n;
 export const MINIMUM_ORDER_REDEEMED = 30n;
 
+// LBE Constraint
+export const DISCOVERY_MAX_RANGE = 30 * 24 * 60 * 60 * 1000; // 30 days
+export const POOL_ALLOCATION_MIN = 70n;
+export const POOL_BASE_FEE_MIN = 5n;
+export const POOL_BASE_FEE_MAX = 2000n;
+export const PENALTY_MAX_RANGE = 2 * 24 * 60 * 60 * 1000;
+export const PENALTY_MAX_PERCENT = 70;
+
 // Batching
 export const MAX_COLLECT_SELLERS = 24;
 export const MAX_COLLECT_ORDERS = 50;
