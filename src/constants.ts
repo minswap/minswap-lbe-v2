@@ -25,3 +25,10 @@ export const MAX_PENALTY_RATE = 25n;
 export const MINIMUM_SELLER_COLLECTED = 20n;
 export const MINIMUM_ORDER_COLLECTED = 30n;
 export const MINIMUM_ORDER_REDEEMED = 30n;
+
+// Batching
+export const MAX_COLLECT_SELLERS = 24;
+export const MAX_COLLECT_ORDERS = 50;
+export const MAX_REDEEM_ORDERS = 50;
+export const MAX_REFUND_ORDERS = 50;
+export const MAX_SEEDS = 100;

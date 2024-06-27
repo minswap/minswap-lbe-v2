@@ -70,7 +70,7 @@ async function genTestWarehouse() {
         treasuryDatum.reserveBase,
     },
     address: builder.treasuryAddress,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
   };
   const orderInDatums: OrderDatum[] = [
     {
@@ -106,7 +106,7 @@ async function genTestWarehouse() {
   const raiseAssetUnit = toUnit(raiseAsset.policyId, raiseAsset.assetName);
   const sortedOrders = sortUTxOs(orderInputUTxOs);
   for (const order of sortedOrders) {
-    const { penaltyAmount, amount, owner } = builder.fromDatumOrder(
+    const { penaltyAmount, amount, owner } = WarehouseBuilder.fromDatumOrder(
       order.datum!,
     );
     const assets: Record<string, bigint> = {
@@ -151,7 +151,7 @@ function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): UTxO {
       lovelace: ORDER_MIN_ADA + ORDER_COMMISSION,
     },
     address: builder.orderAddress,
-    datum: builder.toDatumOrder(datum),
+    datum: WarehouseBuilder.toDatumOrder(datum),
   };
 }
 
@@ -207,7 +207,7 @@ test("Refund | FAIL | Not collected manager", async () => {
   const { builder, options, treasuryDatum } = warehouse;
   options.treasuryInput = {
     ...options.treasuryInput,
-    datum: builder.toDatumTreasury({
+    datum: WarehouseBuilder.toDatumTreasury({
       ...treasuryDatum,
       isManagerCollected: false,
     }),
@@ -219,7 +219,7 @@ test("Refund | FAIL | Not collected all orders", async () => {
   const { builder, options, treasuryDatum } = warehouse;
   options.treasuryInput = {
     ...options.treasuryInput,
-    datum: builder.toDatumTreasury({
+    datum: WarehouseBuilder.toDatumTreasury({
       ...treasuryDatum,
       collectedFund: treasuryDatum.collectedFund - 10n,
     }),
@@ -231,7 +231,7 @@ test("Refund | FAIL | Not collected all orders", async () => {
   const { builder, options, treasuryDatum } = warehouse;
   options.treasuryInput = {
     ...options.treasuryInput,
-    datum: builder.toDatumTreasury({
+    datum: WarehouseBuilder.toDatumTreasury({
       ...treasuryDatum,
       isCancelled: false,
     }),

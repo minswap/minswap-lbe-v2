@@ -27,7 +27,7 @@ beforeEach(async () => {
       lovelace: 2_000_000n,
     },
     address: builder.managerAddress,
-    datum: builder.toDatumManager(managerDatum),
+    datum: WarehouseBuilder.toDatumManager(managerDatum),
   };
   const treasuryDatum: TreasuryDatum = {
     ...W.defaultTreasuryDatum,
@@ -41,7 +41,7 @@ beforeEach(async () => {
       lovelace: TREASURY_MIN_ADA,
     },
     address: builder.treasuryAddress,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
   };
   const options: BuildCollectManagerOptions = {
     treasuryInput: treasuryInput,
@@ -111,7 +111,7 @@ test("collect-manager | FAIL | LBE ID missmatch", async () => {
   };
   const treasuryInput: UTxO = {
     ...W.treasuryInput,
-    datum: builder.toDatumTreasury(treasuryInDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryInDatum),
   };
   const options = {
     ...W.options,

@@ -40,7 +40,7 @@ async function genTestWarehouse() {
       lovelace: TREASURY_MIN_ADA,
     },
     address: builder.treasuryAddress,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
   };
   let orderDatum: OrderDatum = {
     ...warehouse.defaultOrderDatum,
@@ -55,7 +55,7 @@ async function genTestWarehouse() {
       lovelace: ORDER_MIN_ADA + 2n * ORDER_COMMISSION + orderAmount,
     },
     address: builder.orderAddress,
-    datum: builder.toDatumOrder(orderDatum),
+    datum: WarehouseBuilder.toDatumOrder(orderDatum),
   };
   const options: BuildCollectOrdersOptions = {
     treasuryInput: treasuryInput,
@@ -82,7 +82,7 @@ let remixTreasuryInput = (remixDatum: any): UTxO => {
   };
   return {
     ...W.treasuryInput,
-    datum: W.builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
   };
 };
 

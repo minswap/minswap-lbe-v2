@@ -8,12 +8,20 @@ import type {
   SellerValidateSellerSpending,
   TreasuryValidateTreasurySpending,
 } from "../plutus";
+import type { FactoryValidatorValidateFactory } from "../amm-plutus";
 
 export type Address = T.Address;
 export type Assets = T.Assets;
 export type BluePrintAsset = { policyId: string; assetName: string };
+export type Credential = T.Credential;
+export type CTransactionHash = T.CTransactionHash;
+export type CTransactionOutput = T.CTransactionOutput;
+export type CTransactionOutputs = T.CTransactionOutputs;
+export type CTransactionUnspentOutputs = T.CTransactionUnspentOutputs;
 export type Datum = T.Datum;
 export type Emulator = T.Emulator;
+export type Maestro = T.Maestro;
+export type MaestroSupportedNetworks = T.MaestroSupportedNetworks;
 export type Network = T.Network;
 export type OutputData = T.OutputData;
 export type OutRef = T.OutRef;
@@ -26,14 +34,13 @@ export type Script = T.Script;
 export type ScriptRef = T.ScriptRef;
 export type Translucent = T.Translucent;
 export type Tx = T.Tx;
+export type TxSigned = T.TxSigned;
 export type Unit = T.Unit;
 export type UnixTime = T.UnixTime;
 export type UTxO = T.UTxO;
-export type Maestro = T.Maestro;
-export type MaestroSupportedNetworks = T.MaestroSupportedNetworks;
-export type Credential = T.Credential;
 
 export type AmmPoolDatum = FeedTypeAmmPool["_datum"];
+export type AmmFactoryDatum = FactoryValidatorValidateFactory["datum"];
 export type FactoryDatum = FactoryValidateFactory["datum"];
 export type ManagerDatum = ManagerValidateManagerSpending["managerInDatum"];
 export type OrderDatum = OrderValidateOrder["datum"];

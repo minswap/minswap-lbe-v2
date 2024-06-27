@@ -93,7 +93,7 @@ async function genTestWarehouse() {
         treasuryDatum.reserveBase,
     },
     address: builder.treasuryAddress,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
   };
   const managerDatum: ManagerDatum = {
     ...defaultManagerDatum,
@@ -107,7 +107,7 @@ async function genTestWarehouse() {
       lovelace: MANAGER_MIN_ADA,
     },
     address: builder.managerAddress,
-    datum: builder.toDatumManager(managerDatum),
+    datum: WarehouseBuilder.toDatumManager(managerDatum),
   };
   const sellerDatums: SellerDatum[] = [
     {
@@ -175,7 +175,7 @@ function genSellerUTxO(datum: SellerDatum, builder: WarehouseBuilder): UTxO {
       lovelace: SELLER_MIN_ADA + BigInt(rand) * SELLER_COMMISSION,
     },
     address: builder.sellerAddress,
-    datum: builder.toDatumSeller(datum),
+    datum: WarehouseBuilder.toDatumSeller(datum),
   };
 }
 
@@ -213,7 +213,10 @@ test("collect sellers | PASS | happy case 2", async () => {
   );
   warehouse.options.managerInput = {
     ...warehouse.options.managerInput,
-    datum: builder.toDatumManager({ ...managerDatum, sellerCount: 4n }),
+    datum: WarehouseBuilder.toDatumManager({
+      ...managerDatum,
+      sellerCount: 4n,
+    }),
   };
   const builder1 = stupidManagerDatumOut({
     reserveRaise: warehouse.expectedManagerDatumOut.reserveRaise + 1000n,
@@ -228,12 +231,12 @@ test("collect sellers | PASS | happy case 3", async () => {
   // collect MINIMUM_SELLER_COLLECTED sellers
   let { builder, W, defaultSellerDatum, options, treasuryDatum } = warehouse;
   let managerDatum: ManagerDatum = {
-    ...builder.fromDatumManager(options.managerInput.datum!),
+    ...WarehouseBuilder.fromDatumManager(options.managerInput.datum!),
     sellerCount: 100n,
   };
   let managerInput = {
     ...options.managerInput,
-    datum: builder.toDatumManager(managerDatum),
+    datum: WarehouseBuilder.toDatumManager(managerDatum),
   };
   let sellerInputs: UTxO[] = [];
   for (let i = 0; i <= MINIMUM_SELLER_COLLECTED; i++) {
@@ -294,7 +297,7 @@ test("collect sellers | FAIL | No treasury ref input", async () => {
       .readFrom([builder.deployedValidators["sellerValidator"]])
       .collectFrom(
         builder.sellerInputs,
-        builder.toRedeemerSellerSpend(builder.sellerRedeemer),
+        WarehouseBuilder.toRedeemerSellerSpend(builder.sellerRedeemer),
       );
   };
   assertValidatorFail(builder);
@@ -312,7 +315,7 @@ test("collect sellers | FAIL | No treasury ref input", async () => {
       .readFrom([builder.deployedValidators["sellerValidator"]])
       .collectFrom(
         builder.sellerInputs,
-        builder.toRedeemerSellerSpend(builder.sellerRedeemer),
+        WarehouseBuilder.toRedeemerSellerSpend(builder.sellerRedeemer),
       );
   };
   assertValidatorFail(builder);
@@ -420,7 +423,7 @@ test("collect sellers | FAIL | Seller Input: Invalid LBE ID", async () => {
   const { sellerInputs } = options;
   sellerInputs[0] = {
     ...sellerInputs[0],
-    datum: builder.toDatumSeller({
+    datum: WarehouseBuilder.toDatumSeller({
       ...sellerDatums[0],
       baseAsset: MINt,
     }),
@@ -440,7 +443,10 @@ test("collect sellers | FAIL | Manager Input: Invalid LBE ID", async () => {
     ...options,
     managerInput: {
       ...managerInput,
-      datum: builder.toDatumManager({ ...managerDatum, baseAsset: MINt }),
+      datum: WarehouseBuilder.toDatumManager({
+        ...managerDatum,
+        baseAsset: MINt,
+      }),
     },
   });
   assertValidatorFail(builder);
@@ -468,12 +474,12 @@ test("collect sellers | FAIL | More than 1 manager input", async () => {
 test("collect sellers | FAIL | spam collect sellers", async () => {
   let { builder, options } = warehouse;
   let managerDatum: ManagerDatum = {
-    ...builder.fromDatumManager(options.managerInput.datum!),
+    ...WarehouseBuilder.fromDatumManager(options.managerInput.datum!),
     sellerCount: 100n,
   };
   let managerInput = {
     ...options.managerInput,
-    datum: builder.toDatumManager(managerDatum),
+    datum: WarehouseBuilder.toDatumManager(managerDatum),
   };
   options = {
     ...options,
