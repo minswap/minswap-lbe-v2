@@ -38,6 +38,7 @@ export type TxSigned = T.TxSigned;
 export type Unit = T.Unit;
 export type UnixTime = T.UnixTime;
 export type UTxO = T.UTxO;
+export type walletApi = T.WalletApi;
 
 export type AmmPoolDatum = FeedTypeAmmPool["_datum"];
 export type AmmFactoryDatum = FactoryValidatorValidateFactory["datum"];
