@@ -31,20 +31,28 @@ let main = async () => {
     revocable: true,
     poolBaseFee: 30n,
   };
-
+  let lbeId = { baseAsset: params.baseAsset, raiseAsset: params.raiseAsset };
   // let createTx = await api.createLbe(params);
   // let txHash = await api.signAndSubmit(createTx);
 
   // let cancelTx = await api.cancelLbe({ baseAsset: params.baseAsset, raiseAsset: params.raiseAsset });
   // let txHash = await api.signAndSubmit(cancelTx);
 
-  let createOrderTx = await api.createOrder({
-    owner: address,
+  let order = (await api.getOrders(lbeId, address))[0];
+  let updateTx = await api.updateOrder({
+    orderUTxO: order,
     amount: 10_000_000n,
-    baseAsset: params.baseAsset,
-    raiseAsset: params.raiseAsset,
+    ...lbeId,
   });
-  let txHash = await api.signAndSubmit(createOrderTx);
+  let txHash = await api.signAndSubmit(updateTx);
+
+  // let createOrderTx = await api.createOrder({
+  //   owner: address,
+  //   amount: 10_000_000n,
+  //   baseAsset: params.baseAsset,
+  //   raiseAsset: params.raiseAsset,
+  // });
+  // let txHash = await api.signAndSubmit(createOrderTx);
 
   console.log(txHash);
 };

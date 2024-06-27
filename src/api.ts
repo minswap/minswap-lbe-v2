@@ -10,6 +10,7 @@ import {
   address2PlutusAddress,
   computeLPAssetName,
   genWarehouseBuilderOptions,
+  plutusAddress2Address,
   toUnit,
   type Address,
   type BluePrintAsset,
@@ -19,6 +20,7 @@ import {
   type LbeId,
   type MaestroSupportedNetworks,
   type OrderDatum,
+  type PenaltyConfig,
   type TreasuryDatum,
   type UTxO,
   type UnixTime,
@@ -63,7 +65,7 @@ export interface LbeParameters {
   minimumOrderRaise?: bigint;
   minimumRaise?: bigint;
   maximumRaise?: bigint;
-  penaltyConfig?: { penaltyStartTime: bigint; percent: bigint };
+  penaltyConfig?: PenaltyConfig;
   revocable: boolean;
   poolBaseFee: bigint;
 }
@@ -75,8 +77,20 @@ export interface CreateOrderOptions {
   amount: bigint;
 }
 
+/**
+ * TopUp: Amount > 0
+ * Withdraw: Amount < 0
+ * Cancel | WithdrawAll : Amount == Order.amount
+ */
+export interface UpdateOrderOptions {
+  baseAsset: BluePrintAsset;
+  raiseAsset: BluePrintAsset;
+  orderUTxO: UTxO;
+  amount: bigint;
+}
+
 export class Api {
-  builder: WarehouseBuilder;
+  private builder: WarehouseBuilder;
 
   constructor(builder: WarehouseBuilder) {
     this.builder = builder;
@@ -103,7 +117,52 @@ export class Api {
     );
   }
 
+  async getOrders(lbeId: LbeId, owner?: Address): Promise<UTxO[]> {
+    let orders = await this.builder.t.utxosAtWithUnit(
+      this.builder.orderAddress,
+      this.builder.orderToken,
+    );
+    return orders.filter((o) => {
+      let orderDatum = WarehouseBuilder.fromDatumOrder(o.datum!);
+      return (
+        Api.compareLbeId(lbeId, orderDatum) &&
+        (owner
+          ? owner ===
+            plutusAddress2Address(this.builder.t.network, orderDatum.owner)
+          : true)
+      );
+    });
+  }
+
   /** ******************** Validating **************************/
+  static validateUpdateOrder(options: {
+    treasuryDatum: TreasuryDatum;
+    validFrom: UnixTime;
+    orderDatum: OrderDatum;
+    amount: bigint;
+  }): boolean {
+    let { treasuryDatum, validFrom, orderDatum, amount } = options;
+
+    invariant(treasuryDatum.isCancelled === false, "LBE is cancelled");
+    invariant(
+      treasuryDatum.startTime < BigInt(validFrom),
+      "Discovery Phase not start",
+    );
+    invariant(
+      treasuryDatum.endTime > BigInt(validFrom),
+      "Discovery Phase ended",
+    );
+
+    if (amount < 0n) {
+      let newAmount = orderDatum.amount + amount;
+      invariant(
+        newAmount > (treasuryDatum.minimumOrderRaise ?? 0n),
+        "Order Amount must greater than minimum order raise",
+      );
+    }
+
+    return true;
+  }
 
   static validateCreateOrder(options: {
     treasuryDatum: TreasuryDatum;
@@ -123,7 +182,7 @@ export class Api {
     );
     invariant(
       amount > (treasuryDatum.minimumOrderRaise ?? 0n),
-      "Deposit Amount must greater than minimum order raise",
+      "Order Amount must greater than minimum order raise",
     );
     return true;
   }
@@ -389,7 +448,72 @@ export class Api {
     return completeTx.toString();
   }
 
-  
+  /**
+   * Actor: User
+   */
+  async updateOrder(options: UpdateOrderOptions): Promise<string> {
+    let { baseAsset, raiseAsset, amount, orderUTxO } = options;
+    let orderDatum = WarehouseBuilder.fromDatumOrder(orderUTxO.datum!);
+    let treasuryRefInput = await this.findTreasury({ baseAsset, raiseAsset });
+    let treasuryDatum: TreasuryDatum = WarehouseBuilder.fromDatumTreasury(
+      treasuryRefInput.datum!,
+    );
+    let validFrom = await this.genValidFrom();
+    let validTo = Math.min(
+      validFrom + 3 * 60 * 60 * 1000,
+      Number(treasuryDatum.endTime - 1n),
+    );
+    let penaltyAmount = 0n;
+
+    // Withdraw in Penalty Time => be penalied
+    if (amount < 0 && treasuryDatum.penaltyConfig) {
+      // Already in Penalty Time
+      if (BigInt(validFrom) >= treasuryDatum.penaltyConfig.penaltyStartTime) {
+        penaltyAmount = Api.calculatePenalty({
+          validTo,
+          inAmount: orderDatum.amount,
+          outAmount: orderDatum.amount + amount,
+          penaltyConfig: treasuryDatum.penaltyConfig,
+        });
+      } else {
+        // While there's life, there's hope, avoid the user getting penalty as much as possible.
+        validTo = Math.min(
+          Number(treasuryDatum.penaltyConfig.penaltyStartTime - 1n),
+          validFrom + 3 * 60 * 60 * 1000,
+        );
+      }
+    }
+
+    let newOrderDatum: OrderDatum = {
+      ...orderDatum,
+      amount: orderDatum.amount + amount,
+      penaltyAmount: orderDatum.penaltyAmount + penaltyAmount,
+    };
+
+    Api.validateUpdateOrder({ treasuryDatum, amount, validFrom, orderDatum });
+
+    let sellers = await this.findSellers({ baseAsset, raiseAsset });
+    let sellerUtxo = sellers[Math.floor(Math.random() * sellers.length)];
+
+    let usingSellerOptions: BuildUsingSellerOptions = {
+      treasuryRefInput: treasuryRefInput,
+      sellerUtxo: sellerUtxo,
+      validFrom,
+      validTo,
+      owners: [plutusAddress2Address(this.builder.t.network, orderDatum.owner)],
+      orderInputs: [],
+      orderOutputDatums: [newOrderDatum],
+    };
+
+    this.builder.clean();
+    let completeTx = await this.builder
+      .buildUsingSeller(usingSellerOptions)
+      .complete()
+      .complete();
+
+    return completeTx.toString();
+  }
+
   /**
    * Actor: User
    */
@@ -487,5 +611,24 @@ export class Api {
       from.raiseAsset.policyId === to.raiseAsset.policyId &&
       from.raiseAsset.assetName === to.raiseAsset.assetName
     );
+  }
+
+  static calculatePenalty(options: {
+    validTo: UnixTime;
+    penaltyConfig?: PenaltyConfig;
+    inAmount: bigint;
+    outAmount: bigint;
+  }): bigint {
+    let { validTo, penaltyConfig, inAmount, outAmount } = options;
+    if (!penaltyConfig || validTo < penaltyConfig.penaltyStartTime) {
+      // No penalty configuration provided or not in penalty time
+      return 0n;
+    }
+    if (inAmount > outAmount) {
+      // Calculate withdrawal amount and penalty
+      const withdrawalAmount = inAmount - outAmount;
+      return (withdrawalAmount * penaltyConfig.percent) / 100n;
+    }
+    return 0n;
   }
 }

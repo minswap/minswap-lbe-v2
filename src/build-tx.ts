@@ -147,6 +147,8 @@ export type BuildCollectOrdersOptions = {
   validTo: UnixTime;
 };
 
+export type PenaltyConfig = { penaltyStartTime: bigint; percent: bigint };
+
 export type BuildUpdateLBEOptions = {
   treasuryInput: UTxO;
   validFrom: UnixTime;
@@ -160,7 +162,7 @@ export type BuildUpdateLBEOptions = {
   maximumRaise?: bigint;
   reserveBase?: bigint;
   revocable?: boolean;
-  penaltyConfig?: { penaltyStartTime: bigint; percent: bigint };
+  penaltyConfig?: PenaltyConfig;
 };
 
 export type BuildCancelLBEOptions = {
