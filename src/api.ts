@@ -8,11 +8,14 @@ import {
   POOL_BASE_FEE_MIN,
   WarehouseBuilder,
   address2PlutusAddress,
+  computeLPAssetName,
   genWarehouseBuilderOptions,
   toUnit,
   type Address,
   type BluePrintAsset,
+  type BuildCancelLBEOptions,
   type BuildCreateTreasuryOptions,
+  type LbeId,
   type MaestroSupportedNetworks,
   type TreasuryDatum,
   type UTxO,
@@ -21,11 +24,31 @@ import {
 } from ".";
 import invariant from "@minswap/tiny-invariant";
 
+/**
+ * Ask Tony
+ */
 const MAGIC_THINGS = {
+  sellerAmount: 25n,
   sellerOwner:
     "addr_test1qr03hndgkqdw4jclnvps6ud43xvuhms7rurjq87yfgzc575pm6dyr7fz24xwkh6k0ldufe2rqhgkwcppx5fzjrx5j2rs2rt9qc",
 };
 
+/**
+- **baseAsset:** `(require)` Asset project aims to list. Example: MIN, FLDT, …
+- **reserveBase**: `(require)` The amount of *Base Asset* that project provided. The main goal of this Reserve Base is to create an AMM Pool.
+- **raiseAsset:** `(require)` Asset project aims to raise. Example: ADA, USDC, …
+- **startTime**: `(require)` The start time of the discovery phase.
+- **endTime**: `(require)` The end time of the discovery phase.
+- **owner**: `(require)` The address of project’s owner.
+- **receiver**:  `(require)` Address for receiving the project's LP tokens.
+- **poolAllocation**: `(require)` The rule defines how many funds will go to pool.
+- **minimumOrderRaise**: `(optional)` Minimum amount in a single order.
+- **minimumRaise**: `(optional)` The minimum amount expected to raise. If the amount of *Raise Asset* is lower than this threshold, the LBE will be canceled*.*
+- **maximumRaise**: `(optional)` The maximum amount of raise asset expected to raise. If the amount of *Raise Asset* exceed this threshold, the excess amount should be returned to the users.
+- **penaltyConfig**: `(optional)` Penalty on participants for early withdrawal.
+- **revocable**: `(require)` The project owner has the ability to cancel the LBE during the discovery phase.
+- **poolBaseFee**: `(require)` The Numerator of Trading Fee on AMM Pool.
+ */
 export interface LbeParameters {
   baseAsset: BluePrintAsset;
   reserveBase: bigint;
@@ -39,7 +62,7 @@ export interface LbeParameters {
   minimumRaise?: bigint;
   maximumRaise?: bigint;
   penaltyConfig?: { penaltyStartTime: bigint; percent: bigint };
-  revocable?: boolean;
+  revocable: boolean;
   poolBaseFee: bigint;
 }
 
@@ -50,6 +73,20 @@ export class Api {
     this.builder = builder;
   }
 
+  async getCurrentSlot(): Promise<number> {
+    let slot = await this.builder.t.getCurrentSlot();
+    return slot;
+  }
+
+  async genValidFrom(): Promise<UnixTime> {
+    let slot = await this.getCurrentSlot();
+    return this.builder.t.utils.slotToUnixTime(slot);
+  }
+
+  /**
+   * TODO: ask requirements
+   * @returns Treasury UTxOs
+   */
   async getLbes(): Promise<UTxO[]> {
     return await this.builder.t.utxosAtWithUnit(
       this.builder.treasuryAddress,
@@ -57,6 +94,29 @@ export class Api {
     );
   }
 
+  /** ******************** Validating **************************/
+
+  /**
+   * Validate Cancel LBE By Project Owner
+   */
+  static validateCancelLbeByOwner(treasuryDatum: TreasuryDatum): Boolean {
+    if (treasuryDatum.revocable) {
+      invariant(
+        BigInt(Date.now()) < treasuryDatum.endTime,
+        "Cancel before discovery phase end",
+      );
+    } else {
+      invariant(
+        BigInt(Date.now()) < treasuryDatum.startTime,
+        "Cancel before discovery phase start",
+      );
+    }
+    return true;
+  }
+
+  /**
+   * Validate LBE Parameters
+   */
   static validateLbeParameters(lbeParameters: LbeParameters) {
     let {
       poolBaseFee,
@@ -80,7 +140,7 @@ export class Api {
     );
     invariant(baseAssetUnit !== "lovelace", "Base Asset must not equal ADA");
     invariant(
-      startTime >= Date.now() + 5 * 60 * 60 * 1000,
+      startTime >= Date.now() + 5 * 60 * 1000,
       "LBE must start in future",
     );
     invariant(startTime < endTime, "StartTime < EndTime");
@@ -131,7 +191,58 @@ export class Api {
     );
     return true;
   }
+  /** **********************************************/
 
+  /** Find UTxO ********************************************/
+  /**
+   *
+   * @param param0 LBE ID
+   * @returns Treasury UTxO base on LBE ID
+   */
+  async findTreasury({ baseAsset, raiseAsset }: LbeId): Promise<UTxO> {
+    let treasuries = await this.getLbes();
+    let treasuryUTxO = treasuries.find((treasury) => {
+      let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasury.datum!);
+      return (
+        treasuryDatum.baseAsset === baseAsset &&
+        treasuryDatum.raiseAsset === raiseAsset
+      );
+    });
+    if (treasuryUTxO === undefined) {
+      throw Error("Cannot find Treasury");
+    }
+    return treasuryUTxO;
+  }
+
+  /**
+   * @returns Factory UTxO base on baseAsset, raiseAsset
+   */
+  async findFactory({ baseAsset, raiseAsset }: LbeId): Promise<UTxO> {
+    let lpAssetName = computeLPAssetName(
+      baseAsset.policyId + baseAsset.assetName,
+      raiseAsset.policyId + raiseAsset.assetName,
+    );
+    let factories = await this.builder.t.utxosAtWithUnit(
+      this.builder.factoryAddress,
+      this.builder.factoryToken,
+    );
+    let factoryUtxo = factories.find((factory) => {
+      let factoryDatum = WarehouseBuilder.fromDatumFactory(factory.datum!);
+      return factoryDatum.head < lpAssetName && factoryDatum.tail > lpAssetName;
+    });
+    if (factoryUtxo === undefined) {
+      throw Error("Cannot find Factory UTxO");
+    }
+    return factoryUtxo;
+  }
+
+  /**************************************************************** */
+
+  /**
+   * Actor: Project Owner
+   * @param lbeParameters The LBE Parameters
+   * @returns Transaction Cbor Hex of LBE creation
+   */
   async createLbe(lbeParameters: LbeParameters): Promise<string> {
     Api.validateLbeParameters(lbeParameters);
     let {
@@ -143,21 +254,15 @@ export class Api {
       startTime,
       endTime,
       poolAllocation,
+      minimumRaise,
+      maximumRaise,
+      penaltyConfig,
+      poolBaseFee,
+      minimumOrderRaise,
+      revocable,
     } = lbeParameters;
-    this.builder.clean();
-    this.builder.setInnerAssets(baseAsset, raiseAsset);
-    let factories = await this.builder.t.utxosAtWithUnit(
-      this.builder.factoryAddress,
-      this.builder.factoryToken,
-    );
-    let factoryUtxo = factories.find((factory) => {
-      let factoryDatum = WarehouseBuilder.fromDatumFactory(factory.datum!);
-      return (
-        factoryDatum.head < this.builder.lpAssetName! &&
-        factoryDatum.tail > this.builder.lpAssetName!
-      );
-    })!;
 
+    let factoryUtxo = await this.findFactory({ baseAsset, raiseAsset });
     let treasuryDatum: TreasuryDatum = {
       // default
       factoryPolicyId: this.builder.factoryHash,
@@ -167,36 +272,37 @@ export class Api {
       receiverDatum: "RNoDatum",
       collectedFund: 0n,
       isManagerCollected: false,
+      reserveRaise: 0n,
+      totalLiquidity: 0n,
+      totalPenalty: 0n,
+      isCancelled: false,
       // parameters
-      baseAsset: baseAsset,
-      raiseAsset: raiseAsset,
+      baseAsset,
+      raiseAsset,
       startTime: BigInt(startTime),
       endTime: BigInt(endTime),
       owner: address2PlutusAddress(owner),
       receiver: address2PlutusAddress(receiver),
-      poolAllocation: 100n,
-      minimumRaise: null,
-      maximumRaise: null,
+      poolAllocation,
+      minimumRaise: minimumRaise ?? null,
+      maximumRaise: maximumRaise ?? null,
       reserveBase,
-      reserveRaise: 0n,
-      totalLiquidity: 0n,
-      penaltyConfig: null,
-      poolBaseFee: 30n,
-      totalPenalty: 0n,
-      isCancelled: false,
-      minimumOrderRaise: null,
-      revocable: true,
+      penaltyConfig: penaltyConfig ?? null,
+      poolBaseFee,
+      minimumOrderRaise: minimumOrderRaise ?? null,
+      revocable,
     };
 
     let createTreasuryOptions: BuildCreateTreasuryOptions = {
-      sellerAmount: 25n,
+      sellerAmount: MAGIC_THINGS.sellerAmount,
       factoryUtxo,
       treasuryDatum,
-      sellerOwner,
-      validFrom: Date.now(),
+      sellerOwner: MAGIC_THINGS.sellerOwner,
+      validFrom: genValidFrom,
       validTo: Date.now() + 3 * 60 * 60 * 1000,
     };
 
+    this.builder.clean();
     let completeTx = await this.builder
       .buildCreateTreasury(createTreasuryOptions)
       .complete()
@@ -205,9 +311,42 @@ export class Api {
     return completeTx.toString();
   }
 
+  /**
+   * * Actor: Project Owner
+   */
+  async cancelLbe(lbeId: LbeId): Promise<string> {
+    let treasuryInput = await this.findTreasury(lbeId);
+    let treasuryDatum = WarehouseBuilder.fromDatumTreasury(
+      treasuryInput.datum!,
+    );
+    let lastValidTo = treasuryDatum.revocable
+      ? treasuryDatum.endTime
+      : treasuryDatum.startTime;
+
+    Api.validateCancelLbeByOwner(treasuryDatum);
+
+    let options: BuildCancelLBEOptions = {
+      treasuryInput,
+      validFrom: Date.now(),
+      validTo: Number(lastValidTo),
+      reason: "ByOwner",
+    };
+
+    this.builder.clean();
+    let completeTx = await this.builder
+      .buildCancelLBE(options)
+      .complete()
+      .complete();
+
+    return completeTx.toString();
+  }
+
+  /**
+   *
+   * @param walletApi CIP-30 Wallet
+   * @returns Api instance
+   */
   static async new(walletApi: walletApi) {
-    await T.loadModule();
-    await T.CModuleLoader.load();
     let network: MaestroSupportedNetworks = "Preprod";
     let maestroApiKey = "E0n5jUy4j40nhKCuB7LrYabTNieG0egu";
     let maestro = new T.Maestro({ network, apiKey: maestroApiKey });
@@ -216,5 +355,32 @@ export class Api {
     let warehouseOptions = genWarehouseBuilderOptions(t);
     let builder = new WarehouseBuilder(warehouseOptions);
     return new Api(builder);
+  }
+
+  /***
+   * Only for testing purpose
+   */
+  static async newBySeed(seed: string) {
+    let network: MaestroSupportedNetworks = "Preprod";
+    let maestroApiKey = "E0n5jUy4j40nhKCuB7LrYabTNieG0egu";
+    let maestro = new T.Maestro({ network, apiKey: maestroApiKey });
+    let t = await T.Translucent.new(maestro, network);
+    t.selectWalletFromSeed(seed);
+    let warehouseOptions = genWarehouseBuilderOptions(t);
+    let builder = new WarehouseBuilder(warehouseOptions);
+    return new Api(builder);
+  }
+
+  /**
+   * Only for testing purpose
+   */
+  async signAndSubmit(txRaw: string): Promise<string> {
+    let C = T.CModuleLoader.get;
+    this.builder.t.currentSlot();
+    let cTransaction = C.Transaction.from_bytes(T.fromHex(txRaw));
+    let txComplete = new T.TxComplete(this.builder.t, cTransaction);
+    let signedTx = await txComplete.sign().complete();
+    let txHash = await signedTx.submit();
+    return txHash;
   }
 }

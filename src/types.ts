@@ -93,3 +93,8 @@ export type LbeScript = {
   ammSeedOutRef: OutRef;
   ammPoolStakeCredential: Credential;
 };
+
+export type LbeId = {
+  baseAsset: BluePrintAsset;
+  raiseAsset: BluePrintAsset;
+};
