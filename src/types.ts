@@ -78,10 +78,10 @@ export type LbeScript = {
   ammFactoryRefInput: string;
   ammPoolRefInput: string;
 
-  ammSeedOutRef: OutRef;
-  ammPoolStakeCredential: Credential;
   ammAuthenHash: string;
   ammFactoryHash: string;
   ammPoolHash: string;
   ammPoolBatchingHash: string;
+  ammSeedOutRef: OutRef;
+  ammPoolStakeCredential: Credential;
 };
