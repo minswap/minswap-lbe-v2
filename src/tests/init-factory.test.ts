@@ -6,7 +6,6 @@ import type { FactoryDatum, ProtocolParameters } from "../types";
 import { toUnit } from "../utils";
 import {
   DUMMY_SEED_UTXO,
-  assertValidator,
   assertValidatorFail,
   genWarehouseOptions,
   generateAccount,
@@ -58,7 +57,8 @@ test("init-factory | FAIL | absent @out_ref", async () => {
   let builder = new WarehouseBuilder(warehouseOptions);
   builder.buildInitFactory({ seedUtxo: DUMMY_SEED_UTXO });
   builder.tasks = [builder.tasks[0], ...builder.tasks.slice(2)];
-  assertValidator(builder, "Must spend @out_ref");
+  // Must spend @out_ref
+  assertValidatorFail(builder);
 });
 
 test("init-factory | FAIL | mint redundant Factory Token", async () => {
@@ -76,7 +76,8 @@ test("init-factory | FAIL | mint redundant Factory Token", async () => {
         T.Data.to("Initialization", FactoryValidateFactoryMinting.redeemer),
       );
   });
-  assertValidator(builder, "Must mint 1 Factory Token");
+  // Must mint 1 Factory Token
+  assertValidatorFail(builder);
 });
 
 test("init-factory | FAIL | missing Factory Token", async () => {
@@ -92,7 +93,7 @@ test("init-factory | FAIL | missing Factory Token", async () => {
     builder.tx.payToAddressWithData(
       builder.factoryAddress,
       {
-        inline: builder.toDatumFactory(factoryDatum),
+        inline: WarehouseBuilder.toDatumFactory(factoryDatum),
       },
       {
         lovelace: 2_000_000n,
@@ -115,12 +116,13 @@ test("init-factory | FAIL | Factory Datum is not correct", async () => {
     builder.tx.payToAddressWithData(
       builder.factoryAddress,
       {
-        inline: builder.toDatumFactory(factoryDatum),
+        inline: WarehouseBuilder.toDatumFactory(factoryDatum),
       },
       {
         [builder.factoryToken]: 1n,
       },
     );
   });
-  assertValidator(builder, "Factory Datum must be correct!");
+  // Factory Datum must be correct!
+  assertValidatorFail(builder);
 });

@@ -3,61 +3,46 @@ use aiken/bytearray
 use aiken/hash
 use aiken/interval.{Finite, Interval, IntervalBound}
 use aiken/transaction.{ValidityRange}
-use aiken/transaction/value.{
-  AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
-}
+use aiken/transaction/value.{AssetName, PolicyId}
 use lb_v2/types.{Asset, PenaltyConfig}
 
+// The Asset Name of Factory Authen Token
 pub const factory_auth_an = #"666163746f7279"
 
+// The Asset Name of Treasury Authen Token
 pub const treasury_auth_an = #"7472656173757279"
 
+// The Asset Name of Seller Authen Token
 pub const seller_auth_an = #"73656c6c6572"
 
+// The Asset Name of Order Authen Token
 pub const order_auth_an = #"6f72646572"
 
+// The Asset Name of Manager Authen Token
 pub const manager_auth_an = #"4d616e61676572"
 
-pub const default_number_seller = 20
+// The minimum number of Sellers to set up when starting a new LBE
+pub const minimum_number_seller = 10
 
-pub const minimum_seller_collected = 15
+pub const minimum_seller_collected = 20
 
-pub const minimum_order_collected = 20
+pub const minimum_order_collected = 30
 
-pub const minimum_order_redeemed = 20
+pub const minimum_order_redeemed = 30
 
-// 2 days in milliseconds = 2 * 24 * 60 * 60 * 1000
-pub const two_day_ms = 172800000
-
-/// IMPORTANT: This block is code-gen. Please do not edit!
-/// *******************************************
-pub const amm_factory_auth_asset_name = #"4d5346"
-
-pub const amm_pool_auth_asset_name = #"4d5350"
-
-pub const amm_authen_policy_id =
-  #"d6aae2059baee188f74917493cf7637e679cd219bdfbbf4dcbeb1d0b"
-
-pub const amm_pool_validation_hash =
-  #"d6ba9b7509eac866288ff5072d2a18205ac56f744bc82dcd808cb8fe"
-
-pub const default_burn_liquidity = 10
-
-// Base Fee constraint
-// Max 20%
-pub const max_base_fee_numerator = 2000
-
-// Min 0.05%
-pub const min_base_fee_numerator = 5
-
-/// *******************************************
+// The minimum percentage of total funds will go to pool
 pub const min_pool_allocation = 70
 
+// 2 days in milliseconds = 2 * 24 * 60 * 60 * 1000
+// The business requires a maximum penalty period of two final days.
+pub const two_day_ms = 172800000
+
+// 30 days in milliseconds = 30 * 24 * 60 * 60 * 1000
+// The business requires a maximum encounter phase period is 30 days
+pub const one_month_ms = 2592000000
+
+// Maximum penalty rate based on business
 pub const max_penalty = 25
-
-pub const fee_ada = 1_000_000
-
-pub const penalty_fee = 2_000_000
 
 // the ADA amount store in Treasury UTxO
 pub const treasury_minimum_ada = 3_000_000
@@ -71,8 +56,43 @@ pub const seller_minimum_ada = 2_000_000
 // the ADA amount store in Order UTxO
 pub const order_minimum_ada = 2_000_000
 
+// Commissions:
 // The ADA amount to reward the pool creator
-pub const create_pool_comission = 8_000_000
+pub const create_pool_comission = 10_000_000
+
+// The ADA amount to reward the seller's colector
+pub const collect_seller_commission = 250_000
+
+// The ADA amount to reward the Operator
+pub const order_commission = 250_000
+
+// The ADA amount to reward the seller
+pub const seller_commission = 1_500_000
+
+// The AMM configs based on https://github.com/minswap/minswap-dex-v2
+// The Asset Name of AMM Factory Authen Token
+pub const amm_factory_auth_asset_name = #"4d5346"
+
+// The Asset Name of AMM Pool Authen Token 
+pub const amm_pool_auth_asset_name = #"4d5350"
+
+// The PolicyID of AMM Authen Minting Policy  
+pub const amm_authen_policy_id =
+  #"d6aae2059baee188f74917493cf7637e679cd219bdfbbf4dcbeb1d0b"
+
+// The ValidatorHash of AMM Pool Validator
+pub const amm_pool_validation_hash =
+  #"d6ba9b7509eac866288ff5072d2a18205ac56f744bc82dcd808cb8fe"
+
+// Some LP Tokens will be burned during Pool Creation.
+pub const default_burn_liquidity = 10
+
+// The base fee must be between 5 and 2000
+// Minimum Base Fee
+pub const min_base_fee_numerator = 5
+
+// Maximum Base Fee
+pub const max_base_fee_numerator = 2000
 
 // sort 2 assets in bytearray ascending
 pub fn sort_two_assets(asset_a: Asset, asset_b: Asset) -> (Asset, Asset) {
@@ -108,23 +128,6 @@ pub fn compute_lp_asset_name(
     hash.sha3_256(bytearray.concat(asset_b_policy_id, asset_b_asset_name))
   let pair_ident = bytearray.concat(asset_a_ident, asset_b_ident)
   hash.sha3_256(pair_ident)
-}
-
-pub fn get_order_value(
-  amount: Int,
-  penalty_amount: Int,
-  factory_policy_id: PolicyId,
-  raise_asset: Asset,
-) -> Value {
-  let base_ada = order_minimum_ada + fee_ada * 2
-  value.zero()
-    |> value.add(ada_policy_id, ada_asset_name, base_ada)
-    |> value.add(
-        raise_asset.policy_id,
-        raise_asset.asset_name,
-        amount + penalty_amount,
-      )
-    |> value.add(factory_policy_id, order_auth_an, 1)
 }
 
 pub fn calculate_penalty(
@@ -219,12 +222,4 @@ pub fn must_get_end_validity(validity_range: ValidityRange) -> Int {
     ..
   } = validity_range
   end
-}
-
-pub fn must_get_start_validity(validity_range: ValidityRange) -> Int {
-  expect Interval {
-    lower_bound: IntervalBound { bound_type: Finite(start), .. },
-    ..
-  } = validity_range
-  start
 }

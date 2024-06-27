@@ -38,8 +38,9 @@ FAIL:
 */
 import { WarehouseBuilder, type BuildUsingSellerOptions } from "../build-tx";
 import {
-  LBE_FEE,
+  ORDER_COMMISSION,
   ORDER_MIN_ADA,
+  SELLER_COMMISSION,
   SELLER_MIN_ADA,
   TREASURY_MIN_ADA,
 } from "../constants";
@@ -90,7 +91,7 @@ async function genTestWarehouse() {
         treasuryDatum.reserveBase,
     },
     address: builder.treasuryAddress,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
   };
   const sellerDatum = {
     ...defaultSellerDatum,
@@ -102,10 +103,10 @@ async function genTestWarehouse() {
     outputIndex: ++utxoIndex,
     assets: {
       [builder.sellerToken]: 1n,
-      lovelace: SELLER_MIN_ADA,
+      lovelace: SELLER_MIN_ADA + SELLER_COMMISSION * 5n,
     },
     address: builder.sellerAddress,
-    datum: builder.toDatumSeller(sellerDatum),
+    datum: WarehouseBuilder.toDatumSeller(sellerDatum),
   };
   const orderInDatums: OrderDatum[] = [
     {
@@ -183,10 +184,13 @@ function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): UTxO {
     assets: {
       [builder.orderToken]: 1n,
       lovelace:
-        ORDER_MIN_ADA + 2n * LBE_FEE + datum.amount + datum.penaltyAmount,
+        ORDER_MIN_ADA +
+        2n * ORDER_COMMISSION +
+        datum.amount +
+        datum.penaltyAmount,
     },
     address: builder.orderAddress,
-    datum: builder.toDatumOrder(datum),
+    datum: WarehouseBuilder.toDatumOrder(datum),
   };
 }
 
@@ -238,7 +242,10 @@ test("using-seller | FAIL | update orders: LBE is cancelled", async () => {
     ...warehouse.options,
     treasuryRefInput: {
       ...treasuryUTxO,
-      datum: builder.toDatumTreasury({ ...treasuryDatum, isCancelled: true }),
+      datum: WarehouseBuilder.toDatumTreasury({
+        ...treasuryDatum,
+        isCancelled: true,
+      }),
     },
   };
   builder.buildUsingSeller(options);
@@ -317,7 +324,7 @@ test("using-seller | FAIL | update orders: Seller output don't have any seller t
     builder.tx.payToAddressWithData(
       builder.sellerAddress,
       {
-        inline: builder.toDatumSeller({
+        inline: WarehouseBuilder.toDatumSeller({
           ...sellerDatum,
           // new seller output datum
           amount: -1745n,
@@ -338,13 +345,13 @@ test("using-seller | FAIL | update orders: Invalid order output value", async ()
       // raise asset is ADA
       const assets = {
         [builder.orderToken]: 1n,
-        lovelace: ORDER_MIN_ADA + LBE_FEE * 2n + datum.amount - 1n,
+        lovelace: ORDER_MIN_ADA + ORDER_COMMISSION * 2n + datum.amount - 1n,
       };
 
       builder.tx.payToAddressWithData(
         builder.orderAddress,
         {
-          inline: builder.toDatumOrder(datum),
+          inline: WarehouseBuilder.toDatumOrder(datum),
         },
         assets,
       );
@@ -362,7 +369,7 @@ test("using-seller | FAIL | update orders: penalty_amount is less than 0", async
 
 test("using-seller | FAIL | update orders: Order's input LBE ID miss match", async () => {
   const { builder, options, orderInDatums } = warehouse;
-  options.orderInputs[0].datum = builder.toDatumOrder({
+  options.orderInputs[0].datum = WarehouseBuilder.toDatumOrder({
     ...orderInDatums[0],
     // MINt
     baseAsset: MINt,
@@ -384,7 +391,7 @@ test("using-seller | FAIL | update orders: Order's output LBE ID miss match", as
 
 test("using-seller | FAIL | update orders: Seller's input LBE ID miss match", async () => {
   const { builder, options, sellerDatum } = warehouse;
-  options.sellerUtxo.datum = builder.toDatumSeller({
+  options.sellerUtxo.datum = WarehouseBuilder.toDatumSeller({
     ...sellerDatum,
     // MINt
     baseAsset: MINt,

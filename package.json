@@ -34,10 +34,12 @@
   },
   "dependencies": {
     "@minswap/tiny-invariant": "^1.2.0",
-    "@minswap/translucent": "link:@minswap/translucent",
+    "@minswap/translucent": "0.0.6-minswap.19",
+    "@types/winston": "^2.4.4",
     "rollup": "^4.14.1",
     "rollup-plugin-dts": "^6.1.0",
     "rollup-plugin-esbuild": "^6.1.1",
-    "sha3": "^2.1.4"
+    "sha3": "^2.1.4",
+    "winston": "^3.13.0"
   }
 }

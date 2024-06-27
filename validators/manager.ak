@@ -9,16 +9,16 @@ use lb_v2/types.{
   CollectManager, ManagerDatum, ManagerRedeemer, SpendManager, TreasuryDatum,
   ValidatorHash,
 }
-use lb_v2/utils.{manager_auth_an}
+use lb_v2/utils.{manager_auth_an, treasury_auth_an}
 use lb_v2/validation
 
 // Spending Manager for:
-// 1. Collect Manager
-//   - Purpose: Update `reserve_raise`, `total_penalty` of Treasury
-//   - 1 Manager Token needs to be burned (trigger Factory Minting)
-//   - 1 Manager Input needs to be spent
-//   - 1 Treasury Input needs to be spent
-//   - 1 Treasury Output needs to be paid
+// 1. AddSellers
+//   - Increase `seller_count` 
+// 2. CollectSellers
+//   - Decrease `seller_count`
+// 3. SpendManager
+//   - Update `reserve_raise`, `total_penalty` of Treasury
 validator(
   // ValidatorHash of Treasury Validator
   treasury_hash: ValidatorHash,
@@ -28,8 +28,7 @@ validator(
     redeemer: ManagerRedeemer,
     context: ScriptContext,
   ) {
-    expect ScriptContext { purpose: Spend(manager_out_ref), transaction } =
-      context
+    expect ScriptContext { purpose: Spend(out_ref), transaction } = context
     let Transaction {
       mint,
       reference_inputs,
@@ -49,10 +48,11 @@ validator(
       //   1 Treasury Output needs to be paid
       SpendManager ->
         // Delegate validation logic to the Treasury Validator.
-        validation.has_spend_treasury(
+        validation.has_spend(
           inputs: inputs,
-          factory_policy_id: factory_policy_id,
-          treasury_hash: treasury_hash,
+          auth_policy_id: factory_policy_id,
+          auth_asset_name: treasury_auth_an,
+          validator_hash: treasury_hash,
           redeemers: redeemers,
           expected_redeemer: CollectManager,
         )
@@ -61,8 +61,8 @@ validator(
           list.find(
             inputs,
             fn(input) {
-              let Input { output_reference: out_ref, .. } = input
-              out_ref == manager_out_ref
+              let Input { output_reference, .. } = input
+              output_reference == out_ref
             },
           )
         // Extract some necessary data.
@@ -88,6 +88,9 @@ validator(
           ..
         } = treasury_ref_input
         expect treasury_datum: TreasuryDatum = raw_treasury_datum
+        // Assertion:
+        // - Manager Input is legitimate
+        // - Only 1 Manager Input
         expect and {
             value.quantity_of(
               manager_in_value,

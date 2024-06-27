@@ -25,7 +25,7 @@ beforeEach(async () => {
   };
   let treasuryInput: UTxO = {
     address: builder.treasuryAddress,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
     assets: {
       [builder.treasuryToken]: 1n,
       lovelace: TREASURY_MIN_ADA,
@@ -56,7 +56,7 @@ beforeEach(async () => {
         [builder.factoryToken]: 1n,
       },
       address: builder.factoryAddress,
-      datum: builder.toDatumFactory(factoryHeadDatum),
+      datum: WarehouseBuilder.toDatumFactory(factoryHeadDatum),
     },
     {
       txHash: "00".repeat(32),
@@ -67,7 +67,7 @@ beforeEach(async () => {
         [builder.factoryToken]: 1n,
       },
       address: builder.factoryAddress,
-      datum: builder.toDatumFactory(factoryTailDatum),
+      datum: WarehouseBuilder.toDatumFactory(factoryTailDatum),
     },
   ];
   let options: BuildCloseEventOptions = {

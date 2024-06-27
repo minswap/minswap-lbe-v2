@@ -12,15 +12,31 @@ export const TREASURY_AUTH_AN = "7472656173757279";
 export const SELLER_AUTH_AN = "73656c6c6572";
 export const MANAGER_AUTH_AN = "4d616e61676572";
 export const ORDER_AUTH_AN = "6f72646572";
-export const DEFAULT_NUMBER_SELLER = 20n;
-export const LBE_FEE = 1_000_000n;
+export const ORDER_COMMISSION = 250_000n;
+export const COLLECT_SELLER_COMMISSION = 250_000n;
+export const SELLER_COMMISSION = 1_500_000n;
+export const CREATE_POOL_COMMISSION = 10_000_000n;
 export const DUMMY_REDEEMER = "d87980"; // 121([])
 export const TREASURY_MIN_ADA = 3_000_000n;
 export const MANAGER_MIN_ADA = 2_000_000n;
 export const SELLER_MIN_ADA = 2_000_000n;
 export const ORDER_MIN_ADA = 2_000_000n;
 export const MAX_PENALTY_RATE = 25n;
-export const CREATE_POOL_COMMISION = 8_000_000n;
-export const MINIMUM_SELLER_COLLECTED = 15n;
-export const MINIMUM_ORDER_COLLECTED = 20n;
-export const MINIMUM_ORDER_REDEEMED = 20n;
+export const MINIMUM_SELLER_COLLECTED = 20n;
+export const MINIMUM_ORDER_COLLECTED = 30n;
+export const MINIMUM_ORDER_REDEEMED = 30n;
+
+// LBE Constraint
+export const DISCOVERY_MAX_RANGE = 30 * 24 * 60 * 60 * 1000; // 30 days
+export const POOL_ALLOCATION_MIN = 70n;
+export const POOL_BASE_FEE_MIN = 5n;
+export const POOL_BASE_FEE_MAX = 2000n;
+export const PENALTY_MAX_RANGE = 2 * 24 * 60 * 60 * 1000;
+export const PENALTY_MAX_PERCENT = 70;
+
+// Batching
+export const MAX_COLLECT_SELLERS = 24;
+export const MAX_COLLECT_ORDERS = 50;
+export const MAX_REDEEM_ORDERS = 50;
+export const MAX_REFUND_ORDERS = 50;
+export const MAX_SEEDS = 100;

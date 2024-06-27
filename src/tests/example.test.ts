@@ -17,15 +17,16 @@ import {
   type BuildUsingSellerOptions,
   type WarehouseBuilderOptions,
 } from "../build-tx";
+import { MINIMUM_ORDER_REDEEMED, MINIMUM_SELLER_COLLECTED } from "../constants";
 import {
   collectMinswapValidators,
   collectValidators,
   deployMinswapValidators,
   deployValidators,
+  type DeployMinswapValidators,
   type DeployedValidators,
   type MinswapValidators,
   type Validators,
-  type DeployMinswapValidators,
 } from "../deploy-validators";
 import type {
   Address,
@@ -44,12 +45,12 @@ import {
   calculateInitialLiquidity,
   toUnit,
 } from "../utils";
+import params from "./../../params.json";
 import {
   generateAccount,
   quickSubmitBuilder,
   type GeneratedAccount,
 } from "./utils";
-import params from "./../../params.json";
 
 let ACCOUNT_0: GeneratedAccount;
 let ACCOUNT_1: GeneratedAccount;
@@ -150,13 +151,7 @@ beforeEach(async () => {
   ammDeployedValidators = await deployMinswapValidators(t, ammValidators);
 
   // registerStake
-  await quickSubmitBuilder(emulator)({
-    txBuilder: t
-      .newTx()
-      .registerStake(
-        t.utils.validatorToRewardAddress(validators.sellerValidator),
-      ),
-  });
+  // Need to register Stake Factory Validator because it supports WithdrawFrom
   await quickSubmitBuilder(emulator)({
     txBuilder: t
       .newTx()
@@ -188,7 +183,7 @@ test("example flow", async () => {
   // create treasury
   const discoveryStartSlot = emulator.slot + 60 * 60;
   const discoveryEndSlot = discoveryStartSlot + 60 * 60 * 24 * 2; // 2 days
-  extraDatum = builder.toDatumFactory({ head: "00", tail: "ff" }); // dummy
+  extraDatum = WarehouseBuilder.toDatumFactory({ head: "00", tail: "ff" }); // dummy
   let extraDatumHash = t.utils.datumToHash(extraDatum);
   const treasuryDatum: TreasuryDatum = {
     factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
@@ -232,6 +227,8 @@ test("example flow", async () => {
     validFrom: t.utils.slotToUnixTime(emulator.slot),
     validTo: t.utils.slotToUnixTime(emulator.slot + 60),
     extraDatum,
+    sellerAmount: 20n,
+    sellerOwner: ACCOUNT_0.address,
   });
   const createTreasuryTx = await quickSubmitBuilder(emulator)({
     txBuilder: builder.complete(),
@@ -272,6 +269,7 @@ test("example flow", async () => {
       addSellerCount,
       validFrom: t.utils.slotToUnixTime(emulator.slot),
       validTo: t.utils.slotToUnixTime(emulator.slot + 100),
+      owner: ACCOUNT_0.address,
     };
     builder = new WarehouseBuilder(warehouseOptions);
     builder.buildAddSeller(buildAddSellersOptions);
@@ -392,10 +390,10 @@ test("example flow", async () => {
     });
     console.info(`collect sellers ${maxCount} done.`);
   };
-  await collectingSeller(15);
-  await collectingSeller(15);
-  await collectingSeller(15);
-  await collectingSeller(15);
+  await collectingSeller(Number(MINIMUM_SELLER_COLLECTED));
+  await collectingSeller(Number(MINIMUM_SELLER_COLLECTED));
+  await collectingSeller(Number(MINIMUM_SELLER_COLLECTED));
+  await collectingSeller(Number(MINIMUM_SELLER_COLLECTED));
 
   const collectingManager = async () => {
     const managerUtxo: UTxO = (
@@ -431,7 +429,7 @@ test("example flow", async () => {
     )
       .filter((u) => !u.scriptRef)
       .filter((u) => {
-        const datum = builder.fromDatumOrder(u.datum!);
+        const datum = WarehouseBuilder.fromDatumOrder(u.datum!);
         return datum.isCollected == false;
       }) as UTxO[];
     maxCount = maxCount ?? orderUtxos.length;
@@ -455,9 +453,11 @@ test("example flow", async () => {
     });
     console.info(`collect order ${maxCount} done.`);
   };
-  await collectingOrders(25);
-  await collectingOrders(25);
-  await collectingOrders(15);
+
+  await collectingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await collectingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await collectingOrders(Number(MINIMUM_ORDER_REDEEMED));
+
   const creatingPool = async () => {
     const ammFactoryInput: UTxO = (
       await emulator.getUtxos(ammFactoryAddress)
@@ -559,8 +559,8 @@ test("example flow", async () => {
     });
     console.info(`Redeem order ${maxCount} done.`);
   };
-  await redeemingOrders(20);
-  await redeemingOrders(20);
-  await redeemingOrders(20);
-  await redeemingOrders(1);
+  await redeemingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await redeemingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await redeemingOrders(Number(MINIMUM_ORDER_REDEEMED));
+  await redeemingOrders(Number(MINIMUM_ORDER_REDEEMED));
 });
