@@ -25,7 +25,7 @@ async function genTestWarehouse() {
       lovelace: TREASURY_MIN_ADA + CREATE_POOL_COMMISSION,
     },
     address: builder.treasuryAddress,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
   };
   let options: BuildUpdateLBEOptions = {
     treasuryInput,
@@ -67,7 +67,7 @@ test("Update LBE | FAIL | update when LBE is cancelled", async () => {
   };
   treasuryInput = {
     ...treasuryInput,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
   };
   options = {
     ...options,

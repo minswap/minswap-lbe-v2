@@ -73,7 +73,7 @@ async function genTestWarehouse() {
         treasuryDatum.reserveBase,
     },
     address: builder.treasuryAddress,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
   };
 
   const ammFactoryDatum: FactoryValidatorValidateFactory["datum"] = {
@@ -157,7 +157,7 @@ async function buildTxWithStupidTreasuryDatum(
         treasuryDatum.reserveBase,
     },
     address: builder.treasuryAddress,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
   };
   builder.buildCreateAmmPool({ ...options, treasuryInput: treasuryUTxO });
   await assertValidatorFail(builder);
@@ -221,7 +221,7 @@ test("Create AMM Pool | FAIL | Invalid Treasury out value", async () => {
     builder.tx.payToAddressWithData(
       builder.treasuryAddress,
       {
-        inline: builder.toDatumTreasury(treasuryOutDatum),
+        inline: WarehouseBuilder.toDatumTreasury(treasuryOutDatum),
       },
       createPoolAssets(),
     );

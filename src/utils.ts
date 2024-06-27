@@ -230,3 +230,32 @@ export function calculateInitialLiquidity(
   }
   return x;
 }
+
+export function genDummyUTxO(): UTxO {
+  return {
+    txHash: "",
+    outputIndex: 0,
+    address: "",
+    assets: {},
+  };
+}
+
+export function catchWrapper<T, R>(
+  func: (t: T) => R,
+  arg0: T,
+  defaultValue: R,
+): R {
+  try {
+    return func(arg0);
+  } catch {
+    return defaultValue;
+  }
+}
+
+export function hexToUtxo(hexUtxo: string): UTxO {
+  let C = T.CModuleLoader.get;
+  let cUtxo = C.TransactionUnspentOutput.from_bytes(T.fromHex(hexUtxo));
+  let utxo = T.coreToUtxo(cUtxo);
+  cUtxo.free();
+  return utxo;
+}

@@ -151,13 +151,7 @@ beforeEach(async () => {
   ammDeployedValidators = await deployMinswapValidators(t, ammValidators);
 
   // registerStake
-  await quickSubmitBuilder(emulator)({
-    txBuilder: t
-      .newTx()
-      .registerStake(
-        t.utils.validatorToRewardAddress(validators.sellerValidator),
-      ),
-  });
+  // Need to register Stake Factory Validator because it supports WithdrawFrom
   await quickSubmitBuilder(emulator)({
     txBuilder: t
       .newTx()
@@ -189,7 +183,7 @@ test("example flow", async () => {
   // create treasury
   const discoveryStartSlot = emulator.slot + 60 * 60;
   const discoveryEndSlot = discoveryStartSlot + 60 * 60 * 24 * 2; // 2 days
-  extraDatum = builder.toDatumFactory({ head: "00", tail: "ff" }); // dummy
+  extraDatum = WarehouseBuilder.toDatumFactory({ head: "00", tail: "ff" }); // dummy
   let extraDatumHash = t.utils.datumToHash(extraDatum);
   const treasuryDatum: TreasuryDatum = {
     factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
@@ -435,7 +429,7 @@ test("example flow", async () => {
     )
       .filter((u) => !u.scriptRef)
       .filter((u) => {
-        const datum = builder.fromDatumOrder(u.datum!);
+        const datum = WarehouseBuilder.fromDatumOrder(u.datum!);
         return datum.isCollected == false;
       }) as UTxO[];
     maxCount = maxCount ?? orderUtxos.length;

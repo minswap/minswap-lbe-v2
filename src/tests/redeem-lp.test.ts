@@ -71,7 +71,7 @@ async function genTestWarehouse() {
       [builder.ammLpToken!]: totalLiquidity,
     },
     address: builder.treasuryAddress,
-    datum: builder.toDatumTreasury(treasuryDatum),
+    datum: WarehouseBuilder.toDatumTreasury(treasuryDatum),
   };
   const orderInDatums: OrderDatum[] = [
     {
@@ -116,7 +116,7 @@ async function genTestWarehouse() {
       : 0n;
   const raiseAssetUnit = toUnit(raiseAsset.policyId, raiseAsset.assetName);
   for (const order of sortedOrders) {
-    const datum = builder.fromDatumOrder(order.datum!);
+    const datum = WarehouseBuilder.fromDatumOrder(order.datum!);
     const lpAmount =
       (datum.amount * treasuryDatum.totalLiquidity) /
       treasuryDatum.reserveRaise;
@@ -165,7 +165,7 @@ function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): UTxO {
       lovelace: ORDER_MIN_ADA + ORDER_COMMISSION,
     },
     address: builder.orderAddress,
-    datum: builder.toDatumOrder(datum),
+    datum: WarehouseBuilder.toDatumOrder(datum),
   };
 }
 
@@ -190,6 +190,9 @@ function attachValueToInput(value: Assets): void {
     ]);
   });
 }
+
+test("Redeem LP | PASS | penalty orders", async () => {});
+
 test("Redeem LP | FAIL | No treasury input", async () => {
   const { builder, options, treasuryUTxO } = warehouse;
   builder.buildRedeemOrders(options);
@@ -223,7 +226,10 @@ test("Redeem LP | FAIL | Not created pool yet", async () => {
   options.treasuryInput = {
     ...options.treasuryInput,
     assets: { ...options.treasuryInput.assets, [builder.ammLpToken!]: 0n },
-    datum: builder.toDatumTreasury({ ...treasuryDatum, totalLiquidity: 0n }),
+    datum: WarehouseBuilder.toDatumTreasury({
+      ...treasuryDatum,
+      totalLiquidity: 0n,
+    }),
   };
   builder.buildRefundOrders(options);
   assertValidatorFail(builder);
