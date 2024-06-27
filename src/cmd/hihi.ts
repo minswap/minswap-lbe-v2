@@ -32,9 +32,13 @@ let main = async () => {
 
   // let createTx = await api.createLbe(params);
   // let txHash = await api.signAndSubmit(createTx);
+
+  // let cancelTx = await api.cancelLbe({ baseAsset: params.baseAsset, raiseAsset: params.raiseAsset });
+  // let txHash = await api.signAndSubmit(cancelTx);
+
   // console.log(txHash);
-  let slot = await api.builder.t.getCurrentSlot();
-  console.log(slot);
+  // let slot = await api.builder.t.getCurrentSlot();
+  // console.log(slot);
 };
 
 main();

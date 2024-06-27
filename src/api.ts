@@ -99,15 +99,18 @@ export class Api {
   /**
    * Validate Cancel LBE By Project Owner
    */
-  static validateCancelLbeByOwner(treasuryDatum: TreasuryDatum): Boolean {
+  static validateCancelLbeByOwner(
+    validFrom: UnixTime,
+    treasuryDatum: TreasuryDatum,
+  ): Boolean {
     if (treasuryDatum.revocable) {
       invariant(
-        BigInt(Date.now()) < treasuryDatum.endTime,
+        BigInt(validFrom) < treasuryDatum.endTime,
         "Cancel before discovery phase end",
       );
     } else {
       invariant(
-        BigInt(Date.now()) < treasuryDatum.startTime,
+        BigInt(validFrom) < treasuryDatum.startTime,
         "Cancel before discovery phase start",
       );
     }
@@ -204,8 +207,10 @@ export class Api {
     let treasuryUTxO = treasuries.find((treasury) => {
       let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasury.datum!);
       return (
-        treasuryDatum.baseAsset === baseAsset &&
-        treasuryDatum.raiseAsset === raiseAsset
+        treasuryDatum.baseAsset.policyId === baseAsset.policyId &&
+        treasuryDatum.baseAsset.assetName === baseAsset.assetName &&
+        treasuryDatum.raiseAsset.policyId === raiseAsset.policyId &&
+        treasuryDatum.raiseAsset.assetName === raiseAsset.assetName
       );
     });
     if (treasuryUTxO === undefined) {
@@ -298,7 +303,7 @@ export class Api {
       factoryUtxo,
       treasuryDatum,
       sellerOwner: MAGIC_THINGS.sellerOwner,
-      validFrom: genValidFrom,
+      validFrom: await this.genValidFrom(),
       validTo: Date.now() + 3 * 60 * 60 * 1000,
     };
 
@@ -319,16 +324,18 @@ export class Api {
     let treasuryDatum = WarehouseBuilder.fromDatumTreasury(
       treasuryInput.datum!,
     );
-    let lastValidTo = treasuryDatum.revocable
-      ? treasuryDatum.endTime
-      : treasuryDatum.startTime;
+    let validFrom = await this.genValidFrom();
+    Api.validateCancelLbeByOwner(validFrom, treasuryDatum);
 
-    Api.validateCancelLbeByOwner(treasuryDatum);
+    let validTo: number =
+      validFrom < Number(treasuryDatum.startTime)
+        ? Number(treasuryDatum.startTime) - 1
+        : Number(treasuryDatum.endTime) - 1;
 
     let options: BuildCancelLBEOptions = {
       treasuryInput,
-      validFrom: Date.now(),
-      validTo: Number(lastValidTo),
+      validFrom,
+      validTo,
       reason: "ByOwner",
     };
 
