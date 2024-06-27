@@ -15,8 +15,10 @@ import {
   type BluePrintAsset,
   type BuildCancelLBEOptions,
   type BuildCreateTreasuryOptions,
+  type BuildUsingSellerOptions,
   type LbeId,
   type MaestroSupportedNetworks,
+  type OrderDatum,
   type TreasuryDatum,
   type UTxO,
   type UnixTime,
@@ -66,6 +68,13 @@ export interface LbeParameters {
   poolBaseFee: bigint;
 }
 
+export interface CreateOrderOptions {
+  baseAsset: BluePrintAsset;
+  raiseAsset: BluePrintAsset;
+  owner: Address;
+  amount: bigint;
+}
+
 export class Api {
   builder: WarehouseBuilder;
 
@@ -95,6 +104,29 @@ export class Api {
   }
 
   /** ******************** Validating **************************/
+
+  static validateCreateOrder(options: {
+    treasuryDatum: TreasuryDatum;
+    amount: bigint;
+    validFrom: UnixTime;
+  }): boolean {
+    let { treasuryDatum, amount, validFrom } = options;
+
+    invariant(treasuryDatum.isCancelled === false, "LBE is cancelled");
+    invariant(
+      treasuryDatum.startTime < BigInt(validFrom),
+      "Discovery Phase not start",
+    );
+    invariant(
+      treasuryDatum.endTime > BigInt(validFrom),
+      "Discovery Phase ended",
+    );
+    invariant(
+      amount > (treasuryDatum.minimumOrderRaise ?? 0n),
+      "Deposit Amount must greater than minimum order raise",
+    );
+    return true;
+  }
 
   /**
    * Validate Cancel LBE By Project Owner
@@ -196,22 +228,31 @@ export class Api {
   }
   /** **********************************************/
 
-  /** Find UTxO ********************************************/
+  /***************** Find UTxO *********************/
+  /**
+   * Finding Sellers
+   */
+  async findSellers(lbeId: LbeId): Promise<UTxO[]> {
+    let allSellers = await this.builder.t.utxosAtWithUnit(
+      this.builder.sellerAddress,
+      this.builder.sellerToken,
+    );
+    return allSellers.filter((seller) => {
+      let sellerDatum = WarehouseBuilder.fromDatumSeller(seller.datum!);
+      return Api.compareLbeId(sellerDatum, lbeId);
+    });
+  }
+
   /**
    *
    * @param param0 LBE ID
    * @returns Treasury UTxO base on LBE ID
    */
-  async findTreasury({ baseAsset, raiseAsset }: LbeId): Promise<UTxO> {
+  async findTreasury(lbeId: LbeId): Promise<UTxO> {
     let treasuries = await this.getLbes();
     let treasuryUTxO = treasuries.find((treasury) => {
       let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasury.datum!);
-      return (
-        treasuryDatum.baseAsset.policyId === baseAsset.policyId &&
-        treasuryDatum.baseAsset.assetName === baseAsset.assetName &&
-        treasuryDatum.raiseAsset.policyId === raiseAsset.policyId &&
-        treasuryDatum.raiseAsset.assetName === raiseAsset.assetName
-      );
+      return Api.compareLbeId(treasuryDatum, lbeId);
     });
     if (treasuryUTxO === undefined) {
       throw Error("Cannot find Treasury");
@@ -348,6 +389,54 @@ export class Api {
     return completeTx.toString();
   }
 
+  
+  /**
+   * Actor: User
+   */
+  async createOrder(options: CreateOrderOptions): Promise<string> {
+    let { baseAsset, raiseAsset, owner, amount } = options;
+    let treasuryRefInput = await this.findTreasury({ baseAsset, raiseAsset });
+    let treasuryDatum: TreasuryDatum = WarehouseBuilder.fromDatumTreasury(
+      treasuryRefInput.datum!,
+    );
+    let orderDatum: OrderDatum = {
+      factoryPolicyId: this.builder.factoryHash,
+      baseAsset,
+      raiseAsset,
+      owner: address2PlutusAddress(owner),
+      amount: amount,
+      isCollected: false,
+      penaltyAmount: 0n,
+    };
+    let validFrom = await this.genValidFrom();
+    let validTo = Math.min(
+      validFrom + 3 * 60 * 60 * 1000,
+      Number(treasuryDatum.endTime - 1n),
+    );
+    Api.validateCreateOrder({ treasuryDatum, amount, validFrom });
+
+    let sellers = await this.findSellers({ baseAsset, raiseAsset });
+    let sellerUtxo = sellers[Math.floor(Math.random() * sellers.length)];
+
+    let usingSellerOptions: BuildUsingSellerOptions = {
+      treasuryRefInput: treasuryRefInput,
+      sellerUtxo: sellerUtxo,
+      validFrom,
+      validTo,
+      owners: [owner],
+      orderInputs: [],
+      orderOutputDatums: [orderDatum],
+    };
+
+    this.builder.clean();
+    let completeTx = await this.builder
+      .buildUsingSeller(usingSellerOptions)
+      .complete()
+      .complete();
+
+    return completeTx.toString();
+  }
+
   /**
    *
    * @param walletApi CIP-30 Wallet
@@ -389,5 +478,14 @@ export class Api {
     let signedTx = await txComplete.sign().complete();
     let txHash = await signedTx.submit();
     return txHash;
+  }
+
+  static compareLbeId(from: LbeId, to: LbeId): boolean {
+    return (
+      from.baseAsset.policyId === to.baseAsset.policyId &&
+      from.baseAsset.assetName === to.baseAsset.assetName &&
+      from.raiseAsset.policyId === to.raiseAsset.policyId &&
+      from.raiseAsset.assetName === to.raiseAsset.assetName
+    );
   }
 }
