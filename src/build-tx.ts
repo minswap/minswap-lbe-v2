@@ -1,5 +1,3 @@
-import * as fs from "fs";
-import path from "path";
 import invariant from "@minswap/tiny-invariant";
 import * as T from "@minswap/translucent";
 import {
@@ -53,10 +51,10 @@ import type {
   AmmPoolDatum,
   Assets,
   BluePrintAsset,
+  Credential,
   Datum,
   FactoryDatum,
   FactoryRedeemer,
-  LbeScript,
   ManagerDatum,
   ManagerRedeemer,
   MintRedeemer,
@@ -81,6 +79,7 @@ import {
   sortUTxOs,
   toUnit,
 } from "./utils";
+import lbeV2Script from "./../lbe-v2-script.json";
 
 export type WarehouseBuilderOptions = {
   t: Translucent;
@@ -202,11 +201,6 @@ export type BuildCloseEventOptions = {
 export function genWarehouseBuilderOptions(
   t: Translucent,
 ): WarehouseBuilderOptions {
-  let fileContent = fs.readFileSync(
-    path.resolve("lbe-v2-script.json"),
-    "utf-8",
-  );
-  let lbeV2Script: LbeScript = JSON.parse(fileContent);
   let validators = collectValidators({
     t,
     seedOutRef: lbeV2Script.seedOutRef,
@@ -221,7 +215,7 @@ export function genWarehouseBuilderOptions(
   let ammValidators = collectMinswapValidators({
     t,
     seedOutRef: lbeV2Script.ammSeedOutRef,
-    poolStakeCredential: lbeV2Script.ammPoolStakeCredential,
+    poolStakeCredential: lbeV2Script.ammPoolStakeCredential as Credential,
   });
   let ammDeployedValidators = {
     authenValidator: hexToUtxo(lbeV2Script.ammAuthenRefInput),
