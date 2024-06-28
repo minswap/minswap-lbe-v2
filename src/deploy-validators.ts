@@ -1,5 +1,3 @@
-import * as fs from "fs";
-import path from "path";
 import * as T from "@minswap/translucent";
 import type {
   Address,
@@ -86,13 +84,9 @@ export function collectMinswapValidators(options: {
 
 export function collectValidators(options: {
   t: Translucent;
-  seedOutRef?: OutRef;
+  seedOutRef: OutRef;
 }): Validators {
   let { t, seedOutRef } = options;
-  if (seedOutRef === undefined) {
-    const fileContent = fs.readFileSync(path.resolve("params.json"), "utf-8");
-    seedOutRef = JSON.parse(fileContent).seedOutRef;
-  }
   const treasuryValidator = new TreasuryValidateTreasurySpending();
   const treasuryValidatorHash =
     t.utils.validatorToScriptHash(treasuryValidator);
