@@ -1,4 +1,35 @@
-import type { TreasuryDatum, UnixTime } from "./types";
+import { WarehouseBuilder } from "./build-tx";
+import type { LbeUTxO, TreasuryDatum, UnixTime } from "./types";
+
+export type BatchingPhase =
+  | "countingSellers"
+  | "collectManager"
+  | "collectOrders";
+
+export namespace BatchingPhase {
+  export function from(options: {
+    treasury: LbeUTxO;
+    manager?: LbeUTxO;
+    now: UnixTime;
+  }): BatchingPhase | undefined {
+    let { treasury, manager, now } = options;
+    let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasury.datum);
+    if (treasuryDatum.isCancelled || treasuryDatum.endTime < now) {
+      if (manager) {
+        let managerDatum = WarehouseBuilder.fromDatumManager(manager.datum);
+        if (managerDatum.sellerCount > 0n) return "countingSellers";
+        if (managerDatum.sellerCount === 0n) return "collectManager";
+      }
+      if (
+        treasuryDatum.isManagerCollected &&
+        treasuryDatum.collectedFund !==
+          treasuryDatum.reserveRaise + treasuryDatum.totalLiquidity
+      )
+        return "collectOrders";
+    }
+    return undefined;
+  }
+}
 
 export type LbePhase =
   | "pending"

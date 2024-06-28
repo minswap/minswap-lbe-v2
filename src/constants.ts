@@ -35,7 +35,7 @@ export const PENALTY_MAX_RANGE = 2 * 24 * 60 * 60 * 1000;
 export const PENALTY_MAX_PERCENT = 70;
 
 // Batching
-export const MAX_COLLECT_SELLERS = 24;
+export const MAX_COLLECT_SELLERS = 22;
 export const MAX_COLLECT_ORDERS = 50;
 export const MAX_REDEEM_ORDERS = 50;
 export const MAX_REFUND_ORDERS = 50;
