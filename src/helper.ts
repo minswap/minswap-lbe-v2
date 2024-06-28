@@ -7,7 +7,7 @@ export type LbePhase =
   | "encounter"
   | "cancelled";
 
-export namespace LbePhase {
+export namespace LbePhaseUtils {
   export function from(options: {
     datum: TreasuryDatum;
     currentTime: UnixTime;

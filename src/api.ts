@@ -27,7 +27,7 @@ import {
   type UnixTime,
   type walletApi,
 } from ".";
-import { LbePhase } from "./helper";
+import { LbePhaseUtils, type LbePhase } from "./helper";
 
 /**
  * Ask Tony
@@ -634,6 +634,6 @@ export class Api {
     datum: TreasuryDatum;
     currentTime: UnixTime;
   }): LbePhase {
-    return LbePhase.from(options);
+    return LbePhaseUtils.from(options);
   }
 }
