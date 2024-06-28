@@ -1,5 +1,6 @@
 import * as T from "@minswap/translucent";
 
+import invariant from "@minswap/tiny-invariant";
 import {
   DISCOVERY_MAX_RANGE,
   PENALTY_MAX_PERCENT,
@@ -26,7 +27,6 @@ import {
   type UnixTime,
   type walletApi,
 } from ".";
-import invariant from "@minswap/tiny-invariant";
 
 /**
  * Ask Tony
@@ -630,10 +630,5 @@ export class Api {
       return (withdrawalAmount * penaltyConfig.percent) / 100n;
     }
     return 0n;
-  }
-
-  static async loadModule(): Promise<void> {
-    await T.loadModule();
-    await T.CModuleLoader.load();
   }
 }

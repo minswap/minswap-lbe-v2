@@ -259,3 +259,8 @@ export function hexToUtxo(hexUtxo: string): UTxO {
   cUtxo.free();
   return utxo;
 }
+
+export async function loadModule(): Promise<void> {
+  await T.loadModule();
+  await T.CModuleLoader.load();
+}
