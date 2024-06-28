@@ -27,6 +27,7 @@ import {
   type UnixTime,
   type walletApi,
 } from ".";
+import { LbePhase } from "./helper";
 
 /**
  * Ask Tony
@@ -111,24 +112,24 @@ export class Api {
    * @returns Treasury UTxOs
    */
   async getLbes(): Promise<LbeUTxO[]> {
-    return await this.builder.t.utxosAtWithUnit(
+    return (await this.builder.t.utxosAtWithUnit(
       this.builder.treasuryAddress,
       this.builder.treasuryToken,
-    ) as LbeUTxO[];
+    )) as LbeUTxO[];
   }
 
   async getOrders(lbeId: LbeId, owner?: Address): Promise<LbeUTxO[]> {
-    let orders = await this.builder.t.utxosAtWithUnit(
+    let orders = (await this.builder.t.utxosAtWithUnit(
       this.builder.orderAddress,
       this.builder.orderToken,
-    ) as LbeUTxO[];
+    )) as LbeUTxO[];
     return orders.filter((o) => {
       let orderDatum = WarehouseBuilder.fromDatumOrder(o.datum);
       return (
         Api.compareLbeId(lbeId, orderDatum) &&
         (owner
           ? owner ===
-          plutusAddress2Address(this.builder.t.network, orderDatum.owner)
+            plutusAddress2Address(this.builder.t.network, orderDatum.owner)
           : true)
       );
     });
@@ -292,10 +293,10 @@ export class Api {
    * Finding Sellers
    */
   async findSellers(lbeId: LbeId): Promise<LbeUTxO[]> {
-    let allSellers = await this.builder.t.utxosAtWithUnit(
+    let allSellers = (await this.builder.t.utxosAtWithUnit(
       this.builder.sellerAddress,
       this.builder.sellerToken,
-    ) as LbeUTxO[];
+    )) as LbeUTxO[];
     return allSellers.filter((seller) => {
       let sellerDatum = WarehouseBuilder.fromDatumSeller(seller.datum);
       return Api.compareLbeId(sellerDatum, lbeId);
@@ -327,10 +328,10 @@ export class Api {
       baseAsset.policyId + baseAsset.assetName,
       raiseAsset.policyId + raiseAsset.assetName,
     );
-    let factories = await this.builder.t.utxosAtWithUnit(
+    let factories = (await this.builder.t.utxosAtWithUnit(
       this.builder.factoryAddress,
       this.builder.factoryToken,
-    ) as LbeUTxO[];
+    )) as LbeUTxO[];
     let factoryUtxo = factories.find((factory) => {
       let factoryDatum = WarehouseBuilder.fromDatumFactory(factory.datum);
       return factoryDatum.head < lpAssetName && factoryDatum.tail > lpAssetName;
@@ -421,9 +422,7 @@ export class Api {
    */
   async cancelLbe(lbeId: LbeId): Promise<string> {
     let treasuryInput = await this.findTreasury(lbeId);
-    let treasuryDatum = WarehouseBuilder.fromDatumTreasury(
-      treasuryInput.datum,
-    );
+    let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasuryInput.datum);
     let validFrom = await this.genValidFrom();
     Api.validateCancelLbeByOwner(validFrom, treasuryDatum);
 
@@ -629,5 +628,12 @@ export class Api {
       return (withdrawalAmount * penaltyConfig.percent) / 100n;
     }
     return 0n;
+  }
+
+  static getLbePhase(options: {
+    datum: TreasuryDatum;
+    currentTime: UnixTime;
+  }): LbePhase {
+    return LbePhase.from(options);
   }
 }
