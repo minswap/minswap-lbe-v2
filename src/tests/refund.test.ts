@@ -26,9 +26,9 @@ import {
 import type {
   Address,
   Assets,
+  LbeUTxO,
   OrderDatum,
   TreasuryDatum,
-  UTxO,
 } from "../types";
 import { plutusAddress2Address, sortUTxOs, toUnit } from "../utils";
 import { assertValidatorFail, genWarehouseOptions, loadModule } from "./utils";
@@ -104,10 +104,10 @@ async function genTestWarehouse() {
   };
   const userOutputs: { address: Address; assets: Assets }[] = [];
   const raiseAssetUnit = toUnit(raiseAsset.policyId, raiseAsset.assetName);
-  const sortedOrders = sortUTxOs(orderInputUTxOs);
+  const sortedOrders = sortUTxOs(orderInputUTxOs) as LbeUTxO[];
   for (const order of sortedOrders) {
     const { penaltyAmount, amount, owner } = WarehouseBuilder.fromDatumOrder(
-      order.datum!,
+      order.datum,
     );
     const assets: Record<string, bigint> = {
       lovelace: ORDER_MIN_ADA,
@@ -142,7 +142,7 @@ beforeEach(async () => {
   warehouse = await genTestWarehouse();
 });
 
-function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): UTxO {
+function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): LbeUTxO {
   return {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
     outputIndex: ++utxoIndex,

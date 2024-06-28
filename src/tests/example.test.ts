@@ -1,4 +1,3 @@
-import invariant from "@minswap/tiny-invariant";
 import * as T from "@minswap/translucent";
 import { beforeEach, expect, test } from "bun:test";
 import { FactoryValidatorValidateFactory as AmmValidateFactory } from "../../amm-plutus";
@@ -33,6 +32,7 @@ import type {
   Assets,
   Credential,
   Emulator,
+  LbeUTxO,
   OrderDatum,
   OutputData,
   ProtocolParameters,
@@ -216,11 +216,11 @@ test("example flow", async () => {
     isManagerCollected: false,
   };
   builder = new WarehouseBuilder(warehouseOptions);
-  let factoryUtxo: UTxO = (
-    await emulator.getUtxos(
-      t.utils.validatorToAddress(validators.factoryValidator),
-    )
-  ).find((u) => !u.scriptRef) as UTxO;
+  let factories = await emulator.getUtxosWithUnit(
+    builder.factoryAddress,
+    builder.factoryToken,
+  );
+  let factoryUtxo: LbeUTxO = factories[0] as LbeUTxO;
   builder.buildCreateTreasury({
     factoryUtxo,
     treasuryDatum,
@@ -239,11 +239,12 @@ test("example flow", async () => {
   console.info("create treasury done");
 
   // deposit orders
-  let treasuryRefInput: UTxO = (
-    await emulator.getUtxos(
-      t.utils.validatorToAddress(validators.treasuryValidator),
-    )
-  ).find((u) => !u.scriptRef) as UTxO;
+  let treasuryRefInput: LbeUTxO = (
+    (await emulator.getUtxosWithUnit(
+      builder.treasuryAddress,
+      builder.treasuryToken,
+    )) as LbeUTxO[]
+  )[0];
   let orderDatum: OrderDatum = {
     factoryPolicyId: t.utils.validatorToScriptHash(validators.factoryValidator),
     baseAsset,
@@ -258,11 +259,12 @@ test("example flow", async () => {
     if (!addSellerCount) {
       return;
     }
-    const managerUtxo: UTxO = (
-      await emulator.getUtxos(
-        t.utils.validatorToAddress(validators.managerValidator),
-      )
-    ).find((u) => !u.scriptRef) as UTxO;
+    let managerUtxo: LbeUTxO = (
+      (await emulator.getUtxosWithUnit(
+        builder.managerAddress,
+        builder.managerToken,
+      )) as LbeUTxO[]
+    )[0];
     const buildAddSellersOptions: BuildAddSellersOptions = {
       treasuryRefUtxo: treasuryRefInput,
       managerUtxo,
@@ -281,11 +283,10 @@ test("example flow", async () => {
   await addingSeller(30n);
 
   const depositing = async (maxCount?: number) => {
-    const sellerUtxos: UTxO[] = (
-      await emulator.getUtxos(
-        t.utils.validatorToAddress(validators.sellerValidator),
-      )
-    ).filter((u) => !u.scriptRef) as UTxO[];
+    let sellerUtxos: LbeUTxO[] = (await emulator.getUtxosWithUnit(
+      builder.sellerAddress,
+      builder.sellerToken,
+    )) as LbeUTxO[];
     maxCount = maxCount ?? sellerUtxos.length;
     let depositCount = 0;
     for (const sellerUtxo of sellerUtxos) {
@@ -315,16 +316,16 @@ test("example flow", async () => {
     if (maxCount == 0) {
       return;
     }
-    const sellerUtxo: UTxO = (
-      await emulator.getUtxos(
-        t.utils.validatorToAddress(validators.sellerValidator),
-      )
-    ).find((u) => !u.scriptRef) as UTxO;
-    const orderUtxos: UTxO[] = (
-      await emulator.getUtxos(
-        t.utils.validatorToAddress(validators.orderValidator),
-      )
-    ).filter((u) => !u.scriptRef) as UTxO[];
+    const sellerUtxo: LbeUTxO = (
+      (await emulator.getUtxosWithUnit(
+        builder.sellerAddress,
+        builder.sellerToken,
+      )) as LbeUTxO[]
+    )[0];
+    const orderUtxos: LbeUTxO[] = (await emulator.getUtxosWithUnit(
+      builder.orderAddress,
+      builder.orderToken,
+    )) as LbeUTxO[];
     maxCount = maxCount ?? orderUtxos.length;
     while (orderUtxos.length > maxCount) {
       orderUtxos.pop();
@@ -358,16 +359,16 @@ test("example flow", async () => {
   }
 
   const collectingSeller = async (maxCount?: number) => {
-    const managerUtxo: UTxO = (
-      await emulator.getUtxos(
-        t.utils.validatorToAddress(validators.managerValidator),
-      )
-    ).find((u) => !u.scriptRef) as UTxO;
-    const sellerUtxos: UTxO[] = (
-      await emulator.getUtxos(
-        t.utils.validatorToAddress(validators.sellerValidator),
-      )
-    ).filter((u) => !u.scriptRef) as UTxO[];
+    let managerUtxo: LbeUTxO = (
+      (await emulator.getUtxosWithUnit(
+        builder.managerAddress,
+        builder.managerToken,
+      )) as LbeUTxO[]
+    )[0];
+    let sellerUtxos: LbeUTxO[] = (await emulator.getUtxosWithUnit(
+      builder.sellerAddress,
+      builder.sellerToken,
+    )) as LbeUTxO[];
     maxCount = maxCount ?? sellerUtxos.length;
     maxCount = maxCount > sellerUtxos.length ? sellerUtxos.length : maxCount;
     if (maxCount == 0) {
@@ -396,11 +397,12 @@ test("example flow", async () => {
   await collectingSeller(Number(MINIMUM_SELLER_COLLECTED));
 
   const collectingManager = async () => {
-    const managerUtxo: UTxO = (
-      await emulator.getUtxos(
-        t.utils.validatorToAddress(validators.managerValidator),
-      )
-    ).find((u) => !u.scriptRef) as UTxO;
+    let managerUtxo: LbeUTxO = (
+      (await emulator.getUtxosWithUnit(
+        builder.managerAddress,
+        builder.managerToken,
+      )) as LbeUTxO[]
+    )[0];
     const options: BuildCollectManagerOptions = {
       treasuryInput: treasuryRefInput,
       managerInput: managerUtxo,
@@ -417,21 +419,22 @@ test("example flow", async () => {
   await collectingManager();
 
   const collectingOrders = async (maxCount?: number) => {
-    const treasuryUtxo: UTxO = (
-      await emulator.getUtxos(
-        t.utils.validatorToAddress(validators.treasuryValidator),
-      )
-    ).find((u) => !u.scriptRef) as UTxO;
-    const orderUtxos: UTxO[] = (
-      await emulator.getUtxos(
-        t.utils.validatorToAddress(validators.orderValidator),
-      )
-    )
+    let treasuryUtxo: LbeUTxO = (
+      (await emulator.getUtxosWithUnit(
+        builder.treasuryAddress,
+        builder.treasuryToken,
+      )) as LbeUTxO[]
+    )[0];
+    let orderUtxos: LbeUTxO[] = (await emulator.getUtxosWithUnit(
+      builder.orderAddress,
+      builder.orderToken,
+    )) as LbeUTxO[];
+    orderUtxos = orderUtxos
       .filter((u) => !u.scriptRef)
       .filter((u) => {
-        const datum = WarehouseBuilder.fromDatumOrder(u.datum!);
+        const datum = WarehouseBuilder.fromDatumOrder(u.datum);
         return datum.isCollected == false;
-      }) as UTxO[];
+      });
     maxCount = maxCount ?? orderUtxos.length;
     maxCount = maxCount > orderUtxos.length ? orderUtxos.length : maxCount;
     if (maxCount == 0) {
@@ -459,15 +462,15 @@ test("example flow", async () => {
   await collectingOrders(Number(MINIMUM_ORDER_REDEEMED));
 
   const creatingPool = async () => {
-    const ammFactoryInput: UTxO = (
+    const ammFactoryInput: LbeUTxO = (
       await emulator.getUtxos(ammFactoryAddress)
-    ).find((u) => !u.scriptRef) as UTxO;
-    const treasuryUtxo: UTxO = (
-      await emulator.getUtxos(
-        t.utils.validatorToAddress(validators.treasuryValidator),
-      )
-    ).find((u) => !u.scriptRef) as UTxO;
-    invariant(treasuryUtxo.datum);
+    ).find((u) => !u.scriptRef) as LbeUTxO;
+    let treasuryUtxo: LbeUTxO = (
+      (await emulator.getUtxosWithUnit(
+        builder.treasuryAddress,
+        builder.treasuryToken,
+      )) as LbeUTxO[]
+    )[0];
     const treasuryDatum = T.Data.from(
       treasuryUtxo.datum,
       TreasuryValidateTreasurySpending.treasuryInDatum,
@@ -527,16 +530,16 @@ test("example flow", async () => {
   await creatingPool();
 
   const redeemingOrders = async (maxCount?: number) => {
-    const treasuryUtxo: UTxO = (
-      await emulator.getUtxos(
-        t.utils.validatorToAddress(validators.treasuryValidator),
-      )
-    ).find((u) => !u.scriptRef) as UTxO;
-    const orderUtxos: UTxO[] = (
-      await emulator.getUtxos(
-        t.utils.validatorToAddress(validators.orderValidator),
-      )
-    ).filter((u) => !u.scriptRef) as UTxO[];
+    let treasuryUtxo: LbeUTxO = (
+      (await emulator.getUtxosWithUnit(
+        builder.treasuryAddress,
+        builder.treasuryToken,
+      )) as LbeUTxO[]
+    )[0];
+    const orderUtxos: LbeUTxO[] = (await emulator.getUtxosWithUnit(
+      builder.orderAddress,
+      builder.orderToken,
+    )) as LbeUTxO[];
     maxCount = maxCount ?? orderUtxos.length;
     maxCount = maxCount > orderUtxos.length ? orderUtxos.length : maxCount;
     if (maxCount == 0) {

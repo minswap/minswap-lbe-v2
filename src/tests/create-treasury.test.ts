@@ -5,7 +5,7 @@ import {
   MAX_PENALTY_RATE,
   TREASURY_MIN_ADA,
 } from "../constants";
-import type { Assets, TreasuryDatum, UTxO } from "../types";
+import type { Assets, LbeUTxO, TreasuryDatum, UTxO } from "../types";
 import { assertValidator, assertValidatorFail, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
 
@@ -27,7 +27,7 @@ beforeEach(async () => {
     minswapTokenRaw,
   } = W;
   const builder = new WarehouseBuilder(warehouseOptions);
-  let factoryUtxo: UTxO = {
+  let factoryUtxo: LbeUTxO = {
     txHash: "5428517bd92102ce1af705f8b66560d445e620aead488b47fb824426484912f8",
     outputIndex: 5,
     assets: {
@@ -184,7 +184,7 @@ test("create-treasury | FAIL | Factory Out Tail Datum incorrect!", async () => {
   builder = builder.buildCreateTreasury(W.options);
   builder.tasks[1] = () => {
     const factoryDatum = WarehouseBuilder.fromDatumFactory(
-      builder.factoryInputs[0].datum!,
+      builder.factoryInputs[0].datum,
     );
     const newFactoryHeadDatum = {
       head: factoryDatum.head,
@@ -207,7 +207,7 @@ test("create-treasury | FAIL | Factory Out Head Datum incorrect!", async () => {
   builder = builder.buildCreateTreasury(W.options);
   builder.tasks[1] = () => {
     const factoryDatum = WarehouseBuilder.fromDatumFactory(
-      builder.factoryInputs[0].datum!,
+      builder.factoryInputs[0].datum,
     );
     const newFactoryHeadDatum = {
       // INCORRECT!

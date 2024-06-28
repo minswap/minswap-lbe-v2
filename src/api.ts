@@ -19,11 +19,11 @@ import {
   type BuildCreateTreasuryOptions,
   type BuildUsingSellerOptions,
   type LbeId,
+  type LbeUTxO,
   type MaestroSupportedNetworks,
   type OrderDatum,
   type PenaltyConfig,
   type TreasuryDatum,
-  type UTxO,
   type UnixTime,
   type walletApi,
 } from ".";
@@ -85,7 +85,7 @@ export interface CreateOrderOptions {
 export interface UpdateOrderOptions {
   baseAsset: BluePrintAsset;
   raiseAsset: BluePrintAsset;
-  orderUTxO: UTxO;
+  orderUTxO: LbeUTxO;
   amount: bigint;
 }
 
@@ -110,25 +110,25 @@ export class Api {
    * TODO: ask requirements
    * @returns Treasury UTxOs
    */
-  async getLbes(): Promise<UTxO[]> {
+  async getLbes(): Promise<LbeUTxO[]> {
     return await this.builder.t.utxosAtWithUnit(
       this.builder.treasuryAddress,
       this.builder.treasuryToken,
-    );
+    ) as LbeUTxO[];
   }
 
-  async getOrders(lbeId: LbeId, owner?: Address): Promise<UTxO[]> {
+  async getOrders(lbeId: LbeId, owner?: Address): Promise<LbeUTxO[]> {
     let orders = await this.builder.t.utxosAtWithUnit(
       this.builder.orderAddress,
       this.builder.orderToken,
-    );
+    ) as LbeUTxO[];
     return orders.filter((o) => {
-      let orderDatum = WarehouseBuilder.fromDatumOrder(o.datum!);
+      let orderDatum = WarehouseBuilder.fromDatumOrder(o.datum);
       return (
         Api.compareLbeId(lbeId, orderDatum) &&
         (owner
           ? owner ===
-            plutusAddress2Address(this.builder.t.network, orderDatum.owner)
+          plutusAddress2Address(this.builder.t.network, orderDatum.owner)
           : true)
       );
     });
@@ -291,13 +291,13 @@ export class Api {
   /**
    * Finding Sellers
    */
-  async findSellers(lbeId: LbeId): Promise<UTxO[]> {
+  async findSellers(lbeId: LbeId): Promise<LbeUTxO[]> {
     let allSellers = await this.builder.t.utxosAtWithUnit(
       this.builder.sellerAddress,
       this.builder.sellerToken,
-    );
+    ) as LbeUTxO[];
     return allSellers.filter((seller) => {
-      let sellerDatum = WarehouseBuilder.fromDatumSeller(seller.datum!);
+      let sellerDatum = WarehouseBuilder.fromDatumSeller(seller.datum);
       return Api.compareLbeId(sellerDatum, lbeId);
     });
   }
@@ -307,10 +307,10 @@ export class Api {
    * @param param0 LBE ID
    * @returns Treasury UTxO base on LBE ID
    */
-  async findTreasury(lbeId: LbeId): Promise<UTxO> {
+  async findTreasury(lbeId: LbeId): Promise<LbeUTxO> {
     let treasuries = await this.getLbes();
     let treasuryUTxO = treasuries.find((treasury) => {
-      let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasury.datum!);
+      let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasury.datum);
       return Api.compareLbeId(treasuryDatum, lbeId);
     });
     if (treasuryUTxO === undefined) {
@@ -322,7 +322,7 @@ export class Api {
   /**
    * @returns Factory UTxO base on baseAsset, raiseAsset
    */
-  async findFactory({ baseAsset, raiseAsset }: LbeId): Promise<UTxO> {
+  async findFactory({ baseAsset, raiseAsset }: LbeId): Promise<LbeUTxO> {
     let lpAssetName = computeLPAssetName(
       baseAsset.policyId + baseAsset.assetName,
       raiseAsset.policyId + raiseAsset.assetName,
@@ -330,9 +330,9 @@ export class Api {
     let factories = await this.builder.t.utxosAtWithUnit(
       this.builder.factoryAddress,
       this.builder.factoryToken,
-    );
+    ) as LbeUTxO[];
     let factoryUtxo = factories.find((factory) => {
-      let factoryDatum = WarehouseBuilder.fromDatumFactory(factory.datum!);
+      let factoryDatum = WarehouseBuilder.fromDatumFactory(factory.datum);
       return factoryDatum.head < lpAssetName && factoryDatum.tail > lpAssetName;
     });
     if (factoryUtxo === undefined) {
@@ -422,7 +422,7 @@ export class Api {
   async cancelLbe(lbeId: LbeId): Promise<string> {
     let treasuryInput = await this.findTreasury(lbeId);
     let treasuryDatum = WarehouseBuilder.fromDatumTreasury(
-      treasuryInput.datum!,
+      treasuryInput.datum,
     );
     let validFrom = await this.genValidFrom();
     Api.validateCancelLbeByOwner(validFrom, treasuryDatum);
@@ -453,10 +453,10 @@ export class Api {
    */
   async updateOrder(options: UpdateOrderOptions): Promise<string> {
     let { baseAsset, raiseAsset, amount, orderUTxO } = options;
-    let orderDatum = WarehouseBuilder.fromDatumOrder(orderUTxO.datum!);
+    let orderDatum = WarehouseBuilder.fromDatumOrder(orderUTxO.datum);
     let treasuryRefInput = await this.findTreasury({ baseAsset, raiseAsset });
     let treasuryDatum: TreasuryDatum = WarehouseBuilder.fromDatumTreasury(
-      treasuryRefInput.datum!,
+      treasuryRefInput.datum,
     );
     let validFrom = await this.genValidFrom();
     let validTo = Math.min(
@@ -521,7 +521,7 @@ export class Api {
     let { baseAsset, raiseAsset, owner, amount } = options;
     let treasuryRefInput = await this.findTreasury({ baseAsset, raiseAsset });
     let treasuryDatum: TreasuryDatum = WarehouseBuilder.fromDatumTreasury(
-      treasuryRefInput.datum!,
+      treasuryRefInput.datum,
     );
     let orderDatum: OrderDatum = {
       factoryPolicyId: this.builder.factoryHash,
@@ -596,7 +596,6 @@ export class Api {
    */
   async signAndSubmit(txRaw: string): Promise<string> {
     let C = T.CModuleLoader.get;
-    this.builder.t.currentSlot();
     let cTransaction = C.Transaction.from_bytes(T.fromHex(txRaw));
     let txComplete = new T.TxComplete(this.builder.t, cTransaction);
     let signedTx = await txComplete.sign().complete();

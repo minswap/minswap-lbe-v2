@@ -17,12 +17,12 @@ Validation:
 */
 import { WarehouseBuilder, type BuildRedeemOrdersOptions } from "../build-tx";
 import {
-  ORDER_COMMISSION,
   LP_COLATERAL,
+  ORDER_COMMISSION,
   ORDER_MIN_ADA,
   TREASURY_MIN_ADA,
 } from "../constants";
-import type { Address, Assets, OrderDatum, UTxO } from "../types";
+import type { Address, Assets, LbeUTxO, OrderDatum } from "../types";
 import {
   calculateInitialLiquidity,
   plutusAddress2Address,
@@ -104,7 +104,7 @@ async function genTestWarehouse() {
     validTo: Number(treasuryDatum.endTime) + 2000,
   };
 
-  const sortedOrders = sortUTxOs(orderInputUTxOs);
+  const sortedOrders = sortUTxOs(orderInputUTxOs) as LbeUTxO[];
   const userOutputs: { address: Address; assets: Assets }[] = [];
   const totalBonusRaiseAsset =
     treasuryDatum.maximumRaise &&
@@ -116,7 +116,7 @@ async function genTestWarehouse() {
       : 0n;
   const raiseAssetUnit = toUnit(raiseAsset.policyId, raiseAsset.assetName);
   for (const order of sortedOrders) {
-    const datum = WarehouseBuilder.fromDatumOrder(order.datum!);
+    const datum = WarehouseBuilder.fromDatumOrder(order.datum);
     const lpAmount =
       (datum.amount * treasuryDatum.totalLiquidity) /
       treasuryDatum.reserveRaise;
@@ -156,7 +156,7 @@ beforeEach(async () => {
   warehouse = await genTestWarehouse();
 });
 
-function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): UTxO {
+function genOrderUTxO(datum: OrderDatum, builder: WarehouseBuilder): LbeUTxO {
   return {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
     outputIndex: ++utxoIndex,

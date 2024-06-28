@@ -39,7 +39,13 @@ import {
   SELLER_MIN_ADA,
   TREASURY_MIN_ADA,
 } from "../constants";
-import type { Assets, ManagerDatum, SellerDatum, UTxO } from "../types";
+import type {
+  Assets,
+  LbeUTxO,
+  ManagerDatum,
+  SellerDatum,
+  UTxO,
+} from "../types";
 import { plutusAddress2Address, toUnit } from "../utils";
 import {
   assertValidatorFail,
@@ -126,7 +132,7 @@ async function genTestWarehouse() {
       penaltyAmount: 1000n,
     },
   ];
-  const sellerUTxOs: UTxO[] = sellerDatums.map((datum) =>
+  const sellerUTxOs: LbeUTxO[] = sellerDatums.map((datum) =>
     genSellerUTxO(datum, builder),
   );
   const options: BuildCollectSellersOptions = {
@@ -165,7 +171,7 @@ beforeEach(async () => {
   warehouse = await genTestWarehouse();
 });
 
-function genSellerUTxO(datum: SellerDatum, builder: WarehouseBuilder): UTxO {
+function genSellerUTxO(datum: SellerDatum, builder: WarehouseBuilder): LbeUTxO {
   const rand = Math.floor(Math.random() * 100);
   return {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
@@ -231,14 +237,14 @@ test("collect sellers | PASS | happy case 3", async () => {
   // collect MINIMUM_SELLER_COLLECTED sellers
   let { builder, W, defaultSellerDatum, options, treasuryDatum } = warehouse;
   let managerDatum: ManagerDatum = {
-    ...WarehouseBuilder.fromDatumManager(options.managerInput.datum!),
+    ...WarehouseBuilder.fromDatumManager(options.managerInput.datum),
     sellerCount: 100n,
   };
   let managerInput = {
     ...options.managerInput,
     datum: WarehouseBuilder.toDatumManager(managerDatum),
   };
-  let sellerInputs: UTxO[] = [];
+  let sellerInputs: LbeUTxO[] = [];
   for (let i = 0; i <= MINIMUM_SELLER_COLLECTED; i++) {
     let utxo = genSellerUTxO(
       { ...defaultSellerDatum, amount: 1000n, penaltyAmount: 20_000n },
@@ -474,7 +480,7 @@ test("collect sellers | FAIL | More than 1 manager input", async () => {
 test("collect sellers | FAIL | spam collect sellers", async () => {
   let { builder, options } = warehouse;
   let managerDatum: ManagerDatum = {
-    ...WarehouseBuilder.fromDatumManager(options.managerInput.datum!),
+    ...WarehouseBuilder.fromDatumManager(options.managerInput.datum),
     sellerCount: 100n,
   };
   let managerInput = {

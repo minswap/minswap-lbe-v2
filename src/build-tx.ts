@@ -55,6 +55,7 @@ import type {
   Datum,
   FactoryDatum,
   FactoryRedeemer,
+  LbeUTxO,
   ManagerDatum,
   ManagerRedeemer,
   MintRedeemer,
@@ -95,7 +96,7 @@ export type BuildInitFactoryOptions = {
 
 export type BuildCreateTreasuryOptions = {
   sellerAmount: bigint;
-  factoryUtxo: UTxO;
+  factoryUtxo: LbeUTxO;
   treasuryDatum: TreasuryDatum;
   sellerOwner: Address;
   validFrom: UnixTime;
@@ -104,8 +105,8 @@ export type BuildCreateTreasuryOptions = {
 };
 
 export type BuildAddSellersOptions = {
-  treasuryRefUtxo: UTxO;
-  managerUtxo: UTxO;
+  treasuryRefUtxo: LbeUTxO;
+  managerUtxo: LbeUTxO;
   addSellerCount: bigint;
   validFrom: UnixTime;
   validTo: UnixTime;
@@ -113,18 +114,18 @@ export type BuildAddSellersOptions = {
 };
 
 export type BuildUsingSellerOptions = {
-  treasuryRefInput: UTxO;
-  sellerUtxo: UTxO;
+  treasuryRefInput: LbeUTxO;
+  sellerUtxo: LbeUTxO;
   validFrom: UnixTime;
   validTo: UnixTime;
   owners: Address[];
-  orderInputs: UTxO[];
+  orderInputs: LbeUTxO[];
   orderOutputDatums: OrderDatum[];
 };
 
 export type BuildCollectManagerOptions = {
-  treasuryInput: UTxO;
-  managerInput: UTxO;
+  treasuryInput: LbeUTxO;
+  managerInput: LbeUTxO;
   validFrom: UnixTime;
   validTo: UnixTime;
   // allow pass datum as testing purpose
@@ -132,16 +133,16 @@ export type BuildCollectManagerOptions = {
 };
 
 export type BuildCollectSellersOptions = {
-  treasuryRefInput: UTxO;
-  managerInput: UTxO;
-  sellerInputs: UTxO[];
+  treasuryRefInput: LbeUTxO;
+  managerInput: LbeUTxO;
+  sellerInputs: LbeUTxO[];
   validFrom: UnixTime;
   validTo: UnixTime;
 };
 
 export type BuildCollectOrdersOptions = {
-  treasuryInput: UTxO;
-  orderInputs: UTxO[];
+  treasuryInput: LbeUTxO;
+  orderInputs: LbeUTxO[];
   validFrom: UnixTime;
   validTo: UnixTime;
 };
@@ -149,7 +150,7 @@ export type BuildCollectOrdersOptions = {
 export type PenaltyConfig = { penaltyStartTime: bigint; percent: bigint };
 
 export type BuildUpdateLBEOptions = {
-  treasuryInput: UTxO;
+  treasuryInput: LbeUTxO;
   validFrom: UnixTime;
   validTo: UnixTime;
   // updatable fields
@@ -165,16 +166,16 @@ export type BuildUpdateLBEOptions = {
 };
 
 export type BuildCancelLBEOptions = {
-  treasuryInput: UTxO;
-  ammFactoryRefInput?: UTxO;
+  treasuryInput: LbeUTxO;
+  ammFactoryRefInput?: LbeUTxO;
   validFrom: UnixTime;
   validTo: UnixTime;
   reason: "CreatedPool" | "ByOwner" | "NotReachMinimum";
 };
 
 export type BuildCreateAmmPoolOptions = {
-  treasuryInput: UTxO;
-  ammFactoryInput: UTxO;
+  treasuryInput: LbeUTxO;
+  ammFactoryInput: LbeUTxO;
   ammPoolDatum: FeedTypeAmmPool["_datum"];
   validFrom: UnixTime;
   validTo: UnixTime;
@@ -185,15 +186,15 @@ export type BuildCreateAmmPoolOptions = {
 };
 
 export type BuildRedeemOrdersOptions = {
-  treasuryInput: UTxO;
-  orderInputs: UTxO[];
+  treasuryInput: LbeUTxO;
+  orderInputs: LbeUTxO[];
   validFrom: UnixTime;
   validTo: UnixTime;
 };
 
 export type BuildCloseEventOptions = {
-  treasuryInput: UTxO;
-  factoryInputs: UTxO[]; // [Head Factory Input, Tail Factory Input]
+  treasuryInput: LbeUTxO;
+  factoryInputs: LbeUTxO[]; // [Head Factory Input, Tail Factory Input]
   validFrom: UnixTime;
   validTo: UnixTime;
 };
@@ -281,11 +282,11 @@ export class WarehouseBuilder {
   treasuryRefInput: UTxO | undefined;
 
   // Inputs
-  treasuryInputs: UTxO[] = [];
-  managerInputs: UTxO[] = [];
-  factoryInputs: UTxO[] = [];
-  orderInputs: UTxO[] = [];
-  sellerInputs: UTxO[] = [];
+  treasuryInputs: LbeUTxO[] = [];
+  managerInputs: LbeUTxO[] = [];
+  factoryInputs: LbeUTxO[] = [];
+  orderInputs: LbeUTxO[] = [];
+  sellerInputs: LbeUTxO[] = [];
 
   // Redeemer
   factoryRedeemer: FactoryRedeemer | undefined;
@@ -1193,7 +1194,7 @@ export class WarehouseBuilder {
       },
       () => {
         for (const utxo of sellerInputs) {
-          const sellerDatum = WarehouseBuilder.fromDatumSeller(utxo.datum!);
+          const sellerDatum = WarehouseBuilder.fromDatumSeller(utxo.datum);
           const assets = {
             lovelace: utxo.assets["lovelace"] - COLLECT_SELLER_COMMISSION,
           };
