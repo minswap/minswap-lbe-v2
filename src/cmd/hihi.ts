@@ -14,7 +14,7 @@ let main = async () => {
   let params: LbeParameters = {
     baseAsset: {
       policyId: "e16c2dc8ae937e8d3790c7fd7168d7b994621ba14ca11415f39fed72",
-      assetName: "0014df104b494e474d41",
+      assetName: "0014df104b494e474d4132",
     },
     reserveBase: 50_000_000_000_000n,
     raiseAsset: {

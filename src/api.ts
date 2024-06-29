@@ -26,6 +26,8 @@ import {
   type TreasuryDatum,
   type UnixTime,
   type walletApi,
+  type BuildCloseEventOptions,
+  type Network,
 } from ".";
 import { LbePhaseUtils, type LbePhase } from "./helper";
 
@@ -91,7 +93,7 @@ export interface UpdateOrderOptions {
 }
 
 export class Api {
-  private builder: WarehouseBuilder;
+  builder: WarehouseBuilder;
 
   constructor(builder: WarehouseBuilder) {
     this.builder = builder;
@@ -136,6 +138,25 @@ export class Api {
   }
 
   /** ******************** Validating **************************/
+  static validateCloseEvent(options: {
+    network: Network;
+    datum: TreasuryDatum;
+    owner: Address;
+  }): boolean {
+    let { network, datum, owner } = options;
+    invariant(datum.isCancelled, "LBE is not cancelled");
+    invariant(datum.isManagerCollected, "Manager has not collected yet");
+    invariant(
+      datum.totalPenalty === 0n && datum.reserveRaise === 0n,
+      "Refund All Orders Please",
+    );
+    invariant(
+      plutusAddress2Address(network, datum.owner) === owner,
+      "You are not project owner",
+    );
+    return true;
+  }
+
   static validateUpdateOrder(options: {
     treasuryDatum: TreasuryDatum;
     validFrom: UnixTime;
@@ -342,6 +363,28 @@ export class Api {
     return factoryUtxo;
   }
 
+  async findCloseFactory({ baseAsset, raiseAsset }: LbeId): Promise<LbeUTxO[]> {
+    let lpAssetName = computeLPAssetName(
+      baseAsset.policyId + baseAsset.assetName,
+      raiseAsset.policyId + raiseAsset.assetName,
+    );
+    let factories = (await this.builder.t.utxosAtWithUnit(
+      this.builder.factoryAddress,
+      this.builder.factoryToken,
+    )) as LbeUTxO[];
+    let head = factories.find((f) => {
+      let factoryDatum = WarehouseBuilder.fromDatumFactory(f.datum);
+      return factoryDatum.tail === lpAssetName;
+    });
+    invariant(head, "Cannot find Head Factory");
+    let tail = factories.find((f) => {
+      let factoryDatum = WarehouseBuilder.fromDatumFactory(f.datum);
+      return factoryDatum.head === lpAssetName;
+    });
+    invariant(tail, "Cannot find Tail Factory");
+    return [head, tail];
+  }
+
   /**************************************************************** */
 
   /**
@@ -441,6 +484,34 @@ export class Api {
     this.builder.clean();
     let completeTx = await this.builder
       .buildCancelLBE(options)
+      .complete()
+      .complete();
+
+    return completeTx.toString();
+  }
+
+  /**
+   * * Actor: Project Owner
+   */
+  async closeLBE(lbeId: LbeId, owner: Address): Promise<string> {
+    let treasuryInput = await this.findTreasury(lbeId);
+    let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasuryInput.datum);
+    Api.validateCloseEvent({
+      network: this.builder.t.network,
+      datum: treasuryDatum,
+      owner,
+    });
+    let factoryInputs = await this.findCloseFactory(lbeId);
+    let validFrom = await this.genValidFrom();
+    let options: BuildCloseEventOptions = {
+      treasuryInput,
+      factoryInputs,
+      validFrom,
+      validTo: validFrom + 3 * 60 * 60 * 1000,
+    };
+    this.builder.clean();
+    let completeTx = await this.builder
+      .buildCloseEvent(options)
       .complete()
       .complete();
 

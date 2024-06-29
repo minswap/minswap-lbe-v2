@@ -1,12 +1,19 @@
-import { WarehouseBuilder, type BuildCollectSellersOptions } from "../build-tx";
+import invariant from "@minswap/tiny-invariant";
+import {
+  WarehouseBuilder,
+  type BuildCollectSellersOptions,
+  type BuildCollectManagerOptions,
+} from "../build-tx";
 import { MAX_COLLECT_SELLERS } from "../constants";
 import { BatchingPhase } from "../helper";
+import logger from "../logger";
 import type {
   BluePrintAsset,
   CTransactionOutput,
   LbeUTxO,
   TxSigned,
   UTxO,
+  UnixTime,
 } from "../types";
 import { computeLPAssetName } from "../utils";
 import {
@@ -70,19 +77,47 @@ export class WarehouseBatcher {
     this.builder = builder;
   }
 
+  async getCurrentUnixTime(): Promise<UnixTime> {
+    let slot = await this.builder.t.getCurrentSlot();
+    return this.builder.t.utils.slotToUnixTime(slot);
+  }
+
   // BUILDING
+  async buildCollectManager(options: {
+    batching: BatchUTxO;
+    seeds: UTxO[];
+  }): Promise<string> {
+    let { batching, seeds } = options;
+    invariant(batching.manager, "Missing Manager");
+    this.builder.clean();
+    let currentUnixTime = await this.getCurrentUnixTime();
+    let collectManagerOptions: BuildCollectManagerOptions = {
+      treasuryInput: batching.treasury,
+      managerInput: batching.manager,
+      validFrom: currentUnixTime,
+      validTo: currentUnixTime + 3 * 60 * 60 * 1000,
+    };
+    let completeTx = await this.builder
+      .buildCollectManager(collectManagerOptions)
+      .complete()
+      .complete({ inputsToChoose: seeds });
+    let signedTx = await completeTx.sign().complete();
+    return await signedTx.submit();
+  }
+
   async buildCollectSellers(
     mapInputs: CollectSellersMapInput,
     extra: { sellers: LbeUTxO[]; treasuryRefInput: LbeUTxO },
   ): Promise<TxSigned> {
     let { sellers, treasuryRefInput } = extra;
     this.builder.clean();
+    let currentUnixTime = await this.getCurrentUnixTime();
     let options: BuildCollectSellersOptions = {
       treasuryRefInput,
       managerInput: mapInputs.manager[0],
       sellerInputs: sellers,
-      validFrom: Date.now(),
-      validTo: Date.now() + 3 * 60 * 60 * 1000,
+      validFrom: currentUnixTime,
+      validTo: currentUnixTime + 3 * 60 * 60 * 1000,
     };
     this.builder.buildCollectSeller(options);
     this.builder.tasks.push(() => {
@@ -126,6 +161,9 @@ export class WarehouseBatcher {
         sellers: batchSellers,
       });
     };
+    let submit = async (tx: string): Promise<string> => {
+      return this.builder.t.wallet.submitTx(tx);
+    };
     return {
       mapInputs,
       stopCondition,
@@ -135,6 +173,7 @@ export class WarehouseBatcher {
         treasuryRefInput: batching.treasury,
       },
       buildTx,
+      submit,
     };
   }
 
@@ -151,10 +190,17 @@ export class WarehouseBatcher {
       });
       // Skip if not in counting phase
       if (!phase) continue;
+      logger.info(`batching phase: ${phase}`);
       let seeds = await this.builder.t.wallet.getUtxos();
       if (phase === "countingSellers") {
         let options = this.collectSellersChaining(batching, seeds);
-        await doChaining(options);
+        let txHashes = await doChaining(options);
+        for (const txHash of txHashes) {
+          logger.info(`do ${phase} txHash: ${txHash}`);
+        }
+      } else if (phase === "collectManager") {
+        let txHash = await this.buildCollectManager({ batching, seeds });
+        logger.info(`do ${phase} txHash: ${txHash}`);
       } else {
         throw Error("hihi");
       }
@@ -185,25 +231,34 @@ export class WarehouseBatcher {
         tag: LbeValidator.TREASURY,
         utxo: u as LbeUTxO,
       });
-      this.mapBatchingUTxO[lbeId] = { ...(this.mapBatchingUTxO[lbeId] ?? {}), treasury: u as LbeUTxO };
+      this.mapBatchingUTxO[lbeId] = {
+        ...(this.mapBatchingUTxO[lbeId] ?? {}),
+        treasury: u as LbeUTxO,
+      };
     }
     for (let u of managers) {
       let lbeId = LbeId.from({ tag: LbeValidator.MANAGER, utxo: u as LbeUTxO });
-      this.mapBatchingUTxO[lbeId] = { ...(this.mapBatchingUTxO[lbeId] ?? {}), manager: u as LbeUTxO };
+      this.mapBatchingUTxO[lbeId] = {
+        ...(this.mapBatchingUTxO[lbeId] ?? {}),
+        manager: u as LbeUTxO,
+      };
     }
     for (let u of sellers) {
       let lbeId = LbeId.from({ tag: LbeValidator.SELLER, utxo: u as LbeUTxO });
       this.mapBatchingUTxO[lbeId] = {
         ...(this.mapBatchingUTxO[lbeId] ?? {}),
-        sellers: [...(this.mapBatchingUTxO[lbeId]?.sellers ?? []), u as LbeUTxO],
-      }
+        sellers: [
+          ...(this.mapBatchingUTxO[lbeId]?.sellers ?? []),
+          u as LbeUTxO,
+        ],
+      };
     }
     for (let u of orders) {
       let lbeId = LbeId.from({ tag: LbeValidator.ORDER, utxo: u as LbeUTxO });
       this.mapBatchingUTxO[lbeId] = {
         ...(this.mapBatchingUTxO[lbeId] ?? {}),
         orders: [...(this.mapBatchingUTxO[lbeId]?.orders ?? []), u as LbeUTxO],
-      }
+      };
     }
   }
 }

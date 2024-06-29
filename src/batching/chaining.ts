@@ -24,32 +24,38 @@ export type Chaining = {
     extra: any,
   ) => Promise<TxSigned>;
   stopCondition: () => boolean;
-  submit?: (tx: string) => Promise<void>;
+  submit?: (tx: string) => Promise<string>;
 };
 
-export async function doChaining(options: Chaining) {
-  let { mapInputs, inputIdentifyFuncs, extra, buildTx, stopCondition, submit } =
-    options;
-  let C = T.CModuleLoader.get;
+export async function doChaining(options: Chaining): Promise<string[]> {
+  const {
+    mapInputs,
+    inputIdentifyFuncs,
+    extra,
+    buildTx,
+    stopCondition,
+    submit,
+  } = options;
+  const C = T.CModuleLoader.get;
+  const txHashes: string[] = [];
   while (true) {
     if (stopCondition()) {
-      return;
+      return txHashes;
     }
-    let tx = await buildTx(mapInputs, extra);
-    // await (submit ? submit(tx.toString()) : submitTx(tx.toString()));
-    let transactionHash = tx.toHash();
-    console.log("transactionHash ", transactionHash);
-    console.log(
-      "full Tx: ",
-      C.Transaction.from_bytes(T.fromHex(tx.toString())).body().to_json(),
-    );
-    let txHash = C.TransactionHash.from_hex(transactionHash);
-    let finalOutputs = tx.txSigned.body().outputs();
-    for (let [k, v] of Object.entries(inputIdentifyFuncs)) {
-      let coreUtxos = v(txHash, finalOutputs);
-      let utxos: UTxO[] = [];
+    const tx = await buildTx(mapInputs, extra);
+    (submit ? submit(tx.toString()) : submitTx(tx.toString())).catch((err) => {
+      console.error("submit Tx Fail", err);
+      throw err;
+    });
+    const transactionHash = tx.toHash();
+    txHashes.push(transactionHash);
+    const txHash = C.TransactionHash.from_hex(transactionHash);
+    const finalOutputs = tx.txSigned.body().outputs();
+    for (const [k, v] of Object.entries(inputIdentifyFuncs)) {
+      const coreUtxos = v(txHash, finalOutputs);
+      const utxos: UTxO[] = [];
       for (let i = 0; i < coreUtxos.len(); i++) {
-        let coreUtxo = coreUtxos.get(i);
+        const coreUtxo = coreUtxos.get(i);
         utxos.push(T.coreToUtxo(coreUtxo));
       }
       mapInputs[k] = utxos;
@@ -72,16 +78,16 @@ export async function submitTx(tx: string): Promise<string> {
 export function identifyCommon(
   compare: (output: CTransactionOutput) => boolean,
 ): InputIdentify {
-  let innerFunc = (
+  const innerFunc = (
     txHash: CTransactionHash,
     finalOutputs: CTransactionOutputs,
   ) => {
-    let C = T.CModuleLoader.get;
-    let result = C.TransactionUnspentOutputs.new();
+    const C = T.CModuleLoader.get;
+    const result = C.TransactionUnspentOutputs.new();
     for (let i = 0; i < finalOutputs.len(); i++) {
-      let output = finalOutputs.get(i);
+      const output = finalOutputs.get(i);
       if (compare(output)) {
-        let input = C.TransactionInput.new(
+        const input = C.TransactionInput.new(
           txHash,
           C.BigNum.from_str(i.toString()),
         );

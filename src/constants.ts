@@ -40,3 +40,24 @@ export const MAX_COLLECT_ORDERS = 50;
 export const MAX_REDEEM_ORDERS = 50;
 export const MAX_REFUND_ORDERS = 50;
 export const MAX_SEEDS = 100;
+
+// Protocol
+export const LABEL_MESSAGE_METADATA = 674;
+
+// Metadata Message
+export const LBE_MESSAGE_INIT = "LBE-V2 | Init";
+export const LBE_MESSAGE_CREATE = "LBE-V2 | Create New Event";
+export const LBE_MESSAGE_CANCEL = "LBE-V2 | Cancel Event";
+export const LBE_MESSAGE_UPDATE = "LBE-V2 | Update Event";
+export const LBE_MESSAGE_ADD_SELLERS = "LBE-V2 | Add Sellers";
+export const LBE_MESSAGE_CREATE_ORDER = "LBE-V2 | Create Order";
+export const LBE_MESSAGE_UPDATE_ORDER = "LBE-V2 | Update Order";
+export const LBE_MESSAGE_CANCEL_ORDER = "LBE-V2 | Cancel Order";
+export const LBE_MESSAGE_COUNTING_SELLERS = "LBE-V2 | Counting Sellers";
+export const LBE_MESSAGE_COLLECT_MANAGER = "LBE-V2 | Collect Manager";
+export const LBE_MESSAGE_COLLECT_ORDERS = "LBE-V2 | Collect Orders";
+export const LBE_MESSAGE_CREATE_AMM_POOL = "LBE-V2 | Create AMM Pool";
+export const LBE_MESSAGE_REDEEM_ORDERS = "LBE-V2 | Redeem Orders";
+export const LBE_MESSGAE_REFUND_ORDERS = "LBE-V2 | Refund Orders";
+export const LBE_MESSAGE_CLOSE = "LBE-V2 | Close Event";
+export const LBE_MESSAGE_USING_SELLER = "LBE-V2 | Using Seller";

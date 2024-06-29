@@ -36,6 +36,20 @@ import {
   TREASURY_MIN_ADA,
   SELLER_COMMISSION,
   COLLECT_SELLER_COMMISSION,
+  LABEL_MESSAGE_METADATA,
+  LBE_MESSAGE_INIT,
+  LBE_MESSAGE_CREATE,
+  LBE_MESSAGE_ADD_SELLERS,
+  LBE_MESSAGE_USING_SELLER,
+  LBE_MESSAGE_UPDATE,
+  LBE_MESSAGE_CANCEL,
+  LBE_MESSAGE_CREATE_AMM_POOL,
+  LBE_MESSAGE_CLOSE,
+  LBE_MESSAGE_REDEEM_ORDERS,
+  LBE_MESSGAE_REFUND_ORDERS,
+  LBE_MESSAGE_COLLECT_ORDERS,
+  LBE_MESSAGE_COLLECT_MANAGER,
+  LBE_MESSAGE_COUNTING_SELLERS,
 } from "./constants";
 import {
   collectValidators,
@@ -426,6 +440,9 @@ export class WarehouseBuilder {
       () => {
         this.payingFactoryOutput();
       },
+      () => {
+        WarehouseBuilder.addMetadataMessage(this.tx, LBE_MESSAGE_INIT);
+      },
     );
     return this;
   }
@@ -506,6 +523,9 @@ export class WarehouseBuilder {
           );
         }
       },
+      () => {
+        WarehouseBuilder.addMetadataMessage(this.tx, LBE_MESSAGE_CREATE);
+      },
     );
     return this;
   }
@@ -550,6 +570,9 @@ export class WarehouseBuilder {
           .readFrom([treasuryRefUtxo])
           .validFrom(validFrom)
           .validTo(validTo);
+      },
+      () => {
+        WarehouseBuilder.addMetadataMessage(this.tx, LBE_MESSAGE_ADD_SELLERS);
       },
     );
     return this;
@@ -630,6 +653,9 @@ export class WarehouseBuilder {
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
       },
+      () => {
+        WarehouseBuilder.addMetadataMessage(this.tx, LBE_MESSAGE_USING_SELLER);
+      },
     );
     return this;
   }
@@ -680,6 +706,9 @@ export class WarehouseBuilder {
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
       },
+      () => {
+        WarehouseBuilder.addMetadataMessage(this.tx, LBE_MESSAGE_UPDATE);
+      },
     );
     return this;
   }
@@ -718,6 +747,9 @@ export class WarehouseBuilder {
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
+      },
+      () => {
+        WarehouseBuilder.addMetadataMessage(this.tx, LBE_MESSAGE_CANCEL);
       },
     );
     return this;
@@ -811,6 +843,12 @@ export class WarehouseBuilder {
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
       },
+      () => {
+        WarehouseBuilder.addMetadataMessage(
+          this.tx,
+          LBE_MESSAGE_CREATE_AMM_POOL,
+        );
+      },
     );
     return this;
   }
@@ -858,6 +896,9 @@ export class WarehouseBuilder {
       },
       () => {
         this.payingFactoryOutput();
+      },
+      () => {
+        WarehouseBuilder.addMetadataMessage(this.tx, LBE_MESSAGE_CLOSE);
       },
     );
     return this;
@@ -953,6 +994,9 @@ export class WarehouseBuilder {
       () => {
         this.withdrawFromFactory();
       },
+      () => {
+        WarehouseBuilder.addMetadataMessage(this.tx, LBE_MESSAGE_REDEEM_ORDERS);
+      },
     );
     return this;
   }
@@ -1035,6 +1079,9 @@ export class WarehouseBuilder {
       () => {
         this.withdrawFromFactory();
       },
+      () => {
+        WarehouseBuilder.addMetadataMessage(this.tx, LBE_MESSGAE_REFUND_ORDERS);
+      },
     );
     return this;
   }
@@ -1093,6 +1140,12 @@ export class WarehouseBuilder {
       () => {
         this.withdrawFromFactory();
       },
+      () => {
+        WarehouseBuilder.addMetadataMessage(
+          this.tx,
+          LBE_MESSAGE_COLLECT_ORDERS,
+        );
+      },
     );
     return this;
   }
@@ -1137,6 +1190,12 @@ export class WarehouseBuilder {
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
+      },
+      () => {
+        WarehouseBuilder.addMetadataMessage(
+          this.tx,
+          LBE_MESSAGE_COLLECT_MANAGER,
+        );
       },
     );
     return this;
@@ -1206,6 +1265,12 @@ export class WarehouseBuilder {
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
+      },
+      () => {
+        WarehouseBuilder.addMetadataMessage(
+          this.tx,
+          LBE_MESSAGE_COUNTING_SELLERS,
+        );
       },
     );
     return this;
@@ -1869,5 +1934,9 @@ export class WarehouseBuilder {
         },
         poolAssets,
       );
+  }
+
+  static addMetadataMessage(tx: Tx, msg: string) {
+    tx.attachMetadata(LABEL_MESSAGE_METADATA, JSON.stringify({ msg }));
   }
 }
