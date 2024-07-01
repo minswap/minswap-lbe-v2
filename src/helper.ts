@@ -1,4 +1,57 @@
-import type { TreasuryDatum, UnixTime } from "./types";
+import { WarehouseBuilder } from "./build-tx";
+import type { LbeUTxO, TreasuryDatum, UnixTime } from "./types";
+
+export type BatchingPhase =
+  | "countingSellers"
+  | "collectManager"
+  | "collectOrders"
+  | "redeemOrders"
+  | "refundOrders";
+
+export namespace BatchingPhase {
+  export function from(options: {
+    treasury: LbeUTxO;
+    manager?: LbeUTxO;
+    now: UnixTime;
+  }): BatchingPhase | undefined {
+    let { treasury, manager, now } = options;
+    let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasury.datum);
+    // counting
+    if (treasuryDatum.isCancelled || treasuryDatum.endTime < now) {
+      if (manager) {
+        let managerDatum = WarehouseBuilder.fromDatumManager(manager.datum);
+        if (managerDatum.sellerCount > 0n) return "countingSellers";
+        if (managerDatum.sellerCount === 0n) return "collectManager";
+      }
+      if (
+        treasuryDatum.isManagerCollected &&
+        treasuryDatum.collectedFund !==
+          treasuryDatum.reserveRaise + treasuryDatum.totalLiquidity
+      )
+        return "collectOrders";
+    }
+    // encounter
+    if (
+      treasuryDatum.isCancelled &&
+      treasuryDatum.isManagerCollected &&
+      treasuryDatum &&
+      treasuryDatum.collectedFund > 0n &&
+      treasuryDatum.collectedFund ===
+        treasuryDatum.reserveRaise + treasuryDatum.totalLiquidity
+    ) {
+      return "refundOrders";
+    }
+    if (
+      treasuryDatum.totalLiquidity > 0n &&
+      treasuryDatum.collectedFund > 0n &&
+      treasuryDatum.collectedFund ===
+        treasuryDatum.reserveRaise + treasuryDatum.totalLiquidity
+    ) {
+      return "redeemOrders";
+    }
+    return undefined;
+  }
+}
 
 export type LbePhase =
   | "pending"
