@@ -2,10 +2,6 @@ import * as T from "@minswap/translucent";
 import { beforeEach, expect, test } from "bun:test";
 import { FactoryValidatorValidateFactory as AmmValidateFactory } from "../../amm-plutus";
 import {
-  FeedTypeAmmPool,
-  TreasuryValidateTreasurySpending,
-} from "../../plutus";
-import {
   WarehouseBuilder,
   type BuildAddSellersOptions,
   type BuildCollectManagerOptions,
@@ -40,11 +36,7 @@ import type {
   TreasuryDatum,
   UTxO,
 } from "../types";
-import {
-  address2PlutusAddress,
-  calculateInitialLiquidity,
-  toUnit,
-} from "../utils";
+import { address2PlutusAddress, toUnit } from "../utils";
 import params from "./../../params.json";
 import {
   generateAccount,
@@ -471,52 +463,11 @@ test("example flow", async () => {
         builder.treasuryToken,
       )) as LbeUTxO[]
     )[0];
-    const treasuryDatum = T.Data.from(
-      treasuryUtxo.datum,
-      TreasuryValidateTreasurySpending.treasuryInDatum,
-    );
-    const reserveB =
-      (treasuryDatum.reserveBase * treasuryDatum.poolAllocation) / 100n;
-    const reserveA =
-      ((treasuryDatum.reserveRaise + treasuryDatum.totalPenalty) *
-        treasuryDatum.poolAllocation) /
-      100n;
-    const receiverB = treasuryDatum.reserveBase - reserveB;
-    const receiverA =
-      treasuryDatum.reserveRaise + treasuryDatum.totalPenalty - reserveA;
-    const totalLiquidity = calculateInitialLiquidity(reserveA, reserveB);
-    const poolDatum: FeedTypeAmmPool["_datum"] = {
-      poolBatchingStakeCredential: {
-        Inline: [
-          {
-            ScriptCredential: [
-              t.utils.validatorToScriptHash(
-                ammValidators.poolBatchingValidator,
-              ),
-            ],
-          },
-        ],
-      },
-      assetA: treasuryDatum.raiseAsset,
-      assetB: treasuryDatum.baseAsset,
-      totalLiquidity: totalLiquidity,
-      reserveA: reserveA,
-      reserveB: reserveB,
-      baseFeeANumerator: treasuryDatum.poolBaseFee,
-      baseFeeBNumerator: treasuryDatum.poolBaseFee,
-      feeSharingNumeratorOpt: null,
-      allowDynamicFee: false,
-    };
-
     const options: BuildCreateAmmPoolOptions = {
       treasuryInput: treasuryUtxo,
       ammFactoryInput: ammFactoryInput,
-      ammPoolDatum: poolDatum,
       validFrom: t.utils.slotToUnixTime(emulator.slot),
       validTo: t.utils.slotToUnixTime(emulator.slot + 100),
-      totalLiquidity,
-      receiverA,
-      receiverB,
       extraDatum,
     };
     builder = new WarehouseBuilder(warehouseOptions);
