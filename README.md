@@ -1,55 +1,39 @@
-# lb_v2
+# 😻 Minswap LBE V2 Contract
 
-Write validators in the `validators` folder, and supporting functions in the `lib` folder using `.ak` as a file extension.
-
-For example, as `validators/always_true.ak`
-
-```gleam
-validator {
-  fn spend(_datum: Data, _redeemer: Data, _context: Data) -> Bool {
-    True
-  }
-}
-```
+## Structure
+- Main contracts:
+  - [Factory Validator](/validators/factory.ak)
+  - [Treasury Validator](/validators/factory.ak)
+  - [Manager Validator](/validators/manager.ak)
+  - [Seller Validator](/validators/seller.ak)
+  - [Order Validator](/validators/order.ak)
+- Library: under [library](/lib/lb_v2) package
 
 ## Building
 
-```sh
-aiken build
-```
+### Prerequisites
+- Install [Bun v1.1.17](https://bun.sh/docs/installation)
+- Install [Aiken v1.0.24-alpha](https://aiken-lang.org/installation-instructions)
+- Run `aiken build` to double check scripts bytecode in `plutus.json` file 
+- Run `bun install` to install necessary dependencies 
 
 ## Testing
 
-You can write tests in any module using the `test` keyword. For example:
+- Run `bun check` to run all unit tests.
 
-```gleam
-test foo() {
-  1 + 1 == 2
-}
-```
+## Deployment
 
-To run all tests, simply do:
+### Testnet Preprod
+The smart contract has already been deployed on Testnet Preprod.
 
-```sh
-aiken check
-```
+The detailed information on the deployment is located in [References](/lbe-v2-script.json)
 
-To run only tests matching the string `foo`, do:
+## Audit Report
 
-```sh
-aiken check -m foo
-```
+The contract audit is being conducted by Certik.
 
-## Documentation
+The audit report will be available later.
 
-If you're writing a library, you might want to generate an HTML documentation for it.
+## References
 
-Use:
-
-```sh
-aiken docs
-```
-
-## Resources
-
-Find more on the [Aiken's user manual](https://aiken-lang.org).
+1. [Specification](/lbe-docs)
