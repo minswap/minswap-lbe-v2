@@ -27,11 +27,13 @@ Validation:
     + 1 Treasury output contain remaining raise asset and lp asset
     + sum owner outputs = owner lp asset
 */
+import invariant from "@minswap/tiny-invariant";
 import * as T from "@minswap/translucent";
+import { FactoryValidatorValidateFactory } from "../../amm-plutus";
 import type { FeedTypeAmmPool } from "../../plutus";
 import { WarehouseBuilder, type BuildCreateAmmPoolOptions } from "../build-tx";
 import { LP_COLATERAL, TREASURY_MIN_ADA } from "../constants";
-import type { TreasuryDatum, UTxO } from "../types";
+import type { LbeUTxO, TreasuryDatum } from "../types";
 import {
   calculateInitialLiquidity,
   plutusAddress2Address,
@@ -39,8 +41,6 @@ import {
 } from "../utils";
 import { assertValidatorFail, genWarehouseOptions, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
-import { FactoryValidatorValidateFactory } from "../../amm-plutus";
-import invariant from "@minswap/tiny-invariant";
 
 let utxoIndex = 0;
 
@@ -80,7 +80,7 @@ async function genTestWarehouse() {
     head: "00",
     tail: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
   };
-  const ammFactoryUTxO: UTxO = {
+  const ammFactoryUTxO: LbeUTxO = {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
     outputIndex: ++utxoIndex,
     address: builder.ammFactoryAddress,
@@ -104,12 +104,8 @@ async function genTestWarehouse() {
   const options: BuildCreateAmmPoolOptions = {
     treasuryInput: treasuryUTxO,
     ammFactoryInput: ammFactoryUTxO,
-    ammPoolDatum: poolDatum,
     validFrom: Number(treasuryDatum.endTime + 1000n),
     validTo: Number(treasuryDatum.endTime + 1100n),
-    totalLiquidity: totalLiquidity,
-    receiverA: 0n,
-    receiverB: 0n,
   };
   return {
     builder,
@@ -192,13 +188,12 @@ test("Create AMM Pool | FAIL | manager is collected", async () => {
   });
 });
 
-test("Create AMM Pool | FAIL | Invalid Treasury out value", async () => {
+test("Create AMM Pool | FAIL | Wrong Treasury out value", async () => {
   const { builder, options, treasuryDatum } = warehouse;
   builder.buildCreateAmmPool(options);
-  const projectOwnerLp = (options.totalLiquidity - LP_COLATERAL) / 2n;
   const treasuryOutDatum: TreasuryDatum = {
     ...treasuryDatum,
-    totalLiquidity: options.totalLiquidity - LP_COLATERAL - projectOwnerLp,
+    totalLiquidity: 123123n, // dummy
   };
   builder.tasks[3] = () => {
     const createPoolAssets = () => {
@@ -228,10 +223,10 @@ test("Create AMM Pool | FAIL | Invalid Treasury out value", async () => {
   };
   assertValidatorFail(builder);
 });
-test("Create AMM Pool | FAIL | Invalid Treasury out value", async () => {
+
+test("Create AMM Pool | FAIL | Wrong Project Owner Output", async () => {
   const { builder, options, treasuryDatum } = warehouse;
   builder.buildCreateAmmPool(options);
-  const projectOwnerLp = (options.totalLiquidity - LP_COLATERAL) / 2n;
   builder.tasks[4] = () => {
     invariant(builder.ammLpToken);
     const projectOwner = plutusAddress2Address(
@@ -239,7 +234,7 @@ test("Create AMM Pool | FAIL | Invalid Treasury out value", async () => {
       treasuryDatum.owner,
     );
     builder.tx.payToAddress(projectOwner, {
-      [builder.ammLpToken]: projectOwnerLp - 1n,
+      [builder.ammLpToken]: 1203n, // dummy
     });
     // just ensure 1LP not pay to project owner
     builder.tx.payToAddress(builder.orderAddress, { [builder.ammLpToken]: 1n });

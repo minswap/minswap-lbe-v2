@@ -25,7 +25,7 @@ import {
   type PenaltyConfig,
   type TreasuryDatum,
   type UnixTime,
-  type walletApi,
+  type WalletApi,
   type BuildCloseEventOptions,
   type Network,
 } from ".";
@@ -88,7 +88,7 @@ export interface CreateOrderOptions {
 export interface UpdateOrderOptions {
   baseAsset: BluePrintAsset;
   raiseAsset: BluePrintAsset;
-  orderUTxO: LbeUTxO;
+  orderUTxOs: LbeUTxO[];
   amount: bigint;
 }
 
@@ -160,10 +160,10 @@ export class Api {
   static validateUpdateOrder(options: {
     treasuryDatum: TreasuryDatum;
     validFrom: UnixTime;
-    orderDatum: OrderDatum;
+    orderDatums: OrderDatum[];
     amount: bigint;
   }): boolean {
-    let { treasuryDatum, validFrom, orderDatum, amount } = options;
+    let { treasuryDatum, validFrom, orderDatums, amount } = options;
 
     invariant(treasuryDatum.isCancelled === false, "LBE is cancelled");
     invariant(
@@ -176,7 +176,8 @@ export class Api {
     );
 
     if (amount < 0n) {
-      let newAmount = orderDatum.amount + amount;
+      const inAmount = orderDatums.reduce((acc, d) => acc + d.amount, 0n);
+      let newAmount = inAmount + amount;
       invariant(
         newAmount > (treasuryDatum.minimumOrderRaise ?? 0n),
         "Order Amount must greater than minimum order raise",
@@ -522,8 +523,21 @@ export class Api {
    * Actor: User
    */
   async updateOrder(options: UpdateOrderOptions): Promise<string> {
-    let { baseAsset, raiseAsset, amount, orderUTxO } = options;
-    let orderDatum = WarehouseBuilder.fromDatumOrder(orderUTxO.datum);
+    let { baseAsset, raiseAsset, amount, orderUTxOs } = options;
+    invariant(orderUTxOs.length > 0, "Order Inputs is empty");
+    let orderDatums = orderUTxOs.map((o) =>
+      WarehouseBuilder.fromDatumOrder(o.datum),
+    );
+    const owner = plutusAddress2Address(
+      this.builder.t.network,
+      orderDatums[0].owner,
+    );
+    const inAmount = orderDatums.reduce((acc, d) => acc + d.amount, 0n);
+    const inPenaltyAmount = orderDatums.reduce(
+      (acc, d) => acc + d.penaltyAmount,
+      0n,
+    );
+    const outAmount = inAmount + amount;
     let treasuryRefInput = await this.findTreasury({ baseAsset, raiseAsset });
     let treasuryDatum: TreasuryDatum = WarehouseBuilder.fromDatumTreasury(
       treasuryRefInput.datum,
@@ -541,8 +555,8 @@ export class Api {
       if (BigInt(validFrom) >= treasuryDatum.penaltyConfig.penaltyStartTime) {
         penaltyAmount = Api.calculatePenalty({
           validTo,
-          inAmount: orderDatum.amount,
-          outAmount: orderDatum.amount + amount,
+          inAmount,
+          outAmount,
           penaltyConfig: treasuryDatum.penaltyConfig,
         });
       } else {
@@ -555,12 +569,12 @@ export class Api {
     }
 
     let newOrderDatum: OrderDatum = {
-      ...orderDatum,
-      amount: orderDatum.amount + amount,
-      penaltyAmount: orderDatum.penaltyAmount + penaltyAmount,
+      ...orderDatums[0],
+      amount: outAmount,
+      penaltyAmount: inPenaltyAmount + penaltyAmount,
     };
 
-    Api.validateUpdateOrder({ treasuryDatum, amount, validFrom, orderDatum });
+    Api.validateUpdateOrder({ treasuryDatum, amount, validFrom, orderDatums });
 
     let sellers = await this.findSellers({ baseAsset, raiseAsset });
     let sellerUtxo = sellers[Math.floor(Math.random() * sellers.length)];
@@ -570,8 +584,8 @@ export class Api {
       sellerUtxo: sellerUtxo,
       validFrom,
       validTo,
-      owners: [plutusAddress2Address(this.builder.t.network, orderDatum.owner)],
-      orderInputs: [],
+      owners: [owner],
+      orderInputs: orderUTxOs,
       orderOutputDatums: [newOrderDatum],
     };
 
@@ -631,17 +645,21 @@ export class Api {
     return completeTx.toString();
   }
 
+  sellectWallet(walletApi: WalletApi): Api {
+    this.builder.t.selectWallet(walletApi);
+    return this;
+  }
+
   /**
    *
    * @param walletApi CIP-30 Wallet
    * @returns Api instance
    */
-  static async new(walletApi: walletApi) {
+  static async new() {
     let network: MaestroSupportedNetworks = "Preprod";
     let maestroApiKey = "E0n5jUy4j40nhKCuB7LrYabTNieG0egu";
     let maestro = new T.Maestro({ network, apiKey: maestroApiKey });
     let t = await T.Translucent.new(maestro, network);
-    t.selectWallet(walletApi);
     let warehouseOptions = genWarehouseBuilderOptions(t);
     let builder = new WarehouseBuilder(warehouseOptions);
     return new Api(builder);

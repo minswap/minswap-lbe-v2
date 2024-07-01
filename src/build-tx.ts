@@ -90,6 +90,7 @@ import {
   calculateInitialLiquidity,
   computeLPAssetName,
   hexToUtxo,
+  normalizedPair,
   plutusAddress2Address,
   sortUTxOs,
   toUnit,
@@ -190,12 +191,8 @@ export type BuildCancelLBEOptions = {
 export type BuildCreateAmmPoolOptions = {
   treasuryInput: LbeUTxO;
   ammFactoryInput: LbeUTxO;
-  ammPoolDatum: FeedTypeAmmPool["_datum"];
   validFrom: UnixTime;
   validTo: UnixTime;
-  totalLiquidity: bigint;
-  receiverA: bigint;
-  receiverB: bigint;
   extraDatum?: Datum; // Datum of TreasuryDatum.receiverDatum
 };
 
@@ -284,6 +281,7 @@ export class WarehouseBuilder {
   ammAuthenHash: string;
   ammPoolHash: string;
   ammFactoryHash: string;
+  ammPoolBatchingHash: string;
   ammPoolToken: string;
   ammFactoryToken: string;
   // -----------------------------------
@@ -384,6 +382,9 @@ export class WarehouseBuilder {
     );
     this.ammFactoryHash = t.utils.validatorToScriptHash(
       ammValidators.factoryValidator,
+    );
+    this.ammPoolBatchingHash = t.utils.validatorToScriptHash(
+      ammValidators.poolBatchingValidator,
     );
     this.ammPoolToken = toUnit(this.ammAuthenHash, MINSWAP_V2_POOL_AUTH_AN);
     this.ammFactoryToken = toUnit(
@@ -758,21 +759,57 @@ export class WarehouseBuilder {
   public buildCreateAmmPool(
     options: BuildCreateAmmPoolOptions,
   ): WarehouseBuilder {
-    const {
-      treasuryInput,
-      ammFactoryInput,
-      ammPoolDatum,
-      validFrom,
-      validTo,
-      totalLiquidity,
-      receiverA,
-      receiverB,
-      extraDatum,
-    } = options;
-    invariant(treasuryInput.datum);
+    const { treasuryInput, ammFactoryInput, extraDatum, validFrom, validTo } =
+      options;
     const treasuryInDatum = WarehouseBuilder.fromDatumTreasury(
       treasuryInput.datum,
     );
+    let totalReserveRaise: bigint;
+    if (
+      treasuryInDatum.maximumRaise &&
+      treasuryInDatum.maximumRaise < treasuryInDatum.collectedFund
+    ) {
+      totalReserveRaise = treasuryInDatum.maximumRaise;
+    } else {
+      totalReserveRaise = treasuryInDatum.collectedFund;
+    }
+
+    const [assetA, assetB] = normalizedPair(
+      treasuryInDatum.baseAsset,
+      treasuryInDatum.raiseAsset,
+    );
+
+    let reserveA: bigint;
+    let reserveB: bigint;
+    if (
+      assetA.policyId === treasuryInDatum.baseAsset.policyId &&
+      assetA.assetName === treasuryInDatum.baseAsset.assetName
+    ) {
+      reserveA = treasuryInDatum.reserveBase;
+      reserveB = totalReserveRaise;
+    } else {
+      reserveA = totalReserveRaise;
+      reserveB = treasuryInDatum.reserveBase;
+    }
+    const poolReserveA = (reserveA * treasuryInDatum.poolAllocation) / 100n;
+    const poolReserveB = (reserveB * treasuryInDatum.poolAllocation) / 100n;
+    const totalLiquidity = calculateInitialLiquidity(reserveA, reserveB);
+
+    const ammPoolDatum: FeedTypeAmmPool["_datum"] = {
+      poolBatchingStakeCredential: {
+        Inline: [{ ScriptCredential: [this.ammPoolBatchingHash] }],
+      },
+      assetA,
+      assetB,
+      totalLiquidity,
+      reserveA: poolReserveA,
+      reserveB: poolReserveB,
+      baseFeeANumerator: treasuryInDatum.poolBaseFee,
+      baseFeeBNumerator: treasuryInDatum.poolBaseFee,
+      feeSharingNumeratorOpt: null,
+      allowDynamicFee: false,
+    };
+
     const totalLbeLPs = totalLiquidity - LP_COLATERAL;
     const receiverLP =
       (totalLbeLPs * (treasuryInDatum.poolAllocation - 50n)) /
@@ -781,6 +818,7 @@ export class WarehouseBuilder {
       ...treasuryInDatum,
       totalLiquidity: totalLbeLPs - receiverLP,
     };
+
     this.tasks.push(
       () => {
         this.treasuryInputs = [treasuryInput];
@@ -799,15 +837,13 @@ export class WarehouseBuilder {
         const assets: Assets = {
           [this.ammLpToken]: receiverLP,
         };
+        const receiverA = reserveA - poolReserveA;
+        const receiverB = reserveB - poolReserveB;
         if (receiverA !== 0n) {
-          assets[
-            toUnit(ammPoolDatum.assetA.policyId, ammPoolDatum.assetA.assetName)
-          ] = receiverA;
+          assets[toUnit(assetA.policyId, assetA.assetName)] = receiverA;
         }
         if (receiverB !== 0n) {
-          assets[
-            toUnit(ammPoolDatum.assetB.policyId, ammPoolDatum.assetB.assetName)
-          ] = receiverB;
+          assets[toUnit(assetB.policyId, assetB.assetName)] = receiverB;
         }
         if (treasuryInDatum.receiverDatum !== "RNoDatum") {
           invariant(extraDatum);
