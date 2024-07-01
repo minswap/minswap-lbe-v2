@@ -1,5 +1,6 @@
 {
-  "name": "lb2",
+  "name": "lbe-sdk",
+  "version": "0.0.3",
   "scripts": {
     "build": "rimraf build && rollup -c rollup.config.mjs",
     "format": "bun prettier --w src/* --print-width 80",
