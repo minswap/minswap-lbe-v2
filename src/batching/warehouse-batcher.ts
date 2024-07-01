@@ -4,6 +4,7 @@ import {
   type BuildCollectManagerOptions,
   type BuildCollectOrdersOptions,
   type BuildCollectSellersOptions,
+  type BuildCreateAmmPoolOptions,
   type BuildRedeemOrdersOptions,
 } from "..";
 import { MAX_COLLECT_SELLERS } from "../constants";
@@ -58,7 +59,8 @@ type BuildOptions =
   | BuildCollectSellersOptions
   | BuildCollectManagerOptions
   | BuildRedeemOrdersOptions
-  | BuildRedeemOrdersOptions;
+  | BuildRedeemOrdersOptions
+  | BuildCreateAmmPoolOptions;
 type CommonBuildOptions = Omit<BuildOptions, "validFrom" | "validTo">;
 type CommonBuildFn = (options: BuildOptions) => WarehouseBuilder;
 
@@ -133,6 +135,24 @@ export class WarehouseBatcher {
   }
 
   // BUILDING
+  async buildCreateAmmPool(options: {
+    treasury: LbeUTxO;
+    ammFactory: LbeUTxO;
+    seeds: UTxO[];
+  }): Promise<TxSigned> {
+    const { treasury, ammFactory, seeds } = options;
+    let txSigned = await this.commonComplete({
+      buildFn: this.builder.buildCreateAmmPool as CommonBuildFn,
+      commonOptions: {
+        treasuryInput: treasury,
+        ammFactoryInput: ammFactory,
+      },
+      inputsToChoose: seeds,
+      extraTasks: [],
+    });
+    return txSigned;
+  }
+
   async buildCollectManager(options: {
     batching: BatchUTxO;
     seeds: UTxO[];
@@ -307,7 +327,8 @@ export class WarehouseBatcher {
           logger.info(`do ${phase} txHash: ${txHash}`);
         }
       } else if (phase === "collectManager") {
-        let txHash = await this.buildCollectManager({ batching, seeds });
+        const signedTx = await this.buildCollectManager({ batching, seeds });
+        const txHash = await signedTx.submit();
         logger.info(`do ${phase} txHash: ${txHash}`);
       } else if (
         ["collectOrders", "redeemOrders", "refundOrders"].includes(phase)
@@ -320,6 +341,77 @@ export class WarehouseBatcher {
       } else {
         throw Error(`not support this phase ${phase}`);
       }
+    }
+  }
+
+  /**
+   * do 2 things:
+   * 1. Auto cancel LBE if pool exist
+   * 2. Auto create Pool if need
+   */
+  async poolBatching() {
+    const treasuries: LbeUTxO[] = (await this.builder.t.utxosAtWithUnit(
+      this.builder.treasuryAddress,
+      this.builder.treasuryToken,
+    )) as LbeUTxO[];
+    const ammFactories: LbeUTxO[] = (await this.builder.t.utxosAtWithUnit(
+      this.builder.ammFactoryAddress,
+      this.builder.ammFactoryToken,
+    )) as LbeUTxO[];
+    // current AMM Pools with LP-Asset-Name
+    const pools: Set<string> = new Set([]);
+    for (const ammFactory of ammFactories) {
+      const datum = WarehouseBuilder.fromDatumAmmFactory(ammFactory.datum);
+      pools.add(datum.head);
+      pools.add(datum.tail);
+    }
+    const pendingCancelTreasuries: LbeUTxO[] = [];
+    const pendingCreatePoolTreasuries: LbeUTxO[] = [];
+    for (const treasury of treasuries) {
+      const datum = WarehouseBuilder.fromDatumTreasury(treasury.datum);
+      const { baseAsset, raiseAsset } = datum;
+      const lpAssetName = computeLPAssetName(
+        baseAsset.policyId + baseAsset.assetName,
+        raiseAsset.policyId + raiseAsset.assetName,
+      );
+      if (pools.has(lpAssetName)) {
+        pendingCancelTreasuries.push(treasury);
+      }
+      if (
+        // not cancelled
+        !datum.isCancelled &&
+        // manager collected
+        datum.isManagerCollected &&
+        // order collected
+        datum.collectedFund === datum.reserveRaise + datum.totalPenalty &&
+        // reach minimum
+        datum.collectedFund >= (datum.minimumRaise ?? 0n) &&
+        // not create pool yet
+        datum.totalLiquidity === 0n
+      ) {
+        pendingCreatePoolTreasuries.push(treasury);
+      }
+      // TODO: Cancel LBE pool exists
+    }
+
+    // Auto Create AMM Pool
+    for (const treasury of pendingCreatePoolTreasuries) {
+      const datum = WarehouseBuilder.fromDatumTreasury(treasury.datum);
+      const { baseAsset, raiseAsset } = datum;
+      const lpAssetName = computeLPAssetName(
+        baseAsset.policyId + baseAsset.assetName,
+        raiseAsset.policyId + raiseAsset.assetName,
+      );
+      const ammFactory = ammFactories.find((f) => {
+        const datum = WarehouseBuilder.fromDatumAmmFactory(f.datum);
+        return datum.head < lpAssetName && lpAssetName < datum.tail;
+      });
+      invariant(ammFactory, "Not found Factory");
+      const seeds = await this.builder.t.wallet.getUtxos();
+      const signedTx = await this.buildCreateAmmPool({ treasury, seeds, ammFactory });
+      const txHash = await signedTx.submit();
+      logger.info(`do create-amm-pool txHash: ${txHash}`);
+      await this.builder.t.awaitTx(txHash);
     }
   }
 

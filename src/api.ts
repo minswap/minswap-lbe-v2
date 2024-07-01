@@ -645,7 +645,7 @@ export class Api {
     return completeTx.toString();
   }
 
-  sellectWallet(walletApi: WalletApi): Api {
+  selectWallet(walletApi: WalletApi): Api {
     this.builder.t.selectWallet(walletApi);
     return this;
   }
