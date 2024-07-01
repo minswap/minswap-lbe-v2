@@ -1,13 +1,16 @@
 import invariant from "@minswap/tiny-invariant";
 import {
   WarehouseBuilder,
-  type BuildCollectSellersOptions,
   type BuildCollectManagerOptions,
-} from "../build-tx";
+  type BuildCollectOrdersOptions,
+  type BuildCollectSellersOptions,
+  type BuildRedeemOrdersOptions,
+} from "..";
 import { MAX_COLLECT_SELLERS } from "../constants";
 import { BatchingPhase } from "../helper";
 import logger from "../logger";
 import type {
+  Address,
   BluePrintAsset,
   CTransactionOutput,
   LbeUTxO,
@@ -22,6 +25,7 @@ import {
   type Chaining,
   type InputIdentify,
 } from "./chaining";
+import type { Tx } from "@minswap/translucent";
 
 enum LbeValidator {
   TREASURY,
@@ -43,6 +47,21 @@ interface CollectSellersMapInput extends Record<string, UTxO[]> {
   manager: LbeUTxO[];
 }
 type CollectSellerInputIds = "seeds" | "manager";
+
+interface OrdersMapInput extends Record<string, UTxO[]> {
+  seeds: UTxO[];
+  treasury: LbeUTxO[];
+}
+type OrderInputIds = "seeds" | "treasury";
+
+type BuildOptions =
+  | BuildCollectOrdersOptions
+  | BuildCollectSellersOptions
+  | BuildCollectManagerOptions
+  | BuildRedeemOrdersOptions
+  | BuildRedeemOrdersOptions;
+type CommonBuildOptions = Omit<BuildOptions, "validFrom" | "validTo">;
+type CommonBuildFn = (options: BuildOptions) => WarehouseBuilder;
 
 namespace LbeId {
   export function from(options: { tag: LbeValidator; utxo: LbeUTxO }): LbeId {
@@ -82,27 +101,55 @@ export class WarehouseBatcher {
     return this.builder.t.utils.slotToUnixTime(slot);
   }
 
+  // COMMON
+  private async commonComplete(options: {
+    buildFn: CommonBuildFn;
+    commonOptions: CommonBuildOptions;
+    inputsToChoose: UTxO[];
+    extraTasks: (() => void)[];
+  }): Promise<TxSigned> {
+    let { buildFn, commonOptions, inputsToChoose, extraTasks } = options;
+    let currentUnixTime = await this.getCurrentUnixTime();
+    let buildOptions = {
+      ...commonOptions,
+      validFrom: currentUnixTime,
+      validTo: currentUnixTime + 3 * 60 * 60 * 1000,
+    };
+    this.builder.clean();
+    let mutTxBuilder = buildFn(buildOptions as BuildOptions);
+    mutTxBuilder.tasks.push(...extraTasks);
+    let tx = await mutTxBuilder.complete().complete({ inputsToChoose });
+    let signedTx = tx.sign();
+    let txSigned = await signedTx.complete();
+    return txSigned;
+  }
+
+  private compareAddress(
+    address: Address,
+  ): (output: CTransactionOutput) => boolean {
+    let inner = (output: CTransactionOutput) => {
+      return output.address().to_bech32() === address;
+    };
+    return inner;
+  }
+
   // BUILDING
   async buildCollectManager(options: {
     batching: BatchUTxO;
     seeds: UTxO[];
-  }): Promise<string> {
+  }): Promise<TxSigned> {
     let { batching, seeds } = options;
     invariant(batching.manager, "Missing Manager");
-    this.builder.clean();
-    let currentUnixTime = await this.getCurrentUnixTime();
-    let collectManagerOptions: BuildCollectManagerOptions = {
-      treasuryInput: batching.treasury,
-      managerInput: batching.manager,
-      validFrom: currentUnixTime,
-      validTo: currentUnixTime + 3 * 60 * 60 * 1000,
-    };
-    let completeTx = await this.builder
-      .buildCollectManager(collectManagerOptions)
-      .complete()
-      .complete({ inputsToChoose: seeds });
-    let signedTx = await completeTx.sign().complete();
-    return await signedTx.submit();
+    let txSigned = await this.commonComplete({
+      buildFn: this.builder.buildCollectManager as CommonBuildFn,
+      commonOptions: {
+        treasuryInput: batching.treasury,
+        managerInput: batching.manager,
+      },
+      inputsToChoose: seeds,
+      extraTasks: [],
+    });
+    return txSigned;
   }
 
   async buildCollectSellers(
@@ -110,23 +157,42 @@ export class WarehouseBatcher {
     extra: { sellers: LbeUTxO[]; treasuryRefInput: LbeUTxO },
   ): Promise<TxSigned> {
     let { sellers, treasuryRefInput } = extra;
-    this.builder.clean();
-    let currentUnixTime = await this.getCurrentUnixTime();
-    let options: BuildCollectSellersOptions = {
-      treasuryRefInput,
-      managerInput: mapInputs.manager[0],
-      sellerInputs: sellers,
-      validFrom: currentUnixTime,
-      validTo: currentUnixTime + 3 * 60 * 60 * 1000,
-    };
-    this.builder.buildCollectSeller(options);
-    this.builder.tasks.push(() => {
-      this.builder.tx.collectFrom(mapInputs["seeds"]);
+    let txSigned = await this.commonComplete({
+      buildFn: this.builder.buildCollectSeller as CommonBuildFn,
+      commonOptions: {
+        treasuryRefInput,
+        managerInput: mapInputs.manager[0],
+        sellerInputs: sellers,
+      },
+      inputsToChoose: mapInputs["seeds"],
+      extraTasks: [
+        () => {
+          this.builder.tx.collectFrom(mapInputs["seeds"]);
+        },
+      ],
     });
-    let txBuilder = this.builder.complete();
-    let tx = await txBuilder.complete({ inputsToChoose: mapInputs["seeds"] });
-    let signedTx = tx.sign();
-    let txSigned = await signedTx.complete();
+    return txSigned;
+  }
+
+  async buildHandleOrders(
+    mapInputs: OrdersMapInput,
+    extra: { orders: LbeUTxO[]; treasury: LbeUTxO },
+    handleFn: CommonBuildFn,
+  ): Promise<TxSigned> {
+    let { orders, treasury } = extra;
+    let txSigned = await this.commonComplete({
+      buildFn: handleFn,
+      commonOptions: {
+        treasuryInput: treasury,
+        orderInputs: orders,
+      },
+      inputsToChoose: mapInputs["seeds"],
+      extraTasks: [
+        () => {
+          this.builder.tx.collectFrom(mapInputs["seeds"]);
+        },
+      ],
+    });
     return txSigned;
   }
 
@@ -135,21 +201,14 @@ export class WarehouseBatcher {
     let stopCondition = () => {
       return batching.sellers.length === 0;
     };
+    invariant(batching.manager, "Manager Not Found");
     let mapInputs: CollectSellersMapInput = {
       seeds,
-      manager: [batching.manager!],
-    };
-    let compareManager = (output: CTransactionOutput) => {
-      let curAddress = output.address();
-      return curAddress.to_bech32() === this.builder.managerAddress;
-    };
-    let compareSeed = (output: CTransactionOutput) => {
-      let curAddress = output.address();
-      return curAddress.to_bech32() === seedAddress;
+      manager: [batching.manager],
     };
     let inputIdentifyFuncs: Record<CollectSellerInputIds, InputIdentify> = {
-      seeds: identifyCommon(compareSeed),
-      manager: identifyCommon(compareManager),
+      seeds: identifyCommon(this.compareAddress(seedAddress)),
+      manager: identifyCommon(this.compareAddress(this.builder.managerAddress)),
     };
     let buildTx = async (
       args: Record<string, UTxO[]>,
@@ -174,6 +233,56 @@ export class WarehouseBatcher {
       },
       buildTx,
       submit,
+    };
+  }
+
+  getOrdersChaining(
+    batching: BatchUTxO,
+    seeds: UTxO[],
+    phase: BatchingPhase,
+  ): Chaining {
+    let seedAddress = seeds[0].address;
+    let stopCondition = () => {
+      return batching.orders.length === 0;
+    };
+    let mapInputs: OrdersMapInput = {
+      seeds,
+      treasury: [batching.treasury],
+    };
+    let inputIdentifyFuncs: Record<OrderInputIds, InputIdentify> = {
+      seeds: identifyCommon(this.compareAddress(seedAddress)),
+      treasury: identifyCommon(
+        this.compareAddress(this.builder.treasuryAddress),
+      ),
+    };
+    let cases: Record<
+      string,
+      (options: BuildRedeemOrdersOptions) => WarehouseBuilder
+    > = {
+      collectOrders: this.builder.buildCollectOrders,
+      refundOrders: this.builder.buildRefundOrders,
+      redeemOrders: this.builder.buildRedeemOrders,
+    };
+    let innerFn = cases[phase];
+    let buildTx = (
+      mapInputs: Record<string, UTxO[]>,
+      extra: { orders: LbeUTxO[]; treasury: LbeUTxO },
+    ): Promise<TxSigned> => {
+      return this.buildHandleOrders(
+        mapInputs as OrdersMapInput,
+        extra,
+        innerFn as CommonBuildFn,
+      );
+    };
+    return {
+      mapInputs,
+      inputIdentifyFuncs,
+      stopCondition,
+      extra: {
+        orders: batching.orders,
+        treasury: batching.treasury,
+      },
+      buildTx: buildTx.bind(this),
     };
   }
 

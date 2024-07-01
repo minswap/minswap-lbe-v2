@@ -4,7 +4,9 @@ import type { LbeUTxO, TreasuryDatum, UnixTime } from "./types";
 export type BatchingPhase =
   | "countingSellers"
   | "collectManager"
-  | "collectOrders";
+  | "collectOrders"
+  | "redeemOrders"
+  | "refundOrders";
 
 export namespace BatchingPhase {
   export function from(options: {
@@ -14,6 +16,7 @@ export namespace BatchingPhase {
   }): BatchingPhase | undefined {
     let { treasury, manager, now } = options;
     let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasury.datum);
+    // counting
     if (treasuryDatum.isCancelled || treasuryDatum.endTime < now) {
       if (manager) {
         let managerDatum = WarehouseBuilder.fromDatumManager(manager.datum);
@@ -26,6 +29,25 @@ export namespace BatchingPhase {
           treasuryDatum.reserveRaise + treasuryDatum.totalLiquidity
       )
         return "collectOrders";
+    }
+    // encounter
+    if (
+      treasuryDatum.isCancelled &&
+      treasuryDatum.isManagerCollected &&
+      treasuryDatum &&
+      treasuryDatum.collectedFund > 0n &&
+      treasuryDatum.collectedFund ===
+        treasuryDatum.reserveRaise + treasuryDatum.totalLiquidity
+    ) {
+      return "refundOrders";
+    }
+    if (
+      treasuryDatum.totalLiquidity > 0n &&
+      treasuryDatum.collectedFund > 0n &&
+      treasuryDatum.collectedFund ===
+        treasuryDatum.reserveRaise + treasuryDatum.totalLiquidity
+    ) {
+      return "redeemOrders";
     }
     return undefined;
   }
