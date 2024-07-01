@@ -2,14 +2,10 @@
   "name": "lb2",
   "scripts": {
     "build": "rimraf build && rollup -c rollup.config.mjs",
+    "format": "bun prettier --w src/* --print-width 80",
     "gen-amm-plutus": "bun run blueprint.ts amm-plutus.json amm-plutus.ts && bun run prettier -w amm-plutus.ts",
     "gen-plutus": "bun run blueprint.ts && bun run prettier -w plutus.ts",
-    "init-params": "bun run src/setup.ts init-params",
-    "collect-amm-validators": "bun run src/setup.ts collect-amm-validators",
-    "collect-validators": "bun run src/setup.ts collect-validators",
-    "check": "aiken build && bun gen-plutus && bun init-params && bun collect-validators && bun test",
-    "format": "bun prettier --w src/* --print-width 80",
-    "test:init-factory": "aiken build -t verbose && bun gen-plutus && bun test init-factory",
+    "check": "aiken build && aiken check && bun gen-plutus && bun gen-amm-plutus && bun test",
     "setup-testnet": "aiken build && bun gen-plutus && bun run src/cmd/set-up.ts"
   },
   "main": "./build/index.js",
