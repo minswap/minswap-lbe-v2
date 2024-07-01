@@ -25,7 +25,7 @@ import {
   type PenaltyConfig,
   type TreasuryDatum,
   type UnixTime,
-  type walletApi,
+  type WalletApi,
   type BuildCloseEventOptions,
   type Network,
 } from ".";
@@ -631,17 +631,21 @@ export class Api {
     return completeTx.toString();
   }
 
+  sellectWallet(walletApi: WalletApi): Api {
+    this.builder.t.selectWallet(walletApi);
+    return this;
+  }
+
   /**
    *
    * @param walletApi CIP-30 Wallet
    * @returns Api instance
    */
-  static async new(walletApi: walletApi) {
+  static async new() {
     let network: MaestroSupportedNetworks = "Preprod";
     let maestroApiKey = "E0n5jUy4j40nhKCuB7LrYabTNieG0egu";
     let maestro = new T.Maestro({ network, apiKey: maestroApiKey });
     let t = await T.Translucent.new(maestro, network);
-    t.selectWallet(walletApi);
     let warehouseOptions = genWarehouseBuilderOptions(t);
     let builder = new WarehouseBuilder(warehouseOptions);
     return new Api(builder);

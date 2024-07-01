@@ -38,7 +38,7 @@ export type TxSigned = T.TxSigned;
 export type Unit = T.Unit;
 export type UnixTime = T.UnixTime;
 export type UTxO = T.UTxO;
-export type walletApi = T.WalletApi;
+export type WalletApi = T.WalletApi;
 
 export type LbeUTxO = Omit<UTxO, "datum"> & { datum: Datum };
 
