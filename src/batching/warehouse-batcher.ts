@@ -25,7 +25,6 @@ import {
   type Chaining,
   type InputIdentify,
 } from "./chaining";
-import type { Tx } from "@minswap/translucent";
 
 enum LbeValidator {
   TREASURY,
@@ -310,8 +309,14 @@ export class WarehouseBatcher {
       } else if (phase === "collectManager") {
         let txHash = await this.buildCollectManager({ batching, seeds });
         logger.info(`do ${phase} txHash: ${txHash}`);
+      } else if (["collectOrders", "redeemOrders", "refundOrders"].includes(phase)) {
+        let options = this.getOrdersChaining(batching, seeds, phase);
+        let txHashes = await doChaining(options);
+        for (const txHash of txHashes) {
+          logger.info(`do ${phase} txHash: ${txHash}`);
+        }
       } else {
-        throw Error("hihi");
+        throw Error(`not support this phase ${phase}`);
       }
     }
   }
