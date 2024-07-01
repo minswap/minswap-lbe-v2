@@ -309,7 +309,9 @@ export class WarehouseBatcher {
       } else if (phase === "collectManager") {
         let txHash = await this.buildCollectManager({ batching, seeds });
         logger.info(`do ${phase} txHash: ${txHash}`);
-      } else if (["collectOrders", "redeemOrders", "refundOrders"].includes(phase)) {
+      } else if (
+        ["collectOrders", "redeemOrders", "refundOrders"].includes(phase)
+      ) {
         let options = this.getOrdersChaining(batching, seeds, phase);
         let txHashes = await doChaining(options);
         for (const txHash of txHashes) {
