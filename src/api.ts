@@ -428,8 +428,8 @@ export class Api {
       this.builder.ammFactoryToken,
     )) as LbeUTxO[];
     let factoryUtxo = factories.find((factory) => {
-      let datum = WarehouseBuilder.fromDatumAmmFactory(factory.datum);
-      return datum.head < lpAssetName && datum.tail > lpAssetName;
+      let factoryDatum = WarehouseBuilder.fromDatumAmmFactory(factory.datum);
+      return factoryDatum.head < lpAssetName && factoryDatum.tail > lpAssetName;
     });
     invariant(factoryUtxo, "Cannot find AMM Factory");
     return factoryUtxo;
@@ -445,6 +445,7 @@ export class Api {
       validFrom: await this.genValidFrom(),
       validTo: Date.now() + 3 * 60 * 60 * 1000,
     };
+    console.log(options);
     const completeTx = await this.builder
       .buildCreateAmmPool(options)
       .complete()

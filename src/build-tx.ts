@@ -232,7 +232,7 @@ export function genWarehouseBuilderOptions(
   let ammDeployedValidators = {
     authenValidator: hexToUtxo(lbeV2Script.ammAuthenRefInput),
     poolValidator: hexToUtxo(lbeV2Script.ammPoolRefInput),
-    factoryValidator: hexToUtxo(lbeV2Script.factoryRefInput),
+    factoryValidator: hexToUtxo(lbeV2Script.ammFactoryRefInput),
   };
   return {
     t,
@@ -369,9 +369,7 @@ export class WarehouseBuilder {
 
     // AMM
     this.ammValidators = ammValidators;
-    this.ammFactoryAddress = t.utils.validatorToAddress(
-      ammValidators.factoryValidator,
-    );
+    this.ammFactoryAddress = ammValidators.factoryAddress;
     this.ammPoolAddress = ammValidators.poolAddress;
     this.ammDeployedValidators = ammDeployedValidators;
     this.ammAuthenHash = t.utils.validatorToScriptHash(
@@ -809,6 +807,9 @@ export class WarehouseBuilder {
       feeSharingNumeratorOpt: null,
       allowDynamicFee: false,
     };
+
+    console.log(ammPoolDatum);
+    console.log("treasuryDatum", treasuryInDatum);
 
     const totalLbeLPs = totalLiquidity - LP_COLATERAL;
     const receiverLP =

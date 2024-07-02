@@ -32,7 +32,7 @@ import * as T from "@minswap/translucent";
 import { FactoryValidatorValidateFactory } from "../../amm-plutus";
 import type { FeedTypeAmmPool } from "../../plutus";
 import { WarehouseBuilder, type BuildCreateAmmPoolOptions } from "../build-tx";
-import { LP_COLATERAL, TREASURY_MIN_ADA } from "../constants";
+import { TREASURY_MIN_ADA } from "../constants";
 import type { LbeUTxO, TreasuryDatum } from "../types";
 import {
   calculateInitialLiquidity,
@@ -61,7 +61,7 @@ async function genTestWarehouse() {
     collectedFund,
     totalPenalty,
     reserveRaise,
-    isManagerCollected: true,
+    isManagerCollected: false,
   };
   const treasuryUTxO = {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
@@ -130,7 +130,7 @@ beforeEach(async () => {
   warehouse = await genTestWarehouse();
 });
 
-test("Create AMM Pool | PASS | Happy case", async () => {
+test("Create AMM Pool | PASS | hihi Happy case", async () => {
   const { builder, options } = warehouse;
   builder.buildCreateAmmPool(options);
   const tx = builder.complete();
