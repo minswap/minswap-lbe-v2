@@ -9,6 +9,7 @@
   "managerAddress": "addr_test1wqq7u63h2gzflxacuq9xvucyx3neug5xf75nwmp68ernvdc93dhjp",
   "sellerAddress": "addr_test1wrwsqmyzjq0y4nkmcc38prc4zyaxyhhr63jctz7djnkjftsps087j",
   "orderAddress": "addr_test1wzedczvk8mkcdc32er3hdvf3v3uc2a35e4ke2h453adqmfqgck8x2",
+  "factoryRewardAddress": "stake_test17qpnp0tqf0hhdn969mas4qe6urjzr9p7s24ame9fw6nd9lqfkv8ys",
   "factoryHash": "0330bd604bef76ccba2efb0a833ae0e421943e82abdde4a976a6d2fc",
   "treasuryHash": "99dcec6f835c2a5e8821d3f69b869d20d6338009efe753ca5c282357",
   "managerHash": "01ee6a3752049f9bb8e00a66730434679e22864fa9376c3a3e473637",

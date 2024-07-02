@@ -70,6 +70,7 @@ export type LbeScript = {
   managerAddress: string;
   sellerAddress: string;
   orderAddress: string;
+  factoryRewardAddress: string;
 
   factoryHash: string;
   treasuryHash: string;

@@ -1,6 +1,8 @@
+import invariant from "@minswap/tiny-invariant";
 import * as T from "@minswap/translucent";
 import * as fs from "fs";
 import path from "path";
+import lbeV2Script from "../../lbe-v2-script.json";
 import {
   collectMinswapValidators,
   collectValidators,
@@ -9,6 +11,7 @@ import {
   type MinswapValidators,
   type Validators,
 } from "../deploy-validators";
+import logger from "../logger";
 import type {
   Address,
   Credential,
@@ -19,7 +22,6 @@ import type {
   Translucent,
   UTxO,
 } from "../types";
-import invariant from "@minswap/tiny-invariant";
 
 const DEPLOY_TO =
   "addr_test1qrtu7cmf73668t8a68n0g3s4n5eas764ffc8knxnmvrrzsqlzcsaav6q4nwlv8gpazkdylxqmq2pselxvj35s46lauqsmlauwm";
@@ -227,6 +229,9 @@ class WarehouseSetUp {
         "orderAddress",
         this.validators.orderValidator,
       ),
+      factoryRewardAddress: this.t.utils.validatorToRewardAddress(
+        this.validators.factoryValidator,
+      ),
       factoryHash: setupValidatorHash(
         "factoryHash",
         this.validators.factoryValidator,
@@ -312,13 +317,27 @@ class WarehouseSetUp {
       console.log("lbe-v2-script.json file has been saved.");
     });
   }
+
+  async registerStake() {
+    const tx = await this.t
+      .newTx()
+      .registerStake(lbeV2Script.factoryRewardAddress)
+      .complete();
+    const signedTx = await tx.sign().complete();
+    const txHash = await signedTx.submit();
+    logger.info(`register txHash ${txHash}`);
+    await this.t.awaitTx(txHash);
+  }
 }
 
 let main = async () => {
+  logger.info("Start | set-up");
   await T.loadModule();
   await T.CModuleLoader.load();
   let warehouseSetUp = await WarehouseSetUp.new(getParams());
   await warehouseSetUp.setup();
+  await warehouseSetUp.registerStake();
+  logger.info("Finish | set-up");
 };
 
 main();
