@@ -122,6 +122,13 @@ export class Api {
     )) as LbeUTxO[];
   }
 
+  async getManagers(): Promise<LbeUTxO[]> {
+    return (await this.builder.t.utxosAtWithUnit(
+      this.builder.managerAddress,
+      this.builder.managerToken,
+    )) as LbeUTxO[];
+  }
+
   async getOrders(lbeId: LbeId, owner?: Address): Promise<LbeUTxO[]> {
     let orders = (await this.builder.t.utxosAtWithUnit(
       this.builder.orderAddress,
@@ -129,13 +136,12 @@ export class Api {
     )) as LbeUTxO[];
     return orders.filter((o) => {
       let orderDatum = WarehouseBuilder.fromDatumOrder(o.datum);
-      return (
-        Api.compareLbeId(lbeId, orderDatum) &&
-        (owner
-          ? owner ===
-            plutusAddress2Address(this.builder.t.network, orderDatum.owner)
-          : true)
+      const orderOwner = plutusAddress2Address(
+        this.builder.t.network,
+        orderDatum.owner,
       );
+      const isOwner = owner ? owner === orderOwner : true;
+      return Api.compareLbeId(lbeId, orderDatum) && isOwner;
     });
   }
 

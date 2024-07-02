@@ -1,6 +1,8 @@
+import * as T from "@minswap/translucent";
 import invariant from "@minswap/tiny-invariant";
 import {
   WarehouseBuilder,
+  genWarehouseBuilderOptions,
   type BuildCollectManagerOptions,
   type BuildCollectOrdersOptions,
   type BuildCollectSellersOptions,
@@ -87,6 +89,18 @@ namespace LbeId {
     };
     return innerFunc(cases[tag](utxo));
   }
+}
+
+export async function genDefaultBatcher(): Promise<WarehouseBatcher> {
+  const seed =
+    "voyage private emerge bunker laundry before drastic throw scout damp budget adult wonder charge sister route jacket sound undo dwarf dignity quit cat erode";
+  const maestro = new T.Maestro({ network: "Preprod", apiKey: "E0n5jUy4j40nhKCuB7LrYabTNieG0egu" });
+  const t = await T.Translucent.new(maestro, "Preprod");
+  t.selectWalletFromSeed(seed);
+  const warehouseOptions = genWarehouseBuilderOptions(t);
+  const builder = new WarehouseBuilder(warehouseOptions);
+  const batcher = new WarehouseBatcher(builder);
+  return batcher;
 }
 
 export class WarehouseBatcher {

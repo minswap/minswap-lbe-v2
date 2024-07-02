@@ -357,8 +357,10 @@ const main = async () => {
   const maestroApiKey = "E0n5jUy4j40nhKCuB7LrYabTNieG0egu";
   const maestro = new T.Maestro({ network, apiKey: maestroApiKey });
   const t = await T.Translucent.new(maestro, network);
+  console.log(T.generateSeedPhrase());
   t.selectWalletFromSeed(seed);
-
+  console.log(await t.wallet.address());
+  return;
   const warehouseOptions = genWarehouseBuilderOptions(t);
   const builder = new WarehouseBuilder(warehouseOptions);
   const batcher = new WarehouseBatcher(builder);
