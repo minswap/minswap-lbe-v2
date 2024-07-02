@@ -90,7 +90,12 @@ fn cancel_by_owner(
   let TreasuryDatum { revocable, start_time, end_time, owner, .. } =
     treasury_datum
   let Address { payment_credential: owner_payment_credential, .. } = owner
-
+  // get last time project owner can make cancel
+  let last_time =
+    when revocable is {
+      True -> start_time
+      False -> end_time
+    }
   and {
     // transaction validity before the last time
     end_valid_time_range < last_time,
