@@ -11,8 +11,13 @@ import type {
   UTxO,
   Unit,
   LbeScript,
+  TxHash,
+  Assets,
+  Script,
+  BluePrintAsset,
 } from "./types";
 import lbeV2Script from "./../lbe-v2-script.json";
+import invariant from "@minswap/tiny-invariant";
 
 export function getLbeScript(): LbeScript {
   return lbeV2Script as LbeScript;
@@ -263,4 +268,42 @@ export function hexToUtxo(hexUtxo: string): UTxO {
 export async function loadModule(): Promise<void> {
   await T.loadModule();
   await T.CModuleLoader.load();
+}
+
+export async function mintNativeToken(options: {
+  trans: Translucent;
+  assetName: string;
+  amount: bigint;
+}): Promise<{ txHash: TxHash; asset: BluePrintAsset }> {
+  const { trans, assetName, amount } = options;
+  const C = T.CModuleLoader.get;
+  const addressDetails = T.getAddressDetails(await trans.wallet.address());
+  invariant(
+    addressDetails.paymentCredential,
+    "address not have payment credential",
+  );
+  const keyHash = C.Ed25519KeyHash.from_hex(
+    addressDetails.paymentCredential.hash,
+  );
+  const scriptPubKey = C.ScriptPubkey.new(keyHash);
+  const nativeScript = C.NativeScript.new_script_pubkey(scriptPubKey);
+  const policyId = nativeScript.hash().to_hex();
+  const assets: Assets = {
+    [toUnit(policyId, assetName)]: amount,
+  };
+  const script: Script = {
+    type: "Native",
+    script: T.toHex(nativeScript.to_bytes()),
+  };
+  const completeTx = await trans
+    .newTx()
+    .attachMintingPolicy(script)
+    .mintAssets(assets)
+    .complete();
+  const signedTx = await completeTx.sign().complete();
+  const txHash = await signedTx.submit();
+  return {
+    txHash,
+    asset: { policyId, assetName },
+  };
 }

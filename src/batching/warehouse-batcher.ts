@@ -408,7 +408,11 @@ export class WarehouseBatcher {
       });
       invariant(ammFactory, "Not found Factory");
       const seeds = await this.builder.t.wallet.getUtxos();
-      const signedTx = await this.buildCreateAmmPool({ treasury, seeds, ammFactory });
+      const signedTx = await this.buildCreateAmmPool({
+        treasury,
+        seeds,
+        ammFactory,
+      });
       const txHash = await signedTx.submit();
       logger.info(`do create-amm-pool txHash: ${txHash}`);
       await this.builder.t.awaitTx(txHash);

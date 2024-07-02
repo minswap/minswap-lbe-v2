@@ -28,6 +28,8 @@ import {
   type WalletApi,
   type BuildCloseEventOptions,
   type Network,
+  type TxHash,
+  type BuildAddSellersOptions,
 } from ".";
 import { LbePhaseUtils, type LbePhase } from "./helper";
 
@@ -256,10 +258,7 @@ export class Api {
       "Base Asset, Raise Asset must be different",
     );
     invariant(baseAssetUnit !== "lovelace", "Base Asset must not equal ADA");
-    invariant(
-      startTime >= Date.now() + 5 * 60 * 1000,
-      "LBE must start in future",
-    );
+    invariant(startTime >= Date.now(), "LBE must start in future");
     invariant(startTime < endTime, "StartTime < EndTime");
     invariant(
       endTime - startTime <= DISCOVERY_MAX_RANGE,
@@ -311,6 +310,32 @@ export class Api {
   /** **********************************************/
 
   /***************** Find UTxO *********************/
+  async findOrders(lbeId: LbeId, isCollected: boolean): Promise<LbeUTxO[]> {
+    const orders = (await this.builder.t.utxosAtWithUnit(
+      this.builder.orderAddress,
+      this.builder.orderToken,
+    )) as LbeUTxO[];
+    return orders.filter((o) => {
+      const datum = WarehouseBuilder.fromDatumOrder(o.datum);
+      return (
+        datum.isCollected === isCollected && Api.compareLbeId(lbeId, datum)
+      );
+    });
+  }
+
+  async findManager(lbeId: LbeId): Promise<LbeUTxO> {
+    const managers = (await this.builder.t.utxosAtWithUnit(
+      this.builder.managerAddress,
+      this.builder.managerToken,
+    )) as LbeUTxO[];
+    const manager = managers.find((m) => {
+      const datum = WarehouseBuilder.fromDatumManager(m.datum);
+      return Api.compareLbeId(lbeId, datum);
+    });
+    invariant(manager, "not found Manager");
+    return manager;
+  }
+
   /**
    * Finding Sellers
    */
@@ -386,7 +411,47 @@ export class Api {
     return [head, tail];
   }
 
+  async findAmmFactory({ baseAsset, raiseAsset }: LbeId): Promise<LbeUTxO> {
+    let lpAssetName = computeLPAssetName(
+      baseAsset.policyId + baseAsset.assetName,
+      raiseAsset.policyId + raiseAsset.assetName,
+    );
+    let factories = (await this.builder.t.utxosAtWithUnit(
+      this.builder.ammFactoryAddress,
+      this.builder.ammFactoryToken,
+    )) as LbeUTxO[];
+    let factoryUtxo = factories.find((factory) => {
+      let datum = WarehouseBuilder.fromDatumAmmFactory(factory.datum);
+      return datum.head < lpAssetName && datum.tail > lpAssetName;
+    });
+    invariant(factoryUtxo, "Cannot find AMM Factory");
+    return factoryUtxo;
+  }
   /**************************************************************** */
+  async addSellers(lbeId: LbeId, addSellerCount: bigint): Promise<TxHash> {
+    this.builder.clean();
+    const validFrom = await this.genValidFrom();
+    const treasuryRefUtxo = await this.findTreasury(lbeId);
+    const treasuryDatum = WarehouseBuilder.fromDatumTreasury(
+      treasuryRefUtxo.datum,
+    );
+    const managerUtxo = await this.findManager(lbeId);
+    const options: BuildAddSellersOptions = {
+      treasuryRefUtxo,
+      managerUtxo,
+      addSellerCount,
+      validFrom,
+      validTo: Number(treasuryDatum.endTime - 1n),
+      owner: MAGIC_THINGS.sellerOwner,
+    };
+    const completeTx = await this.builder
+      .buildAddSeller(options)
+      .complete()
+      .complete();
+    const signedTx = await completeTx.sign().complete();
+    const txHash = await signedTx.submit();
+    return txHash;
+  }
 
   /**
    * Actor: Project Owner
@@ -449,7 +514,7 @@ export class Api {
       treasuryDatum,
       sellerOwner: MAGIC_THINGS.sellerOwner,
       validFrom: await this.genValidFrom(),
-      validTo: Date.now() + 3 * 60 * 60 * 1000,
+      validTo: Number(treasuryDatum.startTime - 1n),
     };
 
     this.builder.clean();

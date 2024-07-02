@@ -34,6 +34,7 @@ export type Script = T.Script;
 export type ScriptRef = T.ScriptRef;
 export type Translucent = T.Translucent;
 export type Tx = T.Tx;
+export type TxHash = T.TxHash;
 export type TxSigned = T.TxSigned;
 export type Unit = T.Unit;
 export type UnixTime = T.UnixTime;
