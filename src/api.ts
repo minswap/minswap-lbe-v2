@@ -30,6 +30,7 @@ import {
   type Network,
   type TxHash,
   type BuildAddSellersOptions,
+  type BuildCreateAmmPoolOptions,
 } from ".";
 import { LbePhaseUtils, type LbePhase } from "./helper";
 
@@ -434,6 +435,25 @@ export class Api {
     return factoryUtxo;
   }
   /**************************************************************** */
+  async createPool(lbeId: LbeId): Promise<TxHash> {
+    this.builder.clean();
+    const treasuryInput = await this.findTreasury(lbeId);
+    const ammFactoryInput = await this.findAmmFactory(lbeId);
+    const options: BuildCreateAmmPoolOptions = {
+      treasuryInput,
+      ammFactoryInput,
+      validFrom: await this.genValidFrom(),
+      validTo: Date.now() + 3 * 60 * 60 * 1000,
+    };
+    const completeTx = await this.builder
+      .buildCreateAmmPool(options)
+      .complete()
+      .complete();
+    const signedTx = await completeTx.sign().complete();
+    const txHash = await signedTx.submit();
+    return txHash;
+  }
+
   async addSellers(lbeId: LbeId, addSellerCount: bigint): Promise<TxHash> {
     this.builder.clean();
     const validFrom = await this.genValidFrom();
@@ -565,18 +585,18 @@ export class Api {
     let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasuryInput.datum);
     let validFrom = await this.genValidFrom();
     Api.validateCancelLbeByOwner(validFrom, treasuryDatum);
-
-    let validTo: number =
-      validFrom < Number(treasuryDatum.startTime)
-        ? Number(treasuryDatum.startTime) - 1
-        : Number(treasuryDatum.endTime) - 1;
-
+    let validTo = treasuryDatum.revocable
+      ? Number(treasuryDatum.endTime) - 5 * 1000
+      : Number(treasuryDatum.startTime) - 5 * 1000;
+    console.log("walletAddress", await this.builder.t.wallet.address());
+    console.log("owner", plutusAddress2Address("Preprod", treasuryDatum.owner));
     let options: BuildCancelLBEOptions = {
       treasuryInput,
       validFrom,
       validTo,
       reason: "ByOwner",
     };
+    console.log(options);
 
     this.builder.clean();
     let completeTx = await this.builder

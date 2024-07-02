@@ -117,7 +117,7 @@ const happyCase = async (options: { batcher: WarehouseBatcher; api: Api }) => {
     endTime: 0,
     addSellerCount: 40n,
     orderAmount: 1000000n,
-    orderCount: 200,
+    orderCount: 100,
     treasury: genDummyUTxO() as LbeUTxO,
     manager: genDummyUTxO() as LbeUTxO,
     sellers: [],
@@ -131,7 +131,7 @@ const happyCase = async (options: { batcher: WarehouseBatcher; api: Api }) => {
   logger.warn("Start | Mint Assets");
   const { txHash: mintTxHash, asset: baseAsset } = await mintNativeToken({
     trans,
-    assetName: T.fromText(`TONY-TEST-${Date.now()}`),
+    assetName: T.fromText(`TONY-${Date.now()}`),
     amount: things.reserveBase,
   });
   logger.info(`mint native asset | txHash ${mintTxHash}`);
@@ -144,8 +144,8 @@ const happyCase = async (options: { batcher: WarehouseBatcher; api: Api }) => {
     toUnit(things.lbeId.baseAsset.policyId, things.lbeId.baseAsset.assetName),
     toUnit(things.lbeId.raiseAsset.policyId, things.lbeId.raiseAsset.assetName),
   );
-  things.startTime = Date.now() + 2 * 60 * 1000;
-  things.endTime = things.startTime + 5 * 60 * 1000;
+  things.startTime = Date.now() + 3 * 60 * 1000;
+  things.endTime = things.startTime + 60 * 60 * 1000;
   const lbeParameters: LbeParameters = {
     ...things.lbeId,
     reserveBase: things.reserveBase,
@@ -163,14 +163,14 @@ const happyCase = async (options: { batcher: WarehouseBatcher; api: Api }) => {
   logger.info(`create LBE | txHash ${createTxHash}`);
   await trans.awaitTx(createTxHash);
 
-  // 2.1 Add Sellers
-  logger.warn("Start | Add Sellers");
-  const addSellerTxHash = await api.addSellers(
-    things.lbeId,
-    things.addSellerCount,
-  );
-  logger.info(`add more sellers | txHash ${addSellerTxHash}`);
-  await trans.awaitTx(addSellerTxHash);
+  // // 2.1 Add Sellers
+  // logger.warn("Start | Add Sellers");
+  // const addSellerTxHash = await api.addSellers(
+  //   things.lbeId,
+  //   things.addSellerCount,
+  // );
+  // logger.info(`add more sellers | txHash ${addSellerTxHash}`);
+  // await trans.awaitTx(addSellerTxHash);
 
   // 3. Deposit some orders
   logger.warn("Start | Deposit Orders");
@@ -242,6 +242,7 @@ const happyCase = async (options: { batcher: WarehouseBatcher; api: Api }) => {
     logger.info(`deposit tx: ${depositTx}`);
   }
   await Promise.all(depositTxHashes.map(trans.awaitTx));
+  return;
 
   // Collect Sellers
   logger.warn("Start | Collect Sellers");
@@ -357,10 +358,7 @@ const main = async () => {
   const maestroApiKey = "E0n5jUy4j40nhKCuB7LrYabTNieG0egu";
   const maestro = new T.Maestro({ network, apiKey: maestroApiKey });
   const t = await T.Translucent.new(maestro, network);
-  console.log(T.generateSeedPhrase());
   t.selectWalletFromSeed(seed);
-  console.log(await t.wallet.address());
-  return;
   const warehouseOptions = genWarehouseBuilderOptions(t);
   const builder = new WarehouseBuilder(warehouseOptions);
   const batcher = new WarehouseBatcher(builder);

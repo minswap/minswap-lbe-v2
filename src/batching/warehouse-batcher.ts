@@ -131,12 +131,24 @@ export class WarehouseBatcher {
           options as BuildCollectSellersOptions,
         );
       },
-      createAmmPool: this.builder.buildCreateAmmPool.bind(
-        this,
-      ) as CommonBuildFn,
       collectManager: (options: BuildOptions) => {
         return this.builder.buildCollectManager(
           options as BuildCollectManagerOptions,
+        );
+      },
+      redeemOrders: (options: BuildOptions) => {
+        return this.builder.buildRedeemOrders(
+          options as BuildRedeemOrdersOptions,
+        );
+      },
+      collectOrders: (options: BuildOptions) => {
+        return this.builder.buildCollectOrders(
+          options as BuildCollectOrdersOptions,
+        );
+      },
+      refundOrders: (options: BuildOptions) => {
+        return this.builder.buildRefundOrders(
+          options as BuildRedeemOrdersOptions,
         );
       },
     };
@@ -153,6 +165,7 @@ export class WarehouseBatcher {
     let tx = await this.builder.complete().complete({ inputsToChoose });
     let signedTx = tx.sign();
     let txSigned = await signedTx.complete();
+    console.log(txSigned.toString());
     return txSigned;
   }
 
@@ -227,11 +240,11 @@ export class WarehouseBatcher {
   async buildHandleOrders(
     mapInputs: OrdersMapInput,
     extra: { orders: LbeUTxO[]; treasury: LbeUTxO },
-    _handleFn: CommonBuildFn,
+    phase: BatchingPhase,
   ): Promise<TxSigned> {
     let { orders, treasury } = extra;
     let txSigned = await this.commonComplete({
-      buildFnName: "",
+      buildFnName: phase,
       commonOptions: {
         treasuryInput: treasury,
         orderInputs: orders,
@@ -304,23 +317,15 @@ export class WarehouseBatcher {
         this.compareAddress(this.builder.treasuryAddress),
       ),
     };
-    let cases: Record<
-      string,
-      (options: BuildRedeemOrdersOptions) => WarehouseBuilder
-    > = {
-      collectOrders: this.builder.buildCollectOrders,
-      refundOrders: this.builder.buildRefundOrders,
-      redeemOrders: this.builder.buildRedeemOrders,
-    };
-    let innerFn = cases[phase];
     let buildTx = (
       mapInputs: Record<string, UTxO[]>,
       extra: { orders: LbeUTxO[]; treasury: LbeUTxO },
     ): Promise<TxSigned> => {
+      let batchOrders = extra.orders.splice(0, Number(50));
       return this.buildHandleOrders(
         mapInputs as OrdersMapInput,
-        extra,
-        innerFn as CommonBuildFn,
+        { ...extra, orders: batchOrders },
+        phase,
       );
     };
     return {
@@ -331,7 +336,10 @@ export class WarehouseBatcher {
         orders: batching.orders,
         treasury: batching.treasury,
       },
-      buildTx: buildTx.bind(this),
+      buildTx: buildTx,
+      submit: async (tx: string) => {
+        return await this.builder.t.wallet.submitTx(tx);
+      },
     };
   }
 
