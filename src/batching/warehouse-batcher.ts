@@ -11,7 +11,6 @@ import {
 } from "..";
 import { MAX_COLLECT_SELLERS } from "../constants";
 import { BatchingPhase } from "../helper";
-import logger from "../logger";
 import type {
   Address,
   BluePrintAsset,
@@ -131,9 +130,11 @@ export class WarehouseBatcher {
       validTo: currentUnixTime + 3 * 60 * 60 * 1000,
     };
     this.builder.clean();
-    let mutTxBuilder = buildFn(buildOptions as BuildOptions);
-    mutTxBuilder.tasks.push(...extraTasks);
-    let tx = await mutTxBuilder.complete().complete({ inputsToChoose });
+    console.log("going here");
+    buildFn(buildOptions as BuildOptions);
+    console.log(this.builder);
+    this.builder.tasks.push(...extraTasks);
+    let tx = await this.builder.complete().complete({ inputsToChoose });
     let signedTx = tx.sign();
     let txSigned = await signedTx.complete();
     return txSigned;
@@ -332,25 +333,25 @@ export class WarehouseBatcher {
       });
       // Skip if not in counting phase
       if (!phase) continue;
-      logger.info(`batching phase: ${phase}`);
+      console.info(`batching phase: ${phase}`);
       let seeds = await this.builder.t.wallet.getUtxos();
       if (phase === "countingSellers") {
         let options = this.collectSellersChaining(batching, seeds);
         let txHashes = await doChaining(options);
         for (const txHash of txHashes) {
-          logger.info(`do ${phase} txHash: ${txHash}`);
+          console.info(`do ${phase} txHash: ${txHash}`);
         }
       } else if (phase === "collectManager") {
         const signedTx = await this.buildCollectManager({ batching, seeds });
         const txHash = await signedTx.submit();
-        logger.info(`do ${phase} txHash: ${txHash}`);
+        console.info(`do ${phase} txHash: ${txHash}`);
       } else if (
         ["collectOrders", "redeemOrders", "refundOrders"].includes(phase)
       ) {
         let options = this.getOrdersChaining(batching, seeds, phase);
         let txHashes = await doChaining(options);
         for (const txHash of txHashes) {
-          logger.info(`do ${phase} txHash: ${txHash}`);
+          console.info(`do ${phase} txHash: ${txHash}`);
         }
       } else {
         throw Error(`not support this phase ${phase}`);
@@ -428,7 +429,7 @@ export class WarehouseBatcher {
         ammFactory,
       });
       const txHash = await signedTx.submit();
-      logger.info(`do create-amm-pool txHash: ${txHash}`);
+      console.info(`do create-amm-pool txHash: ${txHash}`);
       await this.builder.t.awaitTx(txHash);
     }
   }
