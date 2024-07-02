@@ -1973,6 +1973,6 @@ export class WarehouseBuilder {
   }
 
   static addMetadataMessage(tx: Tx, msg: string) {
-    tx.attachMetadata(LABEL_MESSAGE_METADATA, JSON.stringify({ msg }));
+    tx.attachMetadata(LABEL_MESSAGE_METADATA, { msg: [msg] });
   }
 }
