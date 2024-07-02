@@ -5,6 +5,7 @@ import type {
   CTransactionOutput,
   CTransactionOutputs,
   CTransactionUnspentOutputs,
+  TxHash,
   TxSigned,
   UTxO,
 } from "../types";
@@ -27,7 +28,7 @@ export type Chaining = {
   submit?: (tx: string) => Promise<string>;
 };
 
-export async function doChaining(options: Chaining): Promise<string[]> {
+export async function doChaining(options: Chaining): Promise<TxHash[]> {
   const {
     mapInputs,
     inputIdentifyFuncs,
