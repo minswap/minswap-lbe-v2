@@ -532,6 +532,31 @@ export class Api {
     return completeTx.toString();
   }
 
+  async cancelNotReachMinimum(lbeId: LbeId): Promise<TxHash> {
+    const treasuryInput = await this.findTreasury(lbeId);
+    let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasuryInput.datum);
+    invariant(
+      treasuryDatum.collectedFund ===
+        treasuryDatum.reserveRaise + treasuryDatum.totalPenalty &&
+        treasuryDatum.isManagerCollected &&
+        treasuryDatum.collectedFund < (treasuryDatum.minimumRaise ?? 1n),
+      "canot cancel by not reach minimum raise",
+    );
+    let validFrom = await this.genValidFrom();
+    let options: BuildCancelLBEOptions = {
+      treasuryInput,
+      validFrom,
+      validTo: validFrom + 3 * 60 * 60 * 1000,
+      reason: "NotReachMinimum",
+    };
+    this.builder.clean();
+    let completeTx = await this.builder
+      .buildCancelLBE(options)
+      .complete()
+      .complete();
+    return completeTx.toString();
+  }
+
   /**
    * * Actor: Project Owner
    */
