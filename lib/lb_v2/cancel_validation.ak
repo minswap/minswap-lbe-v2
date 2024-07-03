@@ -3,12 +3,12 @@ use aiken/transaction.{InlineDatum, Input, Output}
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{Value}
 use lb_v2/types.{
-  ByOwner, CancelReason, CreatedPool, NotReachMinimum, PoolDatum, PubKeyHash,
-  TreasuryDatum,
+  AmmFactoryDatum, ByOwner, CancelReason, CreatedPool, NotReachMinimum,
+  PubKeyHash, TreasuryDatum,
 }
 use lb_v2/utils.{
-  amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  assert,
+  amm_authen_policy_id, amm_factory_auth_asset_name, amm_factory_validation_hash,
+  compute_asset_name_from_base_and_raise,
 }
 use lb_v2/validation.{validate_authorize_by_owner}
 
@@ -20,8 +20,8 @@ fn cancel_by_pool_exist(
   treasury_datum: TreasuryDatum,
   ref_inputs: List<Input>,
 ) -> Bool {
-  // finding AMM Pool Ref Input
-  expect [pool_ref_input] =
+  // finding AMM Factory Ref Input
+  expect [amm_factory_ref_input] =
     list.filter(
       ref_inputs,
       fn(ref_input) {
@@ -35,23 +35,26 @@ fn cancel_by_pool_exist(
         } = ref_input
         and {
           // Ref Input belongs Amm Pool Address
-          payment_credential == ScriptCredential(amm_pool_validation_hash),
+          payment_credential == ScriptCredential(amm_factory_validation_hash),
           // Ref Input has AMM Pool Auth Token
           value.quantity_of(
             in_value,
             amm_authen_policy_id,
-            amm_pool_auth_asset_name,
+            amm_factory_auth_asset_name,
           ) == 1,
         }
       },
     )
   // Extract some necessary data.
-  expect Input { output: Output { datum: InlineDatum(raw_pool_datum), .. }, .. } =
-    pool_ref_input
-  expect PoolDatum { asset_a, asset_b, .. }: PoolDatum = raw_pool_datum
+  expect Input {
+    output: Output { datum: InlineDatum(raw_amm_factory_datum), .. },
+    ..
+  } = amm_factory_ref_input
+  expect AmmFactoryDatum { head, .. }: AmmFactoryDatum = raw_amm_factory_datum
   let TreasuryDatum { base_asset, raise_asset, .. } = treasury_datum
-  // Ensure that the AMM Pool ID and the LBE bootstrapping pool are the same.
-  utils.sort_two_assets(base_asset, raise_asset) == (asset_a, asset_b)
+  let lp_asset_name =
+    compute_asset_name_from_base_and_raise(base_asset, raise_asset)
+  lp_asset_name == head
 }
 
 // After Discovery Phase, If final reserve raise amount not reach target
@@ -93,8 +96,8 @@ fn cancel_by_owner(
   // get last time project owner can make cancel
   let last_time =
     when revocable is {
-      True -> start_time
-      False -> end_time
+      True -> end_time
+      False -> start_time
     }
   and {
     // transaction validity before the last time
@@ -159,6 +162,7 @@ pub fn validate_cancel_lbe(
       is_cancelled: True,
     },
     treasury_in_value == treasury_out_value,
-    assert(mint_value == value.zero(), @"Avoid minting unnecessary"),
+    // Avoid minting unnecessary
+    mint_value == value.zero(),
   }
 }

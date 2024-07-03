@@ -45,16 +45,16 @@ pub const one_month_ms = 2592000000
 pub const max_penalty = 25
 
 // the ADA amount store in Treasury UTxO
-pub const treasury_minimum_ada = 3_000_000
+pub const treasury_minimum_ada = 5_000_000
 
 // the ADA amount store in Manager UTxO
-pub const manager_minimum_ada = 2_000_000
+pub const manager_minimum_ada = 2_500_000
 
 // the ADA amount store in Seller UTxO
-pub const seller_minimum_ada = 2_000_000
+pub const seller_minimum_ada = 2_500_000
 
 // the ADA amount store in Order UTxO
-pub const order_minimum_ada = 2_000_000
+pub const order_minimum_ada = 2_500_000
 
 // Commissions:
 // The ADA amount to reward the pool creator
@@ -83,6 +83,10 @@ pub const amm_authen_policy_id =
 // The ValidatorHash of AMM Pool Validator
 pub const amm_pool_validation_hash =
   #"d6ba9b7509eac866288ff5072d2a18205ac56f744bc82dcd808cb8fe"
+
+// The ValidatorHash of AMM Factory Validator
+pub const amm_factory_validation_hash =
+  #"6e23fe172b5b50e2ad59aded9ee8d488f74c7f4686f91b032220adad"
 
 // Some LP Tokens will be burned during Pool Creation.
 pub const default_burn_liquidity = 10
