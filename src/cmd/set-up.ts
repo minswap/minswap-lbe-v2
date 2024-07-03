@@ -2,7 +2,7 @@ import invariant from "@minswap/tiny-invariant";
 import * as T from "@minswap/translucent";
 import * as fs from "fs";
 import path from "path";
-import lbeV2Script from "../../lbe-v2-script.json";
+import { AlwaysSuccessSpend } from "../../amm-plutus";
 import {
   collectMinswapValidators,
   collectValidators,
@@ -49,7 +49,6 @@ const getParams = () => {
     seedPhase,
   };
 };
-type Params = ReturnType<typeof getParams>;
 
 type WarehouseSetUpConfigs = {
   t: Translucent;
@@ -85,11 +84,7 @@ class WarehouseSetUp {
     this.deployedValidators = deployedValidators;
   }
 
-  static async new(options: Params): Promise<WarehouseSetUp> {
-    let { network, maestroApiKey, seedPhase } = options;
-    let maestro = new T.Maestro({ network, apiKey: maestroApiKey });
-    let t = await T.Translucent.new(maestro, network);
-    t.selectWalletFromSeed(seedPhase);
+  static async new(t: Translucent): Promise<WarehouseSetUp> {
     let params = JSON.parse(
       fs.readFileSync(path.resolve("params.json"), "utf-8"),
     );
@@ -319,6 +314,9 @@ class WarehouseSetUp {
   }
 
   async registerStake() {
+    let lbeV2Script: LbeScript = JSON.parse(
+      fs.readFileSync(path.resolve("lbe-v2-script.json"), "utf-8"),
+    );
     const tx = await this.t
       .newTx()
       .registerStake(lbeV2Script.factoryRewardAddress)
@@ -326,7 +324,47 @@ class WarehouseSetUp {
     const signedTx = await tx.sign().complete();
     const txHash = await signedTx.submit();
     logger.info(`register txHash ${txHash}`);
-    await this.t.awaitTx(txHash);
+    // await this.t.awaitTx(txHash);
+  }
+
+  static async genSeed(t: Translucent) {
+    const secretNumber = parseInt(process.argv[5]);
+    invariant(secretNumber, "not found secret Number");
+    const C = T.CModuleLoader.get;
+    const alwaysSuccessValidator = new AlwaysSuccessSpend();
+    const scriptAddress = t.utils.validatorToAddress(alwaysSuccessValidator);
+    const plutusData = C.PlutusData.new_integer(
+      C.BigInt.from_str(secretNumber.toString()),
+    );
+    const datum = T.toHex(plutusData.to_bytes());
+    const tx = await t
+      .newTx()
+      .payToContract(scriptAddress, datum, {})
+      .complete({ witnessSet: { plutusData: [datum] } });
+
+    const signedTx = await tx.sign().complete();
+    const txHash = await signedTx.submit();
+    logger.info(`paying to always success ${txHash}`);
+    // await t.awaitTx(txHash);
+
+    const params = JSON.parse(
+      fs.readFileSync(path.resolve("params.json"), "utf-8"),
+    );
+    const newParams = {
+      ...params,
+      seedOutRef: {
+        txHash,
+        outputIndex: 0,
+      },
+    };
+    const jsonData = JSON.stringify(newParams, null, 2);
+    fs.writeFile("params.json", jsonData, "utf8", (err) => {
+      if (err) {
+        console.error("Error writing JSON file:", err);
+        return;
+      }
+      console.log("params.json file has been saved.");
+    });
   }
 }
 
@@ -334,7 +372,14 @@ let main = async () => {
   logger.info("Start | set-up");
   await T.loadModule();
   await T.CModuleLoader.load();
-  let warehouseSetUp = await WarehouseSetUp.new(getParams());
+  const inputParams = getParams();
+  let { network, maestroApiKey, seedPhase } = inputParams;
+  let maestro = new T.Maestro({ network, apiKey: maestroApiKey });
+  let t = await T.Translucent.new(maestro, network);
+  t.selectWalletFromSeed(seedPhase);
+
+  await WarehouseSetUp.genSeed(t);
+  let warehouseSetUp = await WarehouseSetUp.new(t);
   await warehouseSetUp.setup();
   await warehouseSetUp.registerStake();
   logger.info("Finish | set-up");

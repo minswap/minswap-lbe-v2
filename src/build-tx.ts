@@ -107,6 +107,7 @@ export type WarehouseBuilderOptions = {
 
 export type BuildInitFactoryOptions = {
   seedUtxo: UTxO;
+  skipCollect?: boolean;
 };
 
 export type BuildCreateTreasuryOptions = {
@@ -425,13 +426,16 @@ export class WarehouseBuilder {
   }
 
   public buildInitFactory(options: BuildInitFactoryOptions): WarehouseBuilder {
-    const { seedUtxo } = options;
+    const { seedUtxo, skipCollect } = options;
     this.tasks.push(
       () => {
         this.mintRedeemer = "Initialization";
       },
       () => {
-        this.tx.collectFrom([seedUtxo]);
+        if (skipCollect) {
+        } else {
+          this.tx.collectFrom([seedUtxo]);
+        }
       },
       () => {
         this.mintingFactoryToken();
