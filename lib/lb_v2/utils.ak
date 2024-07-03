@@ -45,16 +45,16 @@ pub const one_month_ms = 2592000000
 pub const max_penalty = 25
 
 // the ADA amount store in Treasury UTxO
-pub const treasury_minimum_ada = 3_000_000
+pub const treasury_minimum_ada = 5_000_000
 
 // the ADA amount store in Manager UTxO
-pub const manager_minimum_ada = 2_000_000
+pub const manager_minimum_ada = 2_500_000
 
 // the ADA amount store in Seller UTxO
-pub const seller_minimum_ada = 2_000_000
+pub const seller_minimum_ada = 2_500_000
 
 // the ADA amount store in Order UTxO
-pub const order_minimum_ada = 2_000_000
+pub const order_minimum_ada = 2_500_000
 
 // Commissions:
 // The ADA amount to reward the pool creator
