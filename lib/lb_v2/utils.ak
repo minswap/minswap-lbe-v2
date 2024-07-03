@@ -84,6 +84,10 @@ pub const amm_authen_policy_id =
 pub const amm_pool_validation_hash =
   #"d6ba9b7509eac866288ff5072d2a18205ac56f744bc82dcd808cb8fe"
 
+// The ValidatorHash of AMM Factory Validator
+pub const amm_factory_validation_hash =
+  #"6e23fe172b5b50e2ad59aded9ee8d488f74c7f4686f91b032220adad"
+
 // Some LP Tokens will be burned during Pool Creation.
 pub const default_burn_liquidity = 10
 
