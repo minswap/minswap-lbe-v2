@@ -93,8 +93,8 @@ fn cancel_by_owner(
   // get last time project owner can make cancel
   let last_time =
     when revocable is {
-      True -> start_time
-      False -> end_time
+      True -> end_time
+      False -> start_time
     }
   and {
     // transaction validity before the last time
