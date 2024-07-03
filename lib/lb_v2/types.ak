@@ -216,3 +216,8 @@ pub type PoolDatum {
   fee_sharing_numerator_opt: Option<Int>,
   allow_dynamic_fee: Bool,
 }
+
+pub type AmmFactoryDatum {
+  head: ByteArray,
+  tail: ByteArray,
+}
