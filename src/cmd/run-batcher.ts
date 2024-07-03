@@ -18,14 +18,15 @@ const main = async () => {
   t.selectWalletFromSeed(seed);
 
   const warehouseOptions = genWarehouseBuilderOptions(t);
-  const builder = new WarehouseBuilder(warehouseOptions);
-  const batcher = new WarehouseBatcher(builder);
+  // const builder = new WarehouseBuilder(warehouseOptions);
+  // const batcher = new WarehouseBatcher(builder);
 
   const poolBatcher = new WarehouseBatcher(
     new WarehouseBuilder(warehouseOptions),
   );
 
-  await Promise.allSettled([batcher.batching(), poolBatcher.handlePool()]);
+  await poolBatcher.poolBatching();
+  // await Promise.allSettled([batcher.batching(), poolBatcher.poolBatching()]);
   logger.info("run-batcher | end");
 };
 

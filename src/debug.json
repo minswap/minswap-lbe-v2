@@ -1,0 +1,214 @@
+
+{
+  "body": {
+    "inputs": [
+      {
+        "transaction_id": "8db552b8706c65c8a047ed7efdcbf349aabe7e7ccde5db9e45a356fe48935638",
+        "index": "0"
+      },
+      {
+        "transaction_id": "99aac20c491269704c8f471f223b4de7b7cb80593a7a79a7d7b536166057cc32",
+        "index": "1"
+      }
+    ],
+    "outputs": [
+      {
+        "address": "addr_test1qr5ulqkgeuzngqgdkp6l375397m4tr9q2jcsj0zt86cnpc8suxj70pszglg2alw7j2eq0jzymyj8kvsudm6ur38heaks86lqea",
+        "amount": {
+          "coin": "1280070",
+          "multiasset": {
+            "d6aae2059baee188f74917493cf7637e679cd219bdfbbf4dcbeb1d0b": {
+              "73267a9cc82856cc3d5b9d44dd11114fd7a11ba919cdf79a342d62074004f115": "4242640682"
+            }
+          }
+        },
+        "datum_option": null,
+        "script_ref": null
+      },
+      {
+        "address": "addr_test1zphz8lsh9dd4pc4dtxk7m8hg6jy0wnrlg6r0jxcrygs2mtvrajt8r8wqtygrfduwgukk73m5gcnplmztc5tl5ngy0upqjgg24z",
+        "amount": {
+          "coin": "1482640",
+          "multiasset": {
+            "d6aae2059baee188f74917493cf7637e679cd219bdfbbf4dcbeb1d0b": {
+              "4d5346": "1"
+            }
+          }
+        },
+        "datum_option": {
+          "InlineDatum": "{\"constructor\":0,\"fields\":[{\"bytes\":\"72cbd035014eeb01780099a849b1c564ee649993ddb82acba7c64c30cc3ea181\"},{\"bytes\":\"73267a9cc82856cc3d5b9d44dd11114fd7a11ba919cdf79a342d62074004f115\"}]}"
+        },
+        "script_ref": null
+      },
+      {
+        "address": "addr_test1zphz8lsh9dd4pc4dtxk7m8hg6jy0wnrlg6r0jxcrygs2mtvrajt8r8wqtygrfduwgukk73m5gcnplmztc5tl5ngy0upqjgg24z",
+        "amount": {
+          "coin": "1482640",
+          "multiasset": {
+            "d6aae2059baee188f74917493cf7637e679cd219bdfbbf4dcbeb1d0b": {
+              "4d5346": "1"
+            }
+          }
+        },
+        "datum_option": {
+          "InlineDatum": "{\"constructor\":0,\"fields\":[{\"bytes\":\"73267a9cc82856cc3d5b9d44dd11114fd7a11ba919cdf79a342d62074004f115\"},{\"bytes\":\"7391e8cf4ecbb011a82210093c732caa4021f61857ea4257645b5886b2c981cb\"}]}"
+        },
+        "script_ref": null
+      },
+      {
+        "address": "addr_test1zrtt4xm4p84vse3g3l6swtf2rqs943t0w39ustwdszxt3l5rajt8r8wqtygrfduwgukk73m5gcnplmztc5tl5ngy0upqhns793",
+        "amount": {
+          "coin": "76500000",
+          "multiasset": {
+            "7b7ac17b920be487849b4a7e75d455bb5e55aeacd9372bf904b6656c": {
+              "544f4e592d31373139393239343538353731": "1000000000000"
+            },
+            "d6aae2059baee188f74917493cf7637e679cd219bdfbbf4dcbeb1d0b": {
+              "4d5350": "1",
+              "73267a9cc82856cc3d5b9d44dd11114fd7a11ba919cdf79a342d62074004f115": "9223372028369494442"
+            }
+          }
+        },
+        "datum_option": {
+          "InlineDatum": "{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"constructor\":1,\"fields\":[{\"bytes\":\"fb39ea6bb975ea6de4a2c51572234dc584c89beccc09a49934389e51\"}]}]},{\"constructor\":0,\"fields\":[{\"bytes\":\"\"},{\"bytes\":\"\"}]},{\"constructor\":0,\"fields\":[{\"bytes\":\"7b7ac17b920be487849b4a7e75d455bb5e55aeacd9372bf904b6656c\"},{\"bytes\":\"544f4e592d31373139393239343538353731\"}]},{\"int\":8485281375},{\"int\":72000000},{\"int\":1000000000000},{\"int\":30},{\"int\":30},{\"constructor\":1,\"fields\":[]},{\"constructor\":0,\"fields\":[]}]}"
+        },
+        "script_ref": null
+      },
+      {
+        "address": "addr_test1wzvaemr0sdwz5h5gy8fldxuxn5sdvvuqp8h7w572ts5zx4cff5dl8",
+        "amount": {
+          "coin": "3163540",
+          "multiasset": {
+            "0330bd604bef76ccba2efb0a833ae0e421943e82abdde4a976a6d2fc": {
+              "7472656173757279": "1"
+            },
+            "d6aae2059baee188f74917493cf7637e679cd219bdfbbf4dcbeb1d0b": {
+              "73267a9cc82856cc3d5b9d44dd11114fd7a11ba919cdf79a342d62074004f115": "4242640683"
+            }
+          }
+        },
+        "datum_option": {
+          "InlineDatum": "{\"constructor\":0,\"fields\":[{\"bytes\":\"0330bd604bef76ccba2efb0a833ae0e421943e82abdde4a976a6d2fc\"},{\"bytes\":\"01ee6a3752049f9bb8e00a66730434679e22864fa9376c3a3e473637\"},{\"bytes\":\"dd006c82901e4acedbc622708f15113a625ee3d465858bcd94ed24ae\"},{\"bytes\":\"b2dc09963eed86e22ac8e376b1316479857634cd6d955eb48f5a0da4\"},{\"constructor\":0,\"fields\":[{\"bytes\":\"7b7ac17b920be487849b4a7e75d455bb5e55aeacd9372bf904b6656c\"},{\"bytes\":\"544f4e592d31373139393239343538353731\"}]},{\"constructor\":0,\"fields\":[{\"bytes\":\"\"},{\"bytes\":\"\"}]},{\"int\":1719929697971},{\"int\":1719933297971},{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"bytes\":\"e9cf82c8cf0534010db075f8fa912fb7558ca054b1093c4b3eb130e0\"}]},{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"bytes\":\"f0e1a5e7860247d0aefdde92b207c844d9247b321c6ef5c1c4f7cf6d\"}]}]}]}]},{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"bytes\":\"e9cf82c8cf0534010db075f8fa912fb7558ca054b1093c4b3eb130e0\"}]},{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"bytes\":\"f0e1a5e7860247d0aefdde92b207c844d9247b321c6ef5c1c4f7cf6d\"}]}]}]}]},{\"constructor\":0,\"fields\":[]},{\"int\":100},{\"constructor\":1,\"fields\":[]},{\"constructor\":1,\"fields\":[]},{\"constructor\":1,\"fields\":[]},{\"int\":1000000000000},{\"constructor\":1,\"fields\":[]},{\"int\":30},{\"constructor\":1,\"fields\":[]},{\"int\":72000000},{\"int\":72000000},{\"int\":0},{\"int\":4242640683},{\"constructor\":0,\"fields\":[]},{\"constructor\":1,\"fields\":[]}]}"
+        },
+        "script_ref": null
+      },
+      {
+        "address": "addr_test1qr03hndgkqdw4jclnvps6ud43xvuhms7rurjq87yfgzc575pm6dyr7fz24xwkh6k0ldufe2rqhgkwcppx5fzjrx5j2rs2rt9qc",
+        "amount": {
+          "coin": "2295829",
+          "multiasset": null
+        },
+        "datum_option": null,
+        "script_ref": null
+      }
+    ],
+    "fee": "277921",
+    "ttl": "64301512",
+    "certs": null,
+    "withdrawals": null,
+    "update": null,
+    "auxiliary_data_hash": "00546f4910b9d4fac67002b9b5d43a51e05d401f7b627c53c4313a78a6f74bee",
+    "validity_start_interval": "64290712",
+    "mint": {
+      "d6aae2059baee188f74917493cf7637e679cd219bdfbbf4dcbeb1d0b": {
+        "4d5346": "1",
+        "4d5350": "1",
+        "73267a9cc82856cc3d5b9d44dd11114fd7a11ba919cdf79a342d62074004f115": "9223372036854775807"
+      }
+    },
+    "script_data_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "collateral": [
+      {
+        "transaction_id": "8dfe912d301e273d80dd1012982c3623e25d55e84c568911d814e2eeb81755f0",
+        "index": "1"
+      }
+    ],
+    "required_signers": null,
+    "network_id": null,
+    "collateral_return": {
+      "address": "addr_test1qr03hndgkqdw4jclnvps6ud43xvuhms7rurjq87yfgzc575pm6dyr7fz24xwkh6k0ldufe2rqhgkwcppx5fzjrx5j2rs2rt9qc",
+      "amount": {
+        "coin": "1202490",
+        "multiasset": {
+          "e16c2dc8ae937e8d3790c7fd7168d7b994621ba14ca11415f39fed72": {
+            "0014df104b494e474d4132": "50000000000000"
+          }
+        }
+      },
+      "datum_option": null,
+      "script_ref": null
+    },
+    "total_collateral": "12787614",
+    "reference_inputs": [
+      {
+        "transaction_id": "77769a23b2eea26a1f48a4a85b30f6bc2a520df91ec8617d73cf0870236589d4",
+        "index": "0"
+      },
+      {
+        "transaction_id": "c429b8ee27e5761ba8714e26e3a5899886cd28d136d43e969d4bc1acf0f72d4a",
+        "index": "0"
+      },
+      {
+        "transaction_id": "9741d59656e9ad54f197b0763482eede9a6fa1616c4547797eee6617f92a1396",
+        "index": "0"
+      }
+    ]
+  },
+  "witness_set": {
+    "vkeys": [
+      {
+        "vkey": "ed25519_pk1qqqqqqxlr0x63vq6at93lxcrp4cmtzvee0hpu8c8yq0ugjs93faqxpc7mw",
+        "signature": "00f899d39b17fd5d66c192c4b50d343e42f7235b30504c8ae7619f93c828dc6dce4568dd69177c551828492d777a6727fd66c2fbccbda8c2aeed92032c99790a"
+      }
+    ],
+    "native_scripts": null,
+    "bootstraps": null,
+    "plutus_v1_scripts": null,
+    "plutus_data": {
+      "elems": [
+        "{\"constructor\":0,\"fields\":[{\"bytes\":\"0330bd604bef76ccba2efb0a833ae0e421943e82abdde4a976a6d2fc\"},{\"bytes\":\"01ee6a3752049f9bb8e00a66730434679e22864fa9376c3a3e473637\"},{\"bytes\":\"dd006c82901e4acedbc622708f15113a625ee3d465858bcd94ed24ae\"},{\"bytes\":\"b2dc09963eed86e22ac8e376b1316479857634cd6d955eb48f5a0da4\"},{\"constructor\":0,\"fields\":[{\"bytes\":\"7b7ac17b920be487849b4a7e75d455bb5e55aeacd9372bf904b6656c\"},{\"bytes\":\"544f4e592d31373139393239343538353731\"}]},{\"constructor\":0,\"fields\":[{\"bytes\":\"\"},{\"bytes\":\"\"}]},{\"int\":1719929697971},{\"int\":1719933297971},{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"bytes\":\"e9cf82c8cf0534010db075f8fa912fb7558ca054b1093c4b3eb130e0\"}]},{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"bytes\":\"f0e1a5e7860247d0aefdde92b207c844d9247b321c6ef5c1c4f7cf6d\"}]}]}]}]},{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"bytes\":\"e9cf82c8cf0534010db075f8fa912fb7558ca054b1093c4b3eb130e0\"}]},{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"bytes\":\"f0e1a5e7860247d0aefdde92b207c844d9247b321c6ef5c1c4f7cf6d\"}]}]}]}]},{\"constructor\":0,\"fields\":[]},{\"int\":100},{\"constructor\":1,\"fields\":[]},{\"constructor\":1,\"fields\":[]},{\"constructor\":1,\"fields\":[]},{\"int\":1000000000000},{\"constructor\":1,\"fields\":[]},{\"int\":30},{\"constructor\":1,\"fields\":[]},{\"int\":72000000},{\"int\":72000000},{\"int\":0},{\"int\":0},{\"constructor\":0,\"fields\":[]},{\"constructor\":1,\"fields\":[]}]}",
+        "{\"constructor\":0,\"fields\":[{\"bytes\":\"72cbd035014eeb01780099a849b1c564ee649993ddb82acba7c64c30cc3ea181\"},{\"bytes\":\"7391e8cf4ecbb011a82210093c732caa4021f61857ea4257645b5886b2c981cb\"}]}"
+      ],
+      "definite_encoding": null
+    },
+    "redeemers": [
+      {
+        "tag": "Spend",
+        "index": "0",
+        "data": "{\"constructor\":2,\"fields\":[]}",
+        "ex_units": {
+          "mem": "0",
+          "steps": "0"
+        }
+      },
+      {
+        "tag": "Spend",
+        "index": "1",
+        "data": "{\"constructor\":0,\"fields\":[{\"constructor\":0,\"fields\":[{\"bytes\":\"\"},{\"bytes\":\"\"}]},{\"constructor\":0,\"fields\":[{\"bytes\":\"7b7ac17b920be487849b4a7e75d455bb5e55aeacd9372bf904b6656c\"},{\"bytes\":\"544f4e592d31373139393239343538353731\"}]}]}",
+        "ex_units": {
+          "mem": "0",
+          "steps": "0"
+        }
+      },
+      {
+        "tag": "Mint",
+        "index": "0",
+        "data": "{\"constructor\":1,\"fields\":[]}",
+        "ex_units": {
+          "mem": "0",
+          "steps": "0"
+        }
+      }
+    ],
+    "plutus_v2_scripts": null
+  },
+  "is_valid": true,
+  "auxiliary_data": {
+    "metadata": {
+      "674": "{\"map\":[{\"k\":{\"string\":\"msg\"},\"v\":{\"list\":[{\"string\":\"LBE-V2 | Create AMM Pool\"}]}}]}"
+    },
+    "native_scripts": null,
+    "plutus_v1_scripts": null,
+    "plutus_v2_scripts": null
+  }
+}

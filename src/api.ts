@@ -442,14 +442,16 @@ export class Api {
     const options: BuildCreateAmmPoolOptions = {
       treasuryInput,
       ammFactoryInput,
-      validFrom: await this.genValidFrom(),
+      validFrom: Date.now() - 3 * 60 * 60 * 1000,
       validTo: Date.now() + 3 * 60 * 60 * 1000,
     };
     console.log(options);
     const completeTx = await this.builder
       .buildCreateAmmPool(options)
       .complete()
-      .complete();
+      .complete({inputsToChoose: [treasuryInput, ammFactoryInput]});
+    
+    console.log(completeTx.txComplete.to_json());
     const signedTx = await completeTx.sign().complete();
     const txHash = await signedTx.submit();
     return txHash;

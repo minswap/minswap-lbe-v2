@@ -771,11 +771,16 @@ export class WarehouseBuilder {
     } else {
       totalReserveRaise = treasuryInDatum.collectedFund;
     }
-
+    console.log({
+      fund: treasuryInDatum.collectedFund,
+      test: treasuryInDatum.reserveRaise + treasuryInDatum.totalPenalty,
+    });
     const [assetA, assetB] = normalizedPair(
       treasuryInDatum.baseAsset,
       treasuryInDatum.raiseAsset,
     );
+
+    console.log({ assetA, assetB });
 
     let reserveA: bigint;
     let reserveB: bigint;
@@ -789,9 +794,15 @@ export class WarehouseBuilder {
       reserveA = totalReserveRaise;
       reserveB = treasuryInDatum.reserveBase;
     }
+
+    console.log({ reserveA, reserveB });
+
     const poolReserveA = (reserveA * treasuryInDatum.poolAllocation) / 100n;
     const poolReserveB = (reserveB * treasuryInDatum.poolAllocation) / 100n;
-    const totalLiquidity = calculateInitialLiquidity(reserveA, reserveB);
+    const totalLiquidity = calculateInitialLiquidity(
+      poolReserveA,
+      poolReserveB,
+    );
 
     const ammPoolDatum: FeedTypeAmmPool["_datum"] = {
       poolBatchingStakeCredential: {
@@ -846,6 +857,7 @@ export class WarehouseBuilder {
         if (receiverB !== 0n) {
           assets[toUnit(assetB.policyId, assetB.assetName)] = receiverB;
         }
+        console.log("inner Asset", assets);
         if (treasuryInDatum.receiverDatum !== "RNoDatum") {
           invariant(extraDatum);
           if ("RInlineDatum" in treasuryInDatum.receiverDatum) {

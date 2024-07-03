@@ -39,29 +39,30 @@ import {
   plutusAddress2Address,
   toUnit,
 } from "../utils";
-import { assertValidatorFail, genWarehouseOptions, loadModule } from "./utils";
-import { genWarehouse } from "./warehouse";
+import { assertValidatorFail, genWarehouseOptions, loadModule, quickSubmitBuilder } from "./utils";
+import { genWarehouse, skipToCountingPhase } from "./warehouse";
 
 let utxoIndex = 0;
 
 let warehouse: Awaited<ReturnType<typeof genTestWarehouse>>;
 
 async function genTestWarehouse() {
-  const { t, minswapToken, defaultTreasuryDatum, ammPoolDatum } =
+  const { t, minswapToken, defaultTreasuryDatum, ammPoolDatum, emulator } =
     await genWarehouse();
   utxoIndex = 0;
   const baseAsset = minswapToken;
   const warehouseOptions = await genWarehouseOptions(t);
   const builder = new WarehouseBuilder(warehouseOptions);
-  const reserveRaise = 100_000_000_000n;
-  const totalPenalty = 10_000_000_000n;
+  const reserveRaise = 72_000_000n;
+  const totalPenalty = 0n;
   const collectedFund = reserveRaise + totalPenalty;
   const treasuryDatum: TreasuryDatum = {
     ...defaultTreasuryDatum,
     collectedFund,
     totalPenalty,
     reserveRaise,
-    isManagerCollected: false,
+    reserveBase: 1000000000000n,
+    isManagerCollected: true,
   };
   const treasuryUTxO = {
     txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
@@ -104,8 +105,8 @@ async function genTestWarehouse() {
   const options: BuildCreateAmmPoolOptions = {
     treasuryInput: treasuryUTxO,
     ammFactoryInput: ammFactoryUTxO,
-    validFrom: Number(treasuryDatum.endTime + 1000n),
-    validTo: Number(treasuryDatum.endTime + 1100n),
+    validFrom: Number(treasuryDatum.endTime - 3600n * 1000n),
+    validTo: Number(treasuryDatum.endTime + 3600n * 1000n),
   };
   return {
     builder,
@@ -119,6 +120,7 @@ async function genTestWarehouse() {
     ammFactoryDatum,
     ammFactoryUTxO,
     poolDatum,
+    emulator,
   };
 }
 
@@ -131,10 +133,17 @@ beforeEach(async () => {
 });
 
 test("Create AMM Pool | PASS | hihi Happy case", async () => {
-  const { builder, options } = warehouse;
-  builder.buildCreateAmmPool(options);
-  const tx = builder.complete();
-  await tx.complete();
+  const { builder, options, emulator } = warehouse;
+  emulator.addUTxO(options.ammFactoryInput);
+  emulator.addUTxO(options.treasuryInput);
+  skipToCountingPhase({t: builder.t, e: emulator, datum: warehouse.treasuryDatum});
+  await quickSubmitBuilder(emulator)({
+    txBuilder: builder.buildCreateAmmPool(options).complete(),
+    debug: false,
+  })
+  // builder.buildCreateAmmPool(options);
+  // const tx = builder.complete();
+  // await tx.complete();
 });
 
 async function buildTxWithStupidTreasuryDatum(

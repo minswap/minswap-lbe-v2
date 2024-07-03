@@ -151,6 +151,11 @@ export class WarehouseBatcher {
           options as BuildRedeemOrdersOptions,
         );
       },
+      createPool: (options: BuildOptions) => {
+        return this.builder.buildCreateAmmPool(
+          options as BuildCreateAmmPoolOptions,
+        );
+      },
     };
     let { buildFnName, commonOptions, inputsToChoose, extraTasks } = options;
     let currentUnixTime = await this.getCurrentUnixTime();
@@ -186,13 +191,14 @@ export class WarehouseBatcher {
   }): Promise<TxSigned> {
     const { treasury, ammFactory, seeds } = options;
     let txSigned = await this.commonComplete({
-      buildFnName: "createAmmPool",
+      buildFnName: "createPool",
       commonOptions: {
         treasuryInput: treasury,
         ammFactoryInput: ammFactory,
       },
       inputsToChoose: seeds,
-      extraTasks: [],
+      extraTasks: [
+      ],
     });
     return txSigned;
   }
