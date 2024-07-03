@@ -22,7 +22,7 @@ FAIL:
   - after discovery phase
 - LBE is cancelled
 - Invalid minting value
-- TODO: No seller input
+- No seller input
 - Invalid seller output datum
   - invalid amount
   - invalid penalty amount
@@ -34,7 +34,7 @@ FAIL:
 - Order's output LBE ID miss match
 - Seller's input LBE ID miss match
 - Update orders(withdraw fund): invalid penalty amount
-- TODO: No Treasury ref inputs
+- No Treasury ref inputs
 */
 import { WarehouseBuilder, type BuildUsingSellerOptions } from "../build-tx";
 import {
@@ -44,7 +44,7 @@ import {
   SELLER_MIN_ADA,
   TREASURY_MIN_ADA,
 } from "../constants";
-import type { OrderDatum, UTxO } from "../types";
+import type { LbeUTxO, OrderDatum, UTxO } from "../types";
 import { plutusAddress2Address, toUnit } from "../utils";
 import {
   assertValidator,
@@ -147,7 +147,7 @@ async function genTestWarehouse() {
     validFrom: Number(treasuryDatum.startTime) + 1000,
     validTo: Number(treasuryDatum.startTime) + 2000,
     owners: [owner],
-    orderInputs: orderInputUTxOs,
+    orderInputs: orderInputUTxOs as LbeUTxO[],
     orderOutputDatums: orderOutDatums,
   };
   return {
@@ -430,5 +430,26 @@ test("using-seller | FAIL | update orders(withdraw fund): invalid penalty amount
     ...penaltyTimeRange,
   };
   builder.buildUsingSeller(options);
+  await assertValidatorFail(builder);
+});
+
+test("using-seller | FAIL | dont have any seller input", async () => {
+  const { builder, options } = warehouse;
+  builder.buildUsingSeller(options);
+  builder.tasks[1] = () => {};
+  await assertValidatorFail(builder);
+});
+
+test("using-seller | FAIL | create orders: success", async () => {
+  const { builder, options } = warehouse;
+  builder.buildUsingSeller(options);
+  builder.tasks[1] = () => {
+    builder.tx
+      .readFrom([builder.deployedValidators["sellerValidator"]])
+      .collectFrom(
+        builder.sellerInputs,
+        WarehouseBuilder.toRedeemerSellerSpend(builder.sellerRedeemer!),
+      );
+  };
   await assertValidatorFail(builder);
 });

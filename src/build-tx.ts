@@ -1557,7 +1557,7 @@ export class WarehouseBuilder {
         treasuryOutDatum.raiseAsset.policyId,
         treasuryOutDatum.raiseAsset.assetName,
       );
-      assets[raiseAsset] -= deltaRaise;
+      assets[raiseAsset] = (assets[raiseAsset] ?? 0n) - deltaRaise;
       if (assets[this.ammLpToken] === 0n) {
         delete assets[this.ammLpToken];
       }

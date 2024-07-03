@@ -263,8 +263,45 @@ function attachValueToInput(value: Assets): void {
     ]);
   });
 }
-/*
-TODO:
-- Custom treaury out datum....
-- Invalid treasury out value
-*/
+
+const MINt = {
+  policyId: "29d222ce763455e3d7a09a665ce554f00ac89d2e99a1a83d267170c6",
+  assetName: "4d494e74",
+};
+test("Refund | FAIL | Invalid treasury out datum", async () => {
+  const { treasuryDatum } = warehouse;
+  buildTxWithStupidTreasuryDatum({
+    ...treasuryDatum,
+    baseAsset: MINt,
+  });
+});
+test("Refund | FAIL | Invalid treasury out datum", async () => {
+  const { treasuryDatum } = warehouse;
+  buildTxWithStupidTreasuryDatum({
+    ...treasuryDatum,
+    raiseAsset: MINt,
+  });
+});
+
+test("Refund | FAIL | Invalid treasury out datum", async () => {
+  const { treasuryDatum } = warehouse;
+  buildTxWithStupidTreasuryDatum({
+    ...treasuryDatum,
+    totalLiquidity: 2378137912n,
+  });
+});
+
+async function buildTxWithStupidTreasuryDatum(
+  treasuryDatum: TreasuryDatum,
+): Promise<void> {
+  const { options, builder } = warehouse;
+  builder.buildRefundOrders({ ...options });
+  builder.tasks[1] = () => {
+    builder.payingTreasuryOutput({
+      treasuryOutDatum: treasuryDatum,
+      deltaLp: 0n,
+      deltaRaise: 1045n,
+    });
+  };
+  await assertValidatorFail(builder);
+}
