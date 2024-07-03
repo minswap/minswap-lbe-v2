@@ -1,5 +1,5 @@
 import { WarehouseBuilder, type BuildCollectManagerOptions } from "../build-tx";
-import { TREASURY_MIN_ADA } from "../constants";
+import { MANAGER_MIN_ADA, TREASURY_MIN_ADA } from "../constants";
 import type { ManagerDatum, TreasuryDatum, UTxO } from "../types";
 import { assertValidator, assertValidatorFail, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
@@ -24,7 +24,7 @@ beforeEach(async () => {
     outputIndex: 0,
     assets: {
       [builder.managerToken]: 1n,
-      lovelace: 2_000_000n,
+      lovelace: MANAGER_MIN_ADA,
     },
     address: builder.managerAddress,
     datum: builder.toDatumManager(managerDatum),

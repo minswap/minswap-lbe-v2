@@ -346,7 +346,7 @@ test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | reserveRai
   assertValidatorFail(remixTreasuryDatum({ reserveRaise: 12n }));
 });
 
-test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | hihi discovery phase > 30 days", async () => {
+test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | discovery phase > 30 days", async () => {
   let endTime =
     W.defaultTreasuryDatum.startTime + BigInt(35 * 24 * 60 * 60 * 1000);
   assertValidatorFail(remixTreasuryDatum({ endTime }));
