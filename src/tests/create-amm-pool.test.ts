@@ -32,35 +32,41 @@ import * as T from "@minswap/translucent";
 import { FactoryValidatorValidateFactory } from "../../amm-plutus";
 import type { FeedTypeAmmPool } from "../../plutus";
 import { WarehouseBuilder, type BuildCreateAmmPoolOptions } from "../build-tx";
-import { LP_COLATERAL, TREASURY_MIN_ADA } from "../constants";
+import { TREASURY_MIN_ADA } from "../constants";
 import type { LbeUTxO, TreasuryDatum } from "../types";
 import {
   calculateInitialLiquidity,
   plutusAddress2Address,
   toUnit,
 } from "../utils";
-import { assertValidatorFail, genWarehouseOptions, loadModule } from "./utils";
-import { genWarehouse } from "./warehouse";
+import {
+  assertValidatorFail,
+  genWarehouseOptions,
+  loadModule,
+  quickSubmitBuilder,
+} from "./utils";
+import { genWarehouse, skipToCountingPhase } from "./warehouse";
 
 let utxoIndex = 0;
 
 let warehouse: Awaited<ReturnType<typeof genTestWarehouse>>;
 
 async function genTestWarehouse() {
-  const { t, minswapToken, defaultTreasuryDatum, ammPoolDatum } =
+  const { t, minswapToken, defaultTreasuryDatum, ammPoolDatum, emulator } =
     await genWarehouse();
   utxoIndex = 0;
   const baseAsset = minswapToken;
   const warehouseOptions = await genWarehouseOptions(t);
   const builder = new WarehouseBuilder(warehouseOptions);
-  const reserveRaise = 100_000_000_000n;
-  const totalPenalty = 10_000_000_000n;
+  const reserveRaise = 72_000_000n;
+  const totalPenalty = 0n;
   const collectedFund = reserveRaise + totalPenalty;
   const treasuryDatum: TreasuryDatum = {
     ...defaultTreasuryDatum,
     collectedFund,
     totalPenalty,
     reserveRaise,
+    reserveBase: 1000000000000n,
     isManagerCollected: true,
   };
   const treasuryUTxO = {
@@ -104,8 +110,8 @@ async function genTestWarehouse() {
   const options: BuildCreateAmmPoolOptions = {
     treasuryInput: treasuryUTxO,
     ammFactoryInput: ammFactoryUTxO,
-    validFrom: Number(treasuryDatum.endTime + 1000n),
-    validTo: Number(treasuryDatum.endTime + 1100n),
+    validFrom: Number(treasuryDatum.endTime - 3600n * 1000n),
+    validTo: Number(treasuryDatum.endTime + 3600n * 1000n),
   };
   return {
     builder,
@@ -119,6 +125,7 @@ async function genTestWarehouse() {
     ammFactoryDatum,
     ammFactoryUTxO,
     poolDatum,
+    emulator,
   };
 }
 
@@ -130,11 +137,18 @@ beforeEach(async () => {
   warehouse = await genTestWarehouse();
 });
 
-test("Create AMM Pool | PASS | Happy case", async () => {
-  const { builder, options } = warehouse;
-  builder.buildCreateAmmPool(options);
-  const tx = builder.complete();
-  await tx.complete();
+test("Create AMM Pool | PASS | hihi Happy case", async () => {
+  const { builder, options, emulator } = warehouse;
+  emulator.addUTxO(options.ammFactoryInput);
+  emulator.addUTxO(options.treasuryInput);
+  skipToCountingPhase({
+    t: builder.t,
+    e: emulator,
+    datum: warehouse.treasuryDatum,
+  });
+  await quickSubmitBuilder(emulator)({
+    txBuilder: builder.buildCreateAmmPool(options).complete(),
+  });
 });
 
 async function buildTxWithStupidTreasuryDatum(

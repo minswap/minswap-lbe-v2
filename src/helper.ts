@@ -124,6 +124,9 @@ export namespace LbePhaseUtils {
     if (datum.collectedFund !== datum.reserveRaise + datum.totalPenalty) {
       return true;
     }
+    if (!datum.totalLiquidity) {
+      return true;
+    }
     return false;
   }
 

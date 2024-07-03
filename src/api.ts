@@ -15,21 +15,22 @@ import {
   toUnit,
   type Address,
   type BluePrintAsset,
+  type BuildAddSellersOptions,
   type BuildCancelLBEOptions,
+  type BuildCloseEventOptions,
+  type BuildCreateAmmPoolOptions,
   type BuildCreateTreasuryOptions,
   type BuildUsingSellerOptions,
   type LbeId,
   type LbeUTxO,
   type MaestroSupportedNetworks,
+  type Network,
   type OrderDatum,
   type PenaltyConfig,
   type TreasuryDatum,
+  type TxHash,
   type UnixTime,
   type WalletApi,
-  type BuildCloseEventOptions,
-  type Network,
-  type TxHash,
-  type BuildAddSellersOptions,
 } from ".";
 import { LbePhaseUtils, type LbePhase } from "./helper";
 
@@ -122,6 +123,13 @@ export class Api {
     )) as LbeUTxO[];
   }
 
+  async getManagers(): Promise<LbeUTxO[]> {
+    return (await this.builder.t.utxosAtWithUnit(
+      this.builder.managerAddress,
+      this.builder.managerToken,
+    )) as LbeUTxO[];
+  }
+
   async getOrders(lbeId: LbeId, owner?: Address): Promise<LbeUTxO[]> {
     let orders = (await this.builder.t.utxosAtWithUnit(
       this.builder.orderAddress,
@@ -129,13 +137,12 @@ export class Api {
     )) as LbeUTxO[];
     return orders.filter((o) => {
       let orderDatum = WarehouseBuilder.fromDatumOrder(o.datum);
-      return (
-        Api.compareLbeId(lbeId, orderDatum) &&
-        (owner
-          ? owner ===
-            plutusAddress2Address(this.builder.t.network, orderDatum.owner)
-          : true)
+      const orderOwner = plutusAddress2Address(
+        this.builder.t.network,
+        orderDatum.owner,
       );
+      const isOwner = owner ? owner === orderOwner : true;
+      return Api.compareLbeId(lbeId, orderDatum) && isOwner;
     });
   }
 
@@ -421,13 +428,33 @@ export class Api {
       this.builder.ammFactoryToken,
     )) as LbeUTxO[];
     let factoryUtxo = factories.find((factory) => {
-      let datum = WarehouseBuilder.fromDatumAmmFactory(factory.datum);
-      return datum.head < lpAssetName && datum.tail > lpAssetName;
+      let factoryDatum = WarehouseBuilder.fromDatumAmmFactory(factory.datum);
+      return factoryDatum.head < lpAssetName && factoryDatum.tail > lpAssetName;
     });
     invariant(factoryUtxo, "Cannot find AMM Factory");
     return factoryUtxo;
   }
   /**************************************************************** */
+  async createPool(lbeId: LbeId): Promise<TxHash> {
+    this.builder.clean();
+    const treasuryInput = await this.findTreasury(lbeId);
+    const ammFactoryInput = await this.findAmmFactory(lbeId);
+    const options: BuildCreateAmmPoolOptions = {
+      treasuryInput,
+      ammFactoryInput,
+      validFrom: await this.genValidFrom(),
+      validTo: Date.now() + 3 * 60 * 60 * 1000,
+    };
+    const completeTx = await this.builder
+      .buildCreateAmmPool(options)
+      .complete()
+      .complete();
+
+    const signedTx = await completeTx.sign().complete();
+    const txHash = await signedTx.submit();
+    return txHash;
+  }
+
   async addSellers(lbeId: LbeId, addSellerCount: bigint): Promise<TxHash> {
     this.builder.clean();
     const validFrom = await this.genValidFrom();
@@ -523,6 +550,31 @@ export class Api {
       .complete()
       .complete();
 
+    return completeTx.toString();
+  }
+
+  async cancelNotReachMinimum(lbeId: LbeId): Promise<TxHash> {
+    const treasuryInput = await this.findTreasury(lbeId);
+    let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasuryInput.datum);
+    invariant(
+      treasuryDatum.collectedFund ===
+        treasuryDatum.reserveRaise + treasuryDatum.totalPenalty &&
+        treasuryDatum.isManagerCollected &&
+        treasuryDatum.collectedFund < (treasuryDatum.minimumRaise ?? 1n),
+      "canot cancel by not reach minimum raise",
+    );
+    let validFrom = await this.genValidFrom();
+    let options: BuildCancelLBEOptions = {
+      treasuryInput,
+      validFrom,
+      validTo: validFrom + 3 * 60 * 60 * 1000,
+      reason: "NotReachMinimum",
+    };
+    this.builder.clean();
+    let completeTx = await this.builder
+      .buildCancelLBE(options)
+      .complete()
+      .complete();
     return completeTx.toString();
   }
 
