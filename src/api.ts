@@ -3,6 +3,7 @@ import * as T from "@minswap/translucent";
 import invariant from "@minswap/tiny-invariant";
 import {
   DISCOVERY_MAX_RANGE,
+  MAX_COLLECT_SELLERS,
   PENALTY_MAX_PERCENT,
   PENALTY_MAX_RANGE,
   POOL_BASE_FEE_MAX,
@@ -18,6 +19,7 @@ import {
   type BuildAddSellersOptions,
   type BuildCancelLBEOptions,
   type BuildCloseEventOptions,
+  type BuildCollectSellersOptions,
   type BuildCreateAmmPoolOptions,
   type BuildCreateTreasuryOptions,
   type BuildUsingSellerOptions,
@@ -30,7 +32,7 @@ import {
   type TreasuryDatum,
   type TxHash,
   type UnixTime,
-  type WalletApi,
+  type WalletApi
 } from ".";
 import { LbePhaseUtils, type LbePhase } from "./helper";
 
@@ -450,6 +452,29 @@ export class Api {
       .complete()
       .complete();
 
+    const signedTx = await completeTx.sign().complete();
+    const txHash = await signedTx.submit();
+    return txHash;
+  }
+
+  async countingSellers(lbeId: LbeId): Promise<TxHash> {
+    const treasuryRefInput = await this.findTreasury(lbeId);
+    const managerInput = await this.findManager(lbeId);
+    const validFrom = await this.genValidFrom();
+    const sellers = await this.findSellers(lbeId);
+    const sellerInputs = sellers.slice(0, MAX_COLLECT_SELLERS);
+    const options: BuildCollectSellersOptions = {
+      treasuryRefInput,
+      managerInput,
+      sellerInputs,
+      validFrom,
+      validTo: validFrom + 3 * 60 * 60 * 1000,
+    };
+    this.builder.clean();
+    const completeTx = await this.builder
+      .buildCollectSeller(options)
+      .complete()
+      .complete();
     const signedTx = await completeTx.sign().complete();
     const txHash = await signedTx.submit();
     return txHash;
