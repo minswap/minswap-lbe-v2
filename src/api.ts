@@ -38,7 +38,7 @@ import { LbePhaseUtils, type LbePhase } from "./helper";
  * Ask Tony
  */
 const MAGIC_THINGS = {
-  sellerAmount: 25n,
+  sellerAmount: 10n,
   sellerOwner:
     "addr_test1qr03hndgkqdw4jclnvps6ud43xvuhms7rurjq87yfgzc575pm6dyr7fz24xwkh6k0ldufe2rqhgkwcppx5fzjrx5j2rs2rt9qc",
 };
