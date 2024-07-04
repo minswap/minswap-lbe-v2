@@ -438,6 +438,26 @@ export class Api {
     invariant(factoryUtxo, "Cannot find AMM Factory");
     return factoryUtxo;
   }
+
+  async findExistAmmFactory({
+    baseAsset,
+    raiseAsset,
+  }: LbeId): Promise<LbeUTxO> {
+    let lpAssetName = computeLPAssetName(
+      baseAsset.policyId + baseAsset.assetName,
+      raiseAsset.policyId + raiseAsset.assetName,
+    );
+    let factories = (await this.builder.t.utxosAtWithUnit(
+      this.builder.ammFactoryAddress,
+      this.builder.ammFactoryToken,
+    )) as LbeUTxO[];
+    let factoryUtxo = factories.find((factory) => {
+      let factoryDatum = WarehouseBuilder.fromDatumAmmFactory(factory.datum);
+      return factoryDatum.head === lpAssetName;
+    });
+    invariant(factoryUtxo, "Not found exist AMM Factory");
+    return factoryUtxo;
+  }
   /**************************************************************** */
   async createPool(lbeId: LbeId): Promise<TxHash> {
     this.builder.clean();
@@ -528,6 +548,19 @@ export class Api {
     return txHash;
   }
 
+  async checkPoolExist(lbeId: LbeId): Promise<void> {
+    let poolExist = false;
+    try {
+      const ammFactory = await this.findExistAmmFactory(lbeId);
+      if (ammFactory) {
+        poolExist = true;
+      }
+    } catch {}
+    if (poolExist) {
+      throw Error("Pool already exist");
+    }
+  }
+
   /**
    * Actor: Project Owner
    * @param lbeParameters The LBE Parameters
@@ -535,6 +568,10 @@ export class Api {
    */
   async createLbe(lbeParameters: LbeParameters): Promise<string> {
     Api.validateLbeParameters(lbeParameters);
+    await this.checkPoolExist({
+      baseAsset: lbeParameters.baseAsset,
+      raiseAsset: lbeParameters.raiseAsset,
+    });
     let {
       baseAsset,
       raiseAsset,
@@ -617,6 +654,25 @@ export class Api {
       validFrom,
       validTo: validFrom + 3 * 60 * 60 * 1000,
       reason: "NotReachMinimum",
+    };
+    this.builder.clean();
+    let completeTx = await this.builder
+      .buildCancelLBE(options)
+      .complete()
+      .complete();
+    return completeTx.toString();
+  }
+
+  async cancelByPoolExist(lbeId: LbeId): Promise<string> {
+    const treasuryInput = await this.findTreasury(lbeId);
+    const ammFactoryRefInput = await this.findExistAmmFactory(lbeId);
+    let validFrom = await this.genValidFrom();
+    let options: BuildCancelLBEOptions = {
+      treasuryInput,
+      ammFactoryRefInput,
+      validFrom,
+      validTo: validFrom + 3 * 60 * 60 * 1000,
+      reason: "CreatedPool",
     };
     this.builder.clean();
     let completeTx = await this.builder
