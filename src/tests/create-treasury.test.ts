@@ -40,7 +40,7 @@ beforeEach(async () => {
   const owner = await t.wallet.address();
   let options: BuildCreateTreasuryOptions = {
     sellerAmount: DEFAULT_SELLER_AMOUNT,
-    factoryUtxo,
+    factoryUtxo: factoryUtxo,
     sellerOwner: owner,
     treasuryDatum: defaultTreasuryDatum,
     validFrom: t.utils.slotToUnixTime(emulator.slot),
@@ -79,7 +79,7 @@ test("create-treasury | PASS | Penalty Config", async () => {
   let penaltyConfig = {
     penaltyStartTime:
       W.defaultTreasuryDatum.endTime - BigInt(2 * 24 * 60 * 60 * 1000),
-    percent: MAX_PENALTY_RATE,
+    penaltyNumerator: MAX_PENALTY_RATE,
   };
   assertValidator(remixTreasuryDatum({ penaltyConfig }), "");
 });
@@ -172,7 +172,7 @@ test("create-treasury | FAIL | have 3 Factory Outs", async () => {
       },
       {
         lovelace: 1_000_000n,
-      }
+      },
     );
   });
   // await (builder.complete()).complete();
@@ -240,7 +240,7 @@ const remixManagerDatum = (remixDatum: any) => {
       {
         [builder.managerToken]: 1n,
         lovelace: MANAGER_MIN_ADA,
-      }
+      },
     );
   };
   return builder;
@@ -268,7 +268,7 @@ const remixTreasuryValue = (assets: Assets) => {
       {
         inline: WarehouseBuilder.toDatumTreasury(W.defaultTreasuryDatum),
       },
-      assets
+      assets,
     );
   };
   return builder;
@@ -383,7 +383,7 @@ test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | penaltyCon
   let penaltyConfig = {
     penaltyStartTime:
       W.defaultTreasuryDatum.startTime + BigInt(24 * 60 * 60 * 1000),
-    percent: -10n,
+    penaltyNumerator: -10n,
   };
   assertValidatorFail(remixTreasuryDatum({ penaltyConfig }));
 });
@@ -411,7 +411,7 @@ test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | penaltySta
   let penaltyConfig = {
     penaltyStartTime:
       W.defaultTreasuryDatum.endTime - BigInt(3 * 24 * 60 * 60 * 1000),
-      penaltyNumerator: MAX_PENALTY_RATE,
+    penaltyNumerator: MAX_PENALTY_RATE,
   };
   assertValidatorFail(remixTreasuryDatum({ penaltyConfig }));
 });

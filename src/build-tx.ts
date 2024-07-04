@@ -50,6 +50,8 @@ import {
   LBE_MESSAGE_COLLECT_ORDERS,
   LBE_MESSAGE_COLLECT_MANAGER,
   LBE_MESSAGE_COUNTING_SELLERS,
+  DEFAULT_USERS_LP_ASSET_AMOUNT_NUMERATOR,
+  DEFAULT_DENOMINATOR,
 } from "./constants";
 import {
   collectValidators,
@@ -163,7 +165,10 @@ export type BuildCollectOrdersOptions = {
   validTo: UnixTime;
 };
 
-export type PenaltyConfig = { penaltyStartTime: bigint; percent: bigint };
+export type PenaltyConfig = {
+  penaltyStartTime: bigint;
+  penaltyNumerator: bigint;
+};
 
 export type BuildUpdateLBEOptions = {
   treasuryInput: LbeUTxO;
@@ -793,8 +798,10 @@ export class WarehouseBuilder {
       reserveA = totalReserveRaise;
       reserveB = treasuryInDatum.reserveBase;
     }
-    const poolReserveA = (reserveA * treasuryInDatum.poolAllocation) / 100n;
-    const poolReserveB = (reserveB * treasuryInDatum.poolAllocation) / 100n;
+    const poolReserveA =
+      (reserveA * treasuryInDatum.poolAllocation) / DEFAULT_DENOMINATOR;
+    const poolReserveB =
+      (reserveB * treasuryInDatum.poolAllocation) / DEFAULT_DENOMINATOR;
     const totalLiquidity = calculateInitialLiquidity(
       poolReserveA,
       poolReserveB,

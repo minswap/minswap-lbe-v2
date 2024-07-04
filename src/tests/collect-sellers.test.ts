@@ -214,8 +214,8 @@ test("collect sellers | PASS | happy case 2", async () => {
   warehouse.options.sellerInputs.push(
     genSellerUTxO(
       { ...defaultSellerDatum, amount: 1000n, penaltyAmount: 20_000n },
-      builder
-    )
+      builder,
+    ),
   );
   warehouse.options.managerInput = {
     ...warehouse.options.managerInput,
@@ -248,7 +248,7 @@ test("collect sellers | PASS | happy case 3", async () => {
   for (let i = 0; i <= MINIMUM_SELLER_COLLECTED; i++) {
     let utxo = genSellerUTxO(
       { ...defaultSellerDatum, amount: 1000n, penaltyAmount: 20_000n },
-      builder
+      builder,
     );
     sellerInputs.push(utxo);
   }
@@ -471,7 +471,7 @@ test("collect sellers | FAIL | More than 1 manager input", async () => {
             outputIndex: ++utxoIndex,
           },
         ],
-        T.Data.to("CollectSellers", ManagerValidateManagerSpending.redeemer)
+        T.Data.to("CollectSellers", ManagerValidateManagerSpending.redeemer),
       );
   });
   assertValidatorFail(builder);
@@ -497,6 +497,6 @@ test("collect sellers | FAIL | spam collect sellers", async () => {
     await tx.complete();
   };
   expect(async () => await task()).toThrow(
-    `Collect all sellers or at least ${MINIMUM_SELLER_COLLECTED}`
+    `Collect all sellers or at least ${MINIMUM_SELLER_COLLECTED}`,
   );
 });

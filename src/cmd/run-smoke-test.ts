@@ -156,7 +156,7 @@ const happyCase = async (options: { batcher: WarehouseBatcher; api: Api }) => {
     endTime: things.endTime,
     owner: things.address,
     receiver: things.address,
-    poolAllocation: 100n,
+    poolAllocation: 10000n,
     revocable: true,
     poolBaseFee: 30n,
   };

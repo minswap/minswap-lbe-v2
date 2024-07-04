@@ -85,7 +85,7 @@ beforeEach(async () => {
   // console.log("AMM Authen Policy Id", t.utils.validatorToScriptHash(ammValidators.authenValidator));
   // console.log("AMM Pool Validator Hash", t.utils.validatorToScriptHash(ammValidators.poolValidator));
   ammFactoryAddress = t.utils.validatorToAddress(
-    ammValidators.factoryValidator
+    ammValidators.factoryValidator,
   );
   const factoryAccount: {
     address: Address;
@@ -99,14 +99,14 @@ beforeEach(async () => {
           head: "00",
           tail: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
         },
-        AmmValidateFactory.datum
+        AmmValidateFactory.datum,
       ),
     },
     assets: {
       lovelace: 10_000_000n,
       [toUnit(
         t.utils.validatorToScriptHash(ammValidators.authenValidator),
-        "4d5346"
+        "4d5346",
       )]: 1n,
     },
   };
@@ -127,7 +127,7 @@ beforeEach(async () => {
   });
   emulator = new T.Emulator(
     [ACCOUNT_0, ACCOUNT_1, factoryAccount],
-    protocolParameters
+    protocolParameters,
   );
   t = await T.Translucent.new(emulator);
   emulator.awaitBlock(10_000); // For validity ranges to be valid
@@ -152,7 +152,7 @@ beforeEach(async () => {
     txBuilder: t
       .newTx()
       .registerStake(
-        t.utils.validatorToRewardAddress(validators.factoryValidator)
+        t.utils.validatorToRewardAddress(validators.factoryValidator),
       ),
   });
 });

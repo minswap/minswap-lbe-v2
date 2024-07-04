@@ -138,7 +138,7 @@ async function genTestWarehouse() {
     },
   ];
   const orderInputUTxOs = orderInDatums.map((datum) =>
-    genOrderUTxO(datum, builder)
+    genOrderUTxO(datum, builder),
   );
   const owner = plutusAddress2Address(t.network, treasuryDatum.owner);
   const options: BuildUsingSellerOptions = {
@@ -330,7 +330,7 @@ test("using-seller | FAIL | update orders: Seller output don't have any seller t
           amount: -1745n,
         }),
       },
-      {}
+      {},
     );
   };
   assertValidatorFail(builder);
@@ -353,7 +353,7 @@ test("using-seller | FAIL | update orders: Invalid order output value", async ()
         {
           inline: WarehouseBuilder.toDatumOrder(datum),
         },
-        assets
+        assets,
       );
     }
   };

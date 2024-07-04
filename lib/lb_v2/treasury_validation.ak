@@ -91,7 +91,7 @@ pub fn validate_creating_treasury_out(
       RInlineDatum { hash: datum_hash } -> dict.has_key(datums, datum_hash)
     },
     pool_allocation >= min_pool_allocation,
-    pool_allocation <= 100,
+    pool_allocation <= default_denominator,
     when minimum_order_raise is {
       Some(min_order) -> min_order > 0
       _ -> True
