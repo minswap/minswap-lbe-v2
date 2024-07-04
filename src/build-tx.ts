@@ -107,6 +107,7 @@ export type WarehouseBuilderOptions = {
 
 export type BuildInitFactoryOptions = {
   seedUtxo: UTxO;
+  skipCollect?: boolean;
 };
 
 export type BuildCreateTreasuryOptions = {
@@ -232,7 +233,7 @@ export function genWarehouseBuilderOptions(
   let ammDeployedValidators = {
     authenValidator: hexToUtxo(lbeV2Script.ammAuthenRefInput),
     poolValidator: hexToUtxo(lbeV2Script.ammPoolRefInput),
-    factoryValidator: hexToUtxo(lbeV2Script.factoryRefInput),
+    factoryValidator: hexToUtxo(lbeV2Script.ammFactoryRefInput),
   };
   return {
     t,
@@ -369,9 +370,7 @@ export class WarehouseBuilder {
 
     // AMM
     this.ammValidators = ammValidators;
-    this.ammFactoryAddress = t.utils.validatorToAddress(
-      ammValidators.factoryValidator,
-    );
+    this.ammFactoryAddress = ammValidators.factoryAddress;
     this.ammPoolAddress = ammValidators.poolAddress;
     this.ammDeployedValidators = ammDeployedValidators;
     this.ammAuthenHash = t.utils.validatorToScriptHash(
@@ -427,13 +426,16 @@ export class WarehouseBuilder {
   }
 
   public buildInitFactory(options: BuildInitFactoryOptions): WarehouseBuilder {
-    const { seedUtxo } = options;
+    const { seedUtxo, skipCollect } = options;
     this.tasks.push(
       () => {
         this.mintRedeemer = "Initialization";
       },
       () => {
-        this.tx.collectFrom([seedUtxo]);
+        if (skipCollect) {
+        } else {
+          this.tx.collectFrom([seedUtxo]);
+        }
       },
       () => {
         this.mintingFactoryToken();
@@ -793,7 +795,10 @@ export class WarehouseBuilder {
     }
     const poolReserveA = (reserveA * treasuryInDatum.poolAllocation) / 100n;
     const poolReserveB = (reserveB * treasuryInDatum.poolAllocation) / 100n;
-    const totalLiquidity = calculateInitialLiquidity(reserveA, reserveB);
+    const totalLiquidity = calculateInitialLiquidity(
+      poolReserveA,
+      poolReserveB,
+    );
 
     const ammPoolDatum: FeedTypeAmmPool["_datum"] = {
       poolBatchingStakeCredential: {
@@ -1240,8 +1245,8 @@ export class WarehouseBuilder {
   public buildCollectSeller(
     options: BuildCollectSellersOptions,
   ): WarehouseBuilder {
-    const { treasuryRefInput, managerInput, sellerInputs, validFrom, validTo } =
-      options;
+    const { treasuryRefInput, managerInput, validFrom, validTo } = options;
+    const sellerInputs = sortUTxOs(options.sellerInputs);
     invariant(managerInput.datum);
     const managerInDatum = WarehouseBuilder.fromDatumManager(
       managerInput.datum,

@@ -5,7 +5,13 @@ set -euo pipefail
 version=$1
 
 echo "update version field"
-sed -i -E 's/"version": ".+"/"version": "'"$version"'"/' package.json
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # macOS
+  sed -i '' -E 's/"version": ".+"/"version": "'"$version"'"/' package.json
+else
+  # Linux (including Ubuntu)
+  sed -i -E 's/"version": ".+"/"version": "'"$version"'"/' package.json
+fi
 
 echo "publish"
 bun run build

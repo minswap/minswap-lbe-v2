@@ -1,6 +1,8 @@
+import * as T from "@minswap/translucent";
 import invariant from "@minswap/tiny-invariant";
 import {
   WarehouseBuilder,
+  genWarehouseBuilderOptions,
   type BuildCollectManagerOptions,
   type BuildCollectOrdersOptions,
   type BuildCollectSellersOptions,
@@ -9,7 +11,6 @@ import {
 } from "..";
 import { MAX_COLLECT_SELLERS } from "../constants";
 import { BatchingPhase } from "../helper";
-import logger from "../logger";
 import type {
   Address,
   BluePrintAsset,
@@ -89,6 +90,21 @@ namespace LbeId {
   }
 }
 
+export async function genDefaultBatcher(): Promise<WarehouseBatcher> {
+  const seed =
+    "voyage private emerge bunker laundry before drastic throw scout damp budget adult wonder charge sister route jacket sound undo dwarf dignity quit cat erode";
+  const maestro = new T.Maestro({
+    network: "Preprod",
+    apiKey: "E0n5jUy4j40nhKCuB7LrYabTNieG0egu",
+  });
+  const t = await T.Translucent.new(maestro, "Preprod");
+  t.selectWalletFromSeed(seed);
+  const warehouseOptions = genWarehouseBuilderOptions(t);
+  const builder = new WarehouseBuilder(warehouseOptions);
+  const batcher = new WarehouseBatcher(builder);
+  return batcher;
+}
+
 export class WarehouseBatcher {
   builder: WarehouseBuilder;
   mapBatchingUTxO: Record<LbeId, BatchUTxO> = {};
@@ -104,12 +120,44 @@ export class WarehouseBatcher {
 
   // COMMON
   private async commonComplete(options: {
-    buildFn: CommonBuildFn;
+    buildFnName: string;
     commonOptions: CommonBuildOptions;
     inputsToChoose: UTxO[];
     extraTasks: (() => void)[];
   }): Promise<TxSigned> {
-    let { buildFn, commonOptions, inputsToChoose, extraTasks } = options;
+    const cases: Record<string, CommonBuildFn> = {
+      collectSellers: (options: BuildOptions) => {
+        return this.builder.buildCollectSeller(
+          options as BuildCollectSellersOptions,
+        );
+      },
+      collectManager: (options: BuildOptions) => {
+        return this.builder.buildCollectManager(
+          options as BuildCollectManagerOptions,
+        );
+      },
+      redeemOrders: (options: BuildOptions) => {
+        return this.builder.buildRedeemOrders(
+          options as BuildRedeemOrdersOptions,
+        );
+      },
+      collectOrders: (options: BuildOptions) => {
+        return this.builder.buildCollectOrders(
+          options as BuildCollectOrdersOptions,
+        );
+      },
+      refundOrders: (options: BuildOptions) => {
+        return this.builder.buildRefundOrders(
+          options as BuildRedeemOrdersOptions,
+        );
+      },
+      createPool: (options: BuildOptions) => {
+        return this.builder.buildCreateAmmPool(
+          options as BuildCreateAmmPoolOptions,
+        );
+      },
+    };
+    let { buildFnName, commonOptions, inputsToChoose, extraTasks } = options;
     let currentUnixTime = await this.getCurrentUnixTime();
     let buildOptions = {
       ...commonOptions,
@@ -117,9 +165,9 @@ export class WarehouseBatcher {
       validTo: currentUnixTime + 3 * 60 * 60 * 1000,
     };
     this.builder.clean();
-    let mutTxBuilder = buildFn(buildOptions as BuildOptions);
-    mutTxBuilder.tasks.push(...extraTasks);
-    let tx = await mutTxBuilder.complete().complete({ inputsToChoose });
+    cases[buildFnName](buildOptions as BuildOptions);
+    this.builder.tasks.push(...extraTasks);
+    let tx = await this.builder.complete().complete({ inputsToChoose, debug: {showDraftTx: true} });
     let signedTx = tx.sign();
     let txSigned = await signedTx.complete();
     return txSigned;
@@ -142,7 +190,7 @@ export class WarehouseBatcher {
   }): Promise<TxSigned> {
     const { treasury, ammFactory, seeds } = options;
     let txSigned = await this.commonComplete({
-      buildFn: this.builder.buildCreateAmmPool as CommonBuildFn,
+      buildFnName: "createPool",
       commonOptions: {
         treasuryInput: treasury,
         ammFactoryInput: ammFactory,
@@ -160,7 +208,7 @@ export class WarehouseBatcher {
     let { batching, seeds } = options;
     invariant(batching.manager, "Missing Manager");
     let txSigned = await this.commonComplete({
-      buildFn: this.builder.buildCollectManager as CommonBuildFn,
+      buildFnName: "collectManager",
       commonOptions: {
         treasuryInput: batching.treasury,
         managerInput: batching.manager,
@@ -177,7 +225,7 @@ export class WarehouseBatcher {
   ): Promise<TxSigned> {
     let { sellers, treasuryRefInput } = extra;
     let txSigned = await this.commonComplete({
-      buildFn: this.builder.buildCollectSeller as CommonBuildFn,
+      buildFnName: "collectSellers",
       commonOptions: {
         treasuryRefInput,
         managerInput: mapInputs.manager[0],
@@ -196,11 +244,11 @@ export class WarehouseBatcher {
   async buildHandleOrders(
     mapInputs: OrdersMapInput,
     extra: { orders: LbeUTxO[]; treasury: LbeUTxO },
-    handleFn: CommonBuildFn,
+    phase: BatchingPhase,
   ): Promise<TxSigned> {
     let { orders, treasury } = extra;
     let txSigned = await this.commonComplete({
-      buildFn: handleFn,
+      buildFnName: phase,
       commonOptions: {
         treasuryInput: treasury,
         orderInputs: orders,
@@ -239,9 +287,9 @@ export class WarehouseBatcher {
         sellers: batchSellers,
       });
     };
-    let submit = async (tx: string): Promise<string> => {
-      return this.builder.t.wallet.submitTx(tx);
-    };
+    // let submit = async (tx: string): Promise<string> => {
+    //   return this.builder.t.wallet.submitTx(tx);
+    // };
     return {
       mapInputs,
       stopCondition,
@@ -251,7 +299,6 @@ export class WarehouseBatcher {
         treasuryRefInput: batching.treasury,
       },
       buildTx,
-      submit,
     };
   }
 
@@ -274,23 +321,15 @@ export class WarehouseBatcher {
         this.compareAddress(this.builder.treasuryAddress),
       ),
     };
-    let cases: Record<
-      string,
-      (options: BuildRedeemOrdersOptions) => WarehouseBuilder
-    > = {
-      collectOrders: this.builder.buildCollectOrders,
-      refundOrders: this.builder.buildRefundOrders,
-      redeemOrders: this.builder.buildRedeemOrders,
-    };
-    let innerFn = cases[phase];
     let buildTx = (
       mapInputs: Record<string, UTxO[]>,
       extra: { orders: LbeUTxO[]; treasury: LbeUTxO },
     ): Promise<TxSigned> => {
+      let batchOrders = extra.orders.splice(0, Number(50));
       return this.buildHandleOrders(
         mapInputs as OrdersMapInput,
-        extra,
-        innerFn as CommonBuildFn,
+        { ...extra, orders: batchOrders },
+        phase,
       );
     };
     return {
@@ -301,7 +340,10 @@ export class WarehouseBatcher {
         orders: batching.orders,
         treasury: batching.treasury,
       },
-      buildTx: buildTx.bind(this),
+      buildTx: buildTx,
+      submit: async (tx: string) => {
+        return await this.builder.t.wallet.submitTx(tx);
+      },
     };
   }
 
@@ -318,25 +360,25 @@ export class WarehouseBatcher {
       });
       // Skip if not in counting phase
       if (!phase) continue;
-      logger.info(`batching phase: ${phase}`);
+      console.info(`batching phase: ${phase}`);
       let seeds = await this.builder.t.wallet.getUtxos();
       if (phase === "countingSellers") {
         let options = this.collectSellersChaining(batching, seeds);
         let txHashes = await doChaining(options);
         for (const txHash of txHashes) {
-          logger.info(`do ${phase} txHash: ${txHash}`);
+          console.info(`do ${phase} txHash: ${txHash}`);
         }
       } else if (phase === "collectManager") {
         const signedTx = await this.buildCollectManager({ batching, seeds });
         const txHash = await signedTx.submit();
-        logger.info(`do ${phase} txHash: ${txHash}`);
+        console.info(`do ${phase} txHash: ${txHash}`);
       } else if (
         ["collectOrders", "redeemOrders", "refundOrders"].includes(phase)
       ) {
         let options = this.getOrdersChaining(batching, seeds, phase);
         let txHashes = await doChaining(options);
         for (const txHash of txHashes) {
-          logger.info(`do ${phase} txHash: ${txHash}`);
+          console.info(`do ${phase} txHash: ${txHash}`);
         }
       } else {
         throw Error(`not support this phase ${phase}`);
@@ -414,7 +456,7 @@ export class WarehouseBatcher {
         ammFactory,
       });
       const txHash = await signedTx.submit();
-      logger.info(`do create-amm-pool txHash: ${txHash}`);
+      console.info(`do create-amm-pool txHash: ${txHash}`);
       await this.builder.t.awaitTx(txHash);
     }
   }

@@ -5,7 +5,7 @@ import { WarehouseBuilder, genWarehouseBuilderOptions } from "../build-tx";
 import logger from "../logger";
 
 const seed =
-  "muffin spell cement resemble frame pupil grow gloom hawk wild item hungry polar ice maximum sport economy drop sun timber stone circle army jazz";
+  "vocal shock limit you spell damp buzz jazz magnet poet toe lunar crater reject elite alien tornado noodle control race proof pull favorite brief";
 
 const main = async () => {
   logger.info("run-batcher | start");
@@ -20,12 +20,13 @@ const main = async () => {
   const warehouseOptions = genWarehouseBuilderOptions(t);
   const builder = new WarehouseBuilder(warehouseOptions);
   const batcher = new WarehouseBatcher(builder);
+  await batcher.batching();
 
-  const poolBatcher = new WarehouseBatcher(
-    new WarehouseBuilder(warehouseOptions),
-  );
+  // const poolBatcher = new WarehouseBatcher(
+  //   new WarehouseBuilder(warehouseOptions),
+  // );
+  // await poolBatcher.poolBatching();
 
-  await Promise.allSettled([batcher.batching(), poolBatcher.handlePool()]);
   logger.info("run-batcher | end");
 };
 

@@ -38,6 +38,7 @@ export type MinswapValidators = {
   poolValidator: Script;
   poolBatchingValidator: Script;
   poolAddress: Address;
+  factoryAddress: Address;
 };
 
 export function collectMinswapValidators(options: {
@@ -73,12 +74,17 @@ export function collectMinswapValidators(options: {
       Inline: [{ ScriptCredential: [poolBatchingValidatorHash] }],
     },
   );
+  const factoryAddress = t.utils.validatorToAddress(
+    factoryValidator,
+    poolStakeCredential,
+  );
   return {
     authenValidator,
     factoryValidator,
     poolValidator,
     poolBatchingValidator,
     poolAddress,
+    factoryAddress,
   };
 }
 
