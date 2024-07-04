@@ -169,7 +169,7 @@ export class WarehouseBatcher {
     this.builder.tasks.push(...extraTasks);
     let tx = await this.builder
       .complete()
-      .complete({ inputsToChoose, debug: { showDraftTx: true } });
+      .complete({ inputsToChoose, debug: { showDraftTx: false } });
     let signedTx = tx.sign();
     let txSigned = await signedTx.complete();
     return txSigned;
