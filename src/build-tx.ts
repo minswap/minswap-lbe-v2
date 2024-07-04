@@ -1246,7 +1246,7 @@ export class WarehouseBuilder {
     options: BuildCollectSellersOptions,
   ): WarehouseBuilder {
     const { treasuryRefInput, managerInput, validFrom, validTo } = options;
-    const sellerInputs = sortUTxOs(options.sellerInputs);
+    const sellerInputs = sortUTxOs(options.sellerInputs) as LbeUTxO[];
     invariant(managerInput.datum);
     const managerInDatum = WarehouseBuilder.fromDatumManager(
       managerInput.datum,
