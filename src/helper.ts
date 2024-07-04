@@ -58,7 +58,8 @@ export type LbePhase =
   | "discovery"
   | "counting"
   | "encounter"
-  | "cancelled";
+  | "cancelled"
+  | "completed";
 
 export namespace LbePhaseUtils {
   export function from(options: {
@@ -77,6 +78,7 @@ export namespace LbePhaseUtils {
       { checker: isDiscovery, phase: "discovery" },
       { checker: isCounting, phase: "counting" },
       { checker: isEncounter, phase: "encounter" },
+      { checker: isCompleted, phase: "completed" },
     ];
     for (let { checker, phase } of things) {
       if (checker(options)) {
@@ -118,10 +120,10 @@ export namespace LbePhaseUtils {
     currentTime: UnixTime;
   }): boolean {
     let { datum } = options;
-    if (!datum.isManagerCollected) {
-      return true;
+    if (datum.isCancelled) {
+      return false;
     }
-    if (datum.collectedFund !== datum.reserveRaise + datum.totalPenalty) {
+    if (!datum.isManagerCollected) {
       return true;
     }
     if (!datum.totalLiquidity) {
@@ -141,7 +143,17 @@ export namespace LbePhaseUtils {
         datum.collectedFund === datum.reserveRaise + datum.totalPenalty
       );
     } else {
-      return datum.totalLiquidity > 0;
+      // created pool and has redeeming orders
+      return datum.totalLiquidity > 0 && datum.collectedFund > 0;
     }
+  }
+
+  export function isCompleted(options: {
+    datum: TreasuryDatum;
+    currentTime: UnixTime;
+  }): boolean {
+    let { datum } = options;
+    // created pool and redeem all orders
+    return datum.totalLiquidity > 0 && !datum.collectedFund;
   }
 }

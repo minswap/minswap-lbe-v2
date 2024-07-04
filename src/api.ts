@@ -33,6 +33,8 @@ import {
   type TxHash,
   type UnixTime,
   type WalletApi,
+  type BuildCollectOrdersOptions,
+  MAX_COLLECT_ORDERS,
 } from ".";
 import { LbePhaseUtils, type LbePhase } from "./helper";
 
@@ -473,6 +475,27 @@ export class Api {
     this.builder.clean();
     const completeTx = await this.builder
       .buildCollectSeller(options)
+      .complete()
+      .complete();
+    const signedTx = await completeTx.sign().complete();
+    const txHash = await signedTx.submit();
+    return txHash;
+  }
+
+  async collectOrders(lbeId: LbeId): Promise<TxHash> {
+    this.builder.clean();
+    const validFrom = await this.genValidFrom();
+    const treasuryInput = await this.findTreasury(lbeId);
+    const orders = await this.getOrders(lbeId);
+    const orderInputs = orders.slice(0, MAX_COLLECT_ORDERS);
+    const options: BuildCollectOrdersOptions = {
+      validFrom,
+      validTo: validFrom + 3 * 60 * 60 * 1000,
+      treasuryInput,
+      orderInputs,
+    };
+    const completeTx = await this.builder
+      .buildCollectOrders(options)
       .complete()
       .complete();
     const signedTx = await completeTx.sign().complete();
