@@ -1,3 +1,4 @@
+import { FactoryValidateFactory } from "../../plutus";
 import {
   WarehouseBuilder,
   type BuildCancelLBEOptions,
@@ -8,11 +9,19 @@ import {
   MINIMUM_ORDER_COLLECTED,
   ORDER_MIN_ADA,
   TREASURY_MIN_ADA,
+  MINSWAP_V2_FACTORY_AUTH_AN,
 } from "../constants";
-import type { OrderDatum, TreasuryDatum, UTxO } from "../types";
+import type {
+  FactoryDatum,
+  LbeUTxO,
+  OrderDatum,
+  TreasuryDatum,
+  UTxO,
+} from "../types";
+import { toUnit } from "../utils";
 import { assertValidator, loadModule, quickSubmitBuilder } from "./utils";
 import { genWarehouse } from "./warehouse";
-
+import * as T from "@minswap/translucent";
 let W: GenTestWarehouse;
 
 beforeAll(async () => {
@@ -218,10 +227,26 @@ test(`collect-orders | PASS | collect -> cancel -> collect`, async () => {
 
   // 2. Cancel LBE
   let treasuryInput = await W.findTreasuryInput();
-  W.emulator.addUTxO(W.ammPoolInput);
+
+  builder.setInnerAssets(orderDatum.baseAsset, orderDatum.raiseAsset);
+  const ammFactoryDatum: FactoryDatum = {
+    head: builder.lpAssetName!,
+    tail: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
+  };
+  const ammFactoryUTxO: UTxO = {
+    txHash: "ce156ede4b5d1cd72b98f1d78c77c4e6bd3fc37bbe28e6c380f17a4f626e593c",
+    outputIndex: 0,
+    address: builder.ammFactoryAddress,
+    datum: T.Data.to(ammFactoryDatum, FactoryValidateFactory.datum),
+    assets: {
+      lovelace: 2_000_000n,
+      [toUnit(builder.ammAuthenHash, MINSWAP_V2_FACTORY_AUTH_AN)]: 1n,
+    },
+  };
+  W.emulator.addUTxO(ammFactoryUTxO);
   let cancelOptions: BuildCancelLBEOptions = {
-    treasuryInput,
-    ammFactoryRefInput: W.ammPoolInput,
+    treasuryInput: treasuryInput as LbeUTxO,
+    ammFactoryRefInput: ammFactoryUTxO as LbeUTxO,
     validFrom: W.t.utils.slotToUnixTime(W.emulator.slot),
     validTo: W.t.utils.slotToUnixTime(W.emulator.slot + 60),
     reason: "CreatedPool",
@@ -238,8 +263,10 @@ test(`collect-orders | PASS | collect -> cancel -> collect`, async () => {
   treasuryInput = await W.findTreasuryInput();
   options = {
     ...options,
-    orderInputs: orderInputs.slice(Number(MINIMUM_ORDER_COLLECTED)),
-    treasuryInput,
+    orderInputs: orderInputs.slice(
+      Number(MINIMUM_ORDER_COLLECTED),
+    ) as LbeUTxO[],
+    treasuryInput: treasuryInput as LbeUTxO,
   };
   // restart builder
   builder = new WarehouseBuilder(W.warehouseOptions);

@@ -167,7 +167,9 @@ export class WarehouseBatcher {
     this.builder.clean();
     cases[buildFnName](buildOptions as BuildOptions);
     this.builder.tasks.push(...extraTasks);
-    let tx = await this.builder.complete().complete({ inputsToChoose, debug: {showDraftTx: true} });
+    let tx = await this.builder
+      .complete()
+      .complete({ inputsToChoose, debug: { showDraftTx: true } });
     let signedTx = tx.sign();
     let txSigned = await signedTx.complete();
     return txSigned;
