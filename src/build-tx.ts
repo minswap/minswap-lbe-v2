@@ -817,7 +817,9 @@ export class WarehouseBuilder {
 
     const totalLbeLPs = totalLiquidity - LP_COLATERAL;
     const receiverLP =
-      (totalLbeLPs * (treasuryInDatum.poolAllocation - 50n)) /
+      (totalLbeLPs *
+        (treasuryInDatum.poolAllocation -
+          DEFAULT_USERS_LP_ASSET_AMOUNT_NUMERATOR)) /
       treasuryInDatum.poolAllocation;
     const treasuryOutDatum: TreasuryDatum = {
       ...treasuryInDatum,

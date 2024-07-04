@@ -172,7 +172,7 @@ test("create-treasury | FAIL | have 3 Factory Outs", async () => {
       },
       {
         lovelace: 1_000_000n,
-      },
+      }
     );
   });
   // await (builder.complete()).complete();
@@ -240,7 +240,7 @@ const remixManagerDatum = (remixDatum: any) => {
       {
         [builder.managerToken]: 1n,
         lovelace: MANAGER_MIN_ADA,
-      },
+      }
     );
   };
   return builder;
@@ -268,7 +268,7 @@ const remixTreasuryValue = (assets: Assets) => {
       {
         inline: WarehouseBuilder.toDatumTreasury(W.defaultTreasuryDatum),
       },
-      assets,
+      assets
     );
   };
   return builder;
@@ -392,7 +392,7 @@ test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | penaltySta
   // penalty rate exceeds MAX_PENALTY_RATE
   let penaltyConfig = {
     penaltyStartTime: 0n,
-    percent: MAX_PENALTY_RATE,
+    penaltyNumerator: MAX_PENALTY_RATE,
   };
   assertValidatorFail(remixTreasuryDatum({ penaltyConfig }));
 });
@@ -401,7 +401,7 @@ test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | penaltySta
   // penalty rate exceeds MAX_PENALTY_RATE
   let penaltyConfig = {
     penaltyStartTime: W.defaultTreasuryDatum.endTime,
-    percent: MAX_PENALTY_RATE,
+    penaltyNumerator: MAX_PENALTY_RATE,
   };
   assertValidatorFail(remixTreasuryDatum({ penaltyConfig }));
 });
@@ -411,7 +411,7 @@ test("create-treasury | FAIL | Treasury Output Datum incorrect! | X | penaltySta
   let penaltyConfig = {
     penaltyStartTime:
       W.defaultTreasuryDatum.endTime - BigInt(3 * 24 * 60 * 60 * 1000),
-    percent: MAX_PENALTY_RATE,
+      penaltyNumerator: MAX_PENALTY_RATE,
   };
   assertValidatorFail(remixTreasuryDatum({ penaltyConfig }));
 });

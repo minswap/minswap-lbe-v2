@@ -12,7 +12,11 @@ import {
   type BuildUsingSellerOptions,
   type WarehouseBuilderOptions,
 } from "../build-tx";
-import { MINIMUM_ORDER_REDEEMED, MINIMUM_SELLER_COLLECTED } from "../constants";
+import {
+  DEFAULT_DENOMINATOR,
+  MINIMUM_ORDER_REDEEMED,
+  MINIMUM_SELLER_COLLECTED,
+} from "../constants";
 import {
   collectMinswapValidators,
   collectValidators,
@@ -81,7 +85,7 @@ beforeEach(async () => {
   // console.log("AMM Authen Policy Id", t.utils.validatorToScriptHash(ammValidators.authenValidator));
   // console.log("AMM Pool Validator Hash", t.utils.validatorToScriptHash(ammValidators.poolValidator));
   ammFactoryAddress = t.utils.validatorToAddress(
-    ammValidators.factoryValidator,
+    ammValidators.factoryValidator
   );
   const factoryAccount: {
     address: Address;
@@ -95,14 +99,14 @@ beforeEach(async () => {
           head: "00",
           tail: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
         },
-        AmmValidateFactory.datum,
+        AmmValidateFactory.datum
       ),
     },
     assets: {
       lovelace: 10_000_000n,
       [toUnit(
         t.utils.validatorToScriptHash(ammValidators.authenValidator),
-        "4d5346",
+        "4d5346"
       )]: 1n,
     },
   };
@@ -123,7 +127,7 @@ beforeEach(async () => {
   });
   emulator = new T.Emulator(
     [ACCOUNT_0, ACCOUNT_1, factoryAccount],
-    protocolParameters,
+    protocolParameters
   );
   t = await T.Translucent.new(emulator);
   emulator.awaitBlock(10_000); // For validity ranges to be valid
@@ -148,7 +152,7 @@ beforeEach(async () => {
     txBuilder: t
       .newTx()
       .registerStake(
-        t.utils.validatorToRewardAddress(validators.factoryValidator),
+        t.utils.validatorToRewardAddress(validators.factoryValidator)
       ),
   });
 });
@@ -193,7 +197,7 @@ test("example flow", async () => {
     owner: address2PlutusAddress(ACCOUNT_0.address),
     receiver: address2PlutusAddress(ACCOUNT_0.address),
     receiverDatum: { RInlineDatum: { hash: extraDatumHash } },
-    poolAllocation: 100n,
+    poolAllocation: 10000n,
     minimumRaise: null,
     maximumRaise: null,
     reserveBase: 69000000000000n,
