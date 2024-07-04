@@ -30,8 +30,12 @@ pub const minimum_order_collected = 30
 
 pub const minimum_order_redeemed = 30
 
-// The minimum percentage of total funds will go to pool
-pub const min_pool_allocation = 70
+pub const default_denominator = 10000
+
+pub const default_users_lp_asset_amount_numerator = 5000
+
+// The minimum ratio of total funds will go to pool
+pub const min_pool_allocation = 7000
 
 // 2 days in milliseconds = 2 * 24 * 60 * 60 * 1000
 // The business requires a maximum penalty period of two final days.
@@ -42,7 +46,7 @@ pub const two_day_ms = 172800000
 pub const one_month_ms = 2592000000
 
 // Maximum penalty rate based on business
-pub const max_penalty = 25
+pub const max_penalty = 2500
 
 // the ADA amount store in Treasury UTxO
 pub const treasury_minimum_ada = 5_000_000
@@ -142,7 +146,7 @@ pub fn calculate_penalty(
 ) -> Int {
   when penalty_config is {
     None -> 0
-    Some(PenaltyConfig { penalty_start_time, percent }) ->
+    Some(PenaltyConfig { penalty_start_time, penalty_numerator }) ->
       if end_valid_time_range < penalty_start_time {
         // not in penalty time
         0
@@ -151,7 +155,7 @@ pub fn calculate_penalty(
           // withdrawal amount of this Tx
           let withdrawal_amount = total_input_amount - total_output_amount
           // calculate penalty
-          withdrawal_amount * percent / 100
+          withdrawal_amount * penalty_numerator / default_denominator
         } else {
           0
         }

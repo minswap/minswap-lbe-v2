@@ -11,7 +11,7 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
-  create_pool_comission, default_burn_liquidity, max_base_fee_numerator,
+  create_pool_comission, default_burn_liquidity, default_denominator, default_users_lp_asset_amount_numerator, max_base_fee_numerator,
   max_penalty, min_base_fee_numerator, min_pool_allocation, one_month_ms,
   treasury_auth_an, treasury_minimum_ada, two_day_ms,
 }
@@ -112,14 +112,14 @@ pub fn validate_creating_treasury_out(
     reserve_raise == 0,
     total_liquidity == 0,
     when penalty_config is {
-      Some(PenaltyConfig { penalty_start_time, percent }) -> and {
+      Some(PenaltyConfig { penalty_start_time, penalty_numerator }) -> and {
           penalty_start_time > start_time,
           penalty_start_time < end_time,
           // Business requires a maximum penalty period of 2 final days
           penalty_start_time >= end_time - two_day_ms,
-          percent > 0,
+          penalty_numerator > 0,
           // Business requires maximum penalty rate is 25 percent
-          percent <= max_penalty,
+          penalty_numerator <= max_penalty,
         }
       _ -> True
     },
@@ -302,8 +302,8 @@ pub fn calculate_allocation(
   asset_b: Asset,
   amm_authen_policy_id: PolicyId,
 ) -> (Int, Int, Int, Value, AssetName) {
-  let datum_reserve_a = lbe_reserve_a * pool_allocation / 100
-  let datum_reserve_b = lbe_reserve_b * pool_allocation / 100
+  let datum_reserve_a = lbe_reserve_a * pool_allocation / default_denominator
+  let datum_reserve_b = lbe_reserve_b * pool_allocation / default_denominator
 
   let Asset(asset_a_pid, asset_a_tn) = asset_a
   let Asset(asset_b_pid, asset_b_tn) = asset_b
@@ -317,7 +317,7 @@ pub fn calculate_allocation(
     )
   let total_lbe_lp = pool_total_liquidity - default_burn_liquidity
   let expected_receiver_lp_tokens =
-    total_lbe_lp * ( pool_allocation - 50 ) / pool_allocation
+    total_lbe_lp * ( pool_allocation - default_users_lp_asset_amount_numerator ) / pool_allocation
   let treasury_lp_amount = total_lbe_lp - expected_receiver_lp_tokens
 
   let expected_receiver_value =

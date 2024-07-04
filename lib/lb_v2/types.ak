@@ -42,7 +42,7 @@ pub type FactoryRedeemer {
 
 pub type PenaltyConfig {
   penalty_start_time: Int,
-  percent: Int,
+  penalty_numerator: Int,
 }
 
 pub type ReceiverDatum {
