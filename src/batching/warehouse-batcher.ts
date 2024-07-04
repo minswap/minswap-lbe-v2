@@ -170,7 +170,6 @@ export class WarehouseBatcher {
     let tx = await this.builder.complete().complete({ inputsToChoose });
     let signedTx = tx.sign();
     let txSigned = await signedTx.complete();
-    console.log(txSigned.toString());
     return txSigned;
   }
 

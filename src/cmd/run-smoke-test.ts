@@ -128,18 +128,21 @@ const happyCase = async (options: { batcher: WarehouseBatcher; api: Api }) => {
   };
 
   // 1. Mint Asset
-  logger.warn("Start | Mint Assets");
-  const { txHash: mintTxHash, asset: baseAsset } = await mintNativeToken({
-    trans,
-    assetName: T.fromText(`TONY-TEST-${Date.now()}`),
-    amount: things.reserveBase,
-  });
-  logger.info(`mint native asset | txHash ${mintTxHash}`);
-  await trans.awaitTx(mintTxHash);
+  // logger.warn("Start | Mint Assets");
+  // const { txHash: mintTxHash, asset: baseAsset } = await mintNativeToken({
+  //   trans,
+  //   assetName: T.fromText(`TONY-TEST-${Date.now()}`),
+  //   amount: things.reserveBase,
+  // });
+  // logger.info(`mint native asset | txHash ${mintTxHash}`);
+  // await trans.awaitTx(mintTxHash);
 
   // 2. Create LBE
   logger.warn("Start | Create LBE");
-  things.lbeId.baseAsset = baseAsset;
+  things.lbeId.baseAsset = {
+    policyId: "7b7ac17b920be487849b4a7e75d455bb5e55aeacd9372bf904b6656c",
+    assetName: "544f4e592d544553542d31373230303035373138383739",
+  };
   things.lpAssetName = computeLPAssetName(
     toUnit(things.lbeId.baseAsset.policyId, things.lbeId.baseAsset.assetName),
     toUnit(things.lbeId.raiseAsset.policyId, things.lbeId.raiseAsset.assetName),
