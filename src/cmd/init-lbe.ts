@@ -56,7 +56,7 @@ const main = async () => {
     .unlockWithDatumHash(seedUtxo, datum, DUMMY_REDEEMER)
     .complete({ witnessSet: { ignoreScriptDataHash: true } });
 
-  const signedTx = await completedTx.sign().complete();
+  const signedTx = await completedTx.sign().complete({ hasPlutusData: true });
   const txHash = await signedTx.submit();
   logger.info(`init LBE success | txHash: ${txHash}`);
   await t.awaitTx(txHash);
