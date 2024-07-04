@@ -13,6 +13,9 @@ let main = async () => {
   const treasuries = await api.getLbes();
   for (const treasury of treasuries) {
     const treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasury.datum);
+    // SKIP when LBE is cancelled or LBE is success and created Pool
+    if (treasuryDatum.isCancelled || treasuryDatum.totalLiquidity > 0n)
+      continue;
     try {
       await api.checkPoolExist(treasuryDatum);
     } catch (err) {
