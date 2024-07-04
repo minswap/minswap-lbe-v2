@@ -32,7 +32,7 @@ import {
   type TreasuryDatum,
   type TxHash,
   type UnixTime,
-  type WalletApi
+  type WalletApi,
 } from ".";
 import { LbePhaseUtils, type LbePhase } from "./helper";
 
