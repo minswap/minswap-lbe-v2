@@ -1,6 +1,6 @@
 {
   "name": "@minswap/lbe-sdk",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "scripts": {
     "build": "rimraf build && rollup -c rollup.config.mjs",
     "format": "bun prettier --w src/* --print-width 80",
