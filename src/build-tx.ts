@@ -840,7 +840,7 @@ export class WarehouseBuilder {
           this.t.network,
           treasuryInDatum.receiver,
         );
-        const assets: Assets = {
+        let assets: Assets = {
           [this.ammLpToken]: receiverLP,
         };
         const receiverA = reserveA - poolReserveA;
@@ -851,6 +851,7 @@ export class WarehouseBuilder {
         if (receiverB !== 0n) {
           assets[toUnit(assetB.policyId, assetB.assetName)] = receiverB;
         }
+        assets = filterAssets(assets);
         if (treasuryInDatum.receiverDatum !== "RNoDatum") {
           invariant(extraDatum);
           if ("RInlineDatum" in treasuryInDatum.receiverDatum) {
@@ -1018,7 +1019,8 @@ export class WarehouseBuilder {
       },
       () => {
         for (const output of userOutputs) {
-          this.tx.payToAddress(output.address, output.assets);
+          const innerAssets = filterAssets(output.assets);
+          this.tx.payToAddress(output.address, innerAssets);
         }
       },
       () => {
@@ -1103,7 +1105,8 @@ export class WarehouseBuilder {
       },
       () => {
         for (const output of userOutputs) {
-          this.tx.payToAddress(output.address, output.assets);
+          const innerAssets = filterAssets(output.assets);
+          this.tx.payToAddress(output.address, innerAssets);
         }
       },
       () => {
@@ -1296,9 +1299,9 @@ export class WarehouseBuilder {
       () => {
         for (const utxo of sellerInputs) {
           const sellerDatum = WarehouseBuilder.fromDatumSeller(utxo.datum);
-          const assets = {
+          const assets = filterAssets({
             lovelace: utxo.assets["lovelace"] - COLLECT_SELLER_COMMISSION,
-          };
+          });
           this.tx.payToAddress(
             plutusAddress2Address(this.t.network, sellerDatum.owner),
             assets,
@@ -1650,7 +1653,7 @@ export class WarehouseBuilder {
         {
           inline: WarehouseBuilder.toDatumOrder(datum),
         },
-        assets,
+        filterAssets(assets),
       );
     };
     for (const datum of orderDatums) {
@@ -1680,7 +1683,7 @@ export class WarehouseBuilder {
         {
           inline: WarehouseBuilder.toDatumSeller(datum),
         },
-        assets,
+        filterAssets(assets),
       );
     }
   }
