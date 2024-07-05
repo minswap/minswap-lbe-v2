@@ -496,12 +496,10 @@ export class Api {
       .buildCollectManager(options)
       .complete()
       .complete();
-    const signedTx = await completeTx.sign().complete();
-    const txHash = await signedTx.submit();
-    return txHash;
+    return completeTx.toString();
   }
 
-  async countingSellers(lbeId: LbeId): Promise<TxHash> {
+  async countingSellers(lbeId: LbeId): Promise<string> {
     const treasuryRefInput = await this.findTreasury(lbeId);
     const managerInput = await this.findManager(lbeId);
     const validFrom = await this.genValidFrom();
@@ -519,9 +517,7 @@ export class Api {
       .buildCollectSeller(options)
       .complete()
       .complete();
-    const signedTx = await completeTx.sign().complete();
-    const txHash = await signedTx.submit();
-    return txHash;
+    return completeTx.toString();
   }
 
   async handleOrders(lbeId: LbeId, phase: string): Promise<TxHash> {
@@ -571,12 +567,16 @@ export class Api {
       treasuryRefUtxo.datum,
     );
     const managerUtxo = await this.findManager(lbeId);
+    let validTo = Math.min(
+      Number(treasuryDatum.endTime - 1n),
+      validFrom + 3 * 60 * 60 * 1000,
+    );
     const options: BuildAddSellersOptions = {
       treasuryRefUtxo,
       managerUtxo,
       addSellerCount,
       validFrom,
-      validTo: Number(treasuryDatum.endTime - 1n),
+      validTo,
       owner: MAGIC_THINGS.sellerOwner,
     };
     const completeTx = await this.builder
@@ -735,7 +735,7 @@ export class Api {
       validFrom < Number(treasuryDatum.startTime)
         ? Number(treasuryDatum.startTime) - 1
         : Number(treasuryDatum.endTime) - 1;
-
+    validTo = Math.min(validTo, validFrom + 3 * 60 * 60 * 1000);
     let options: BuildCancelLBEOptions = {
       treasuryInput,
       validFrom,

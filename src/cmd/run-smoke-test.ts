@@ -4,7 +4,6 @@ import {
   address2PlutusAddress,
   computeLPAssetName,
   genDummyUTxO,
-  mintNativeToken,
   toUnit,
   type Address,
   type CTransactionOutput,
@@ -141,14 +140,14 @@ const happyCase = async (options: { batcher: WarehouseBatcher; api: Api }) => {
   logger.warn("Start | Create LBE");
   things.lbeId.baseAsset = {
     policyId: "7b7ac17b920be487849b4a7e75d455bb5e55aeacd9372bf904b6656c",
-    assetName: "544f4e592d544553542d31373230303035373138383739",
+    assetName: "544f4e592d544553542d31373139393039363635303332",
   };
   things.lpAssetName = computeLPAssetName(
     toUnit(things.lbeId.baseAsset.policyId, things.lbeId.baseAsset.assetName),
     toUnit(things.lbeId.raiseAsset.policyId, things.lbeId.raiseAsset.assetName),
   );
-  things.startTime = Date.now() + 2 * 60 * 1000;
-  things.endTime = things.startTime + 5 * 60 * 1000;
+  things.startTime = Date.now() + 60 * 1000;
+  things.endTime = things.startTime + 10 * 24 * 60 * 60 * 1000;
   const lbeParameters: LbeParameters = {
     ...things.lbeId,
     reserveBase: things.reserveBase,
