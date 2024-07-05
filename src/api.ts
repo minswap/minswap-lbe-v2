@@ -461,7 +461,7 @@ export class Api {
     return factoryUtxo;
   }
   /**************************************************************** */
-  async createPool(lbeId: LbeId): Promise<TxHash> {
+  async createPool(lbeId: LbeId): Promise<string> {
     this.builder.clean();
     const treasuryInput = await this.findTreasury(lbeId);
     const ammFactoryInput = await this.findAmmFactory(lbeId);
@@ -475,13 +475,10 @@ export class Api {
       .buildCreateAmmPool(options)
       .complete()
       .complete();
-
-    const signedTx = await completeTx.sign().complete();
-    const txHash = await signedTx.submit();
-    return txHash;
+    return completeTx.toString();
   }
 
-  async collectManager(lbeId: LbeId): Promise<TxHash> {
+  async collectManager(lbeId: LbeId): Promise<string> {
     const treasuryInput = await this.findTreasury(lbeId);
     const managerInput = await this.findManager(lbeId);
     const validFrom = await this.genValidFrom();
@@ -520,7 +517,7 @@ export class Api {
     return completeTx.toString();
   }
 
-  async handleOrders(lbeId: LbeId, phase: string): Promise<TxHash> {
+  async handleOrders(lbeId: LbeId, phase: string): Promise<string> {
     invariant(
       ["collectOrders", "refundOrders", "redeemOrders"].includes(phase),
       "phase is not correct",
@@ -554,12 +551,10 @@ export class Api {
     const completeTx = await buildFn(options)
       .complete()
       .complete({ debug: { showDraftTx: false } });
-    const signedTx = await completeTx.sign().complete();
-    const txHash = await signedTx.submit();
-    return txHash;
+    return completeTx.toString();
   }
 
-  async addSellers(lbeId: LbeId, addSellerCount: bigint): Promise<TxHash> {
+  async addSellers(lbeId: LbeId, addSellerCount: bigint): Promise<string> {
     this.builder.clean();
     const validFrom = await this.genValidFrom();
     const treasuryRefUtxo = await this.findTreasury(lbeId);
@@ -583,9 +578,7 @@ export class Api {
       .buildAddSeller(options)
       .complete()
       .complete();
-    const signedTx = await completeTx.sign().complete();
-    const txHash = await signedTx.submit();
-    return txHash;
+    return completeTx.toString();
   }
 
   async checkPoolExist(lbeId: LbeId): Promise<void> {
@@ -678,7 +671,7 @@ export class Api {
     return completeTx.toString();
   }
 
-  async cancelNotReachMinimum(lbeId: LbeId): Promise<TxHash> {
+  async cancelNotReachMinimum(lbeId: LbeId): Promise<string> {
     const treasuryInput = await this.findTreasury(lbeId);
     let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasuryInput.datum);
     invariant(
