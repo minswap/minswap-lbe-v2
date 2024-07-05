@@ -36,10 +36,9 @@ export const PENALTY_MAX_PERCENT = 70;
 
 // Batching
 export const MAX_COLLECT_SELLERS = 20;
-export const MAX_COLLECT_ORDERS = 50;
-export const MAX_REDEEM_ORDERS = 50;
-export const MAX_REFUND_ORDERS = 50;
-export const MAX_SEEDS = 100;
+export const MAX_COLLECT_ORDERS = 30;
+export const MAX_REDEEM_ORDERS = 30;
+export const MAX_REFUND_ORDERS = 30;
 
 // Protocol
 export const LABEL_MESSAGE_METADATA = 674;

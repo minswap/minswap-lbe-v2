@@ -309,6 +309,7 @@ export class WarehouseBatcher {
     seeds: UTxO[],
     phase: BatchingPhase,
   ): Chaining {
+    invariant(batching.orders.length > 0, "Missing orders");
     let seedAddress = seeds[0].address;
     let stopCondition = () => {
       return batching.orders.length === 0;
@@ -358,6 +359,7 @@ export class WarehouseBatcher {
       let phase = BatchingPhase.from({
         treasury: batching.treasury,
         manager: batching.manager,
+        orders: batching.orders,
         now,
       });
       // Skip if not in counting phase
@@ -377,6 +379,8 @@ export class WarehouseBatcher {
       } else if (
         ["collectOrders", "redeemOrders", "refundOrders"].includes(phase)
       ) {
+        // FIX ME
+        if (!batching.orders?.length) continue;
         let options = this.getOrdersChaining(batching, seeds, phase);
         let txHashes = await doChaining(options);
         for (const txHash of txHashes) {

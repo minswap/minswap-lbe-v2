@@ -3,6 +3,7 @@ import * as T from "@minswap/translucent";
 import invariant from "@minswap/tiny-invariant";
 import {
   DISCOVERY_MAX_RANGE,
+  MAX_COLLECT_ORDERS,
   MAX_COLLECT_SELLERS,
   PENALTY_MAX_PERCENT,
   PENALTY_MAX_RANGE,
@@ -19,9 +20,11 @@ import {
   type BuildAddSellersOptions,
   type BuildCancelLBEOptions,
   type BuildCloseEventOptions,
+  type BuildCollectOrdersOptions,
   type BuildCollectSellersOptions,
   type BuildCreateAmmPoolOptions,
   type BuildCreateTreasuryOptions,
+  type BuildRedeemOrdersOptions,
   type BuildUsingSellerOptions,
   type LbeId,
   type LbeUTxO,
@@ -33,8 +36,7 @@ import {
   type TxHash,
   type UnixTime,
   type WalletApi,
-  type BuildCollectOrdersOptions,
-  MAX_COLLECT_ORDERS,
+  type BuildCollectManagerOptions,
 } from ".";
 import { LbePhaseUtils, type LbePhase } from "./helper";
 
@@ -479,6 +481,26 @@ export class Api {
     return txHash;
   }
 
+  async collectManager(lbeId: LbeId): Promise<TxHash> {
+    const treasuryInput = await this.findTreasury(lbeId);
+    const managerInput = await this.findManager(lbeId);
+    const validFrom = await this.genValidFrom();
+    const options: BuildCollectManagerOptions = {
+      treasuryInput,
+      managerInput,
+      validFrom,
+      validTo: validFrom + 3 * 60 * 60 * 1000,
+    };
+    this.builder.clean();
+    const completeTx = await this.builder
+      .buildCollectManager(options)
+      .complete()
+      .complete();
+    const signedTx = await completeTx.sign().complete();
+    const txHash = await signedTx.submit();
+    return txHash;
+  }
+
   async countingSellers(lbeId: LbeId): Promise<TxHash> {
     const treasuryRefInput = await this.findTreasury(lbeId);
     const managerInput = await this.findManager(lbeId);
@@ -502,7 +524,11 @@ export class Api {
     return txHash;
   }
 
-  async collectOrders(lbeId: LbeId): Promise<TxHash> {
+  async handleOrders(lbeId: LbeId, phase: string): Promise<TxHash> {
+    invariant(
+      ["collectOrders", "refundOrders", "redeemOrders"].includes(phase),
+      "phase is not correct",
+    );
     this.builder.clean();
     const validFrom = await this.genValidFrom();
     const treasuryInput = await this.findTreasury(lbeId);
@@ -514,10 +540,24 @@ export class Api {
       treasuryInput,
       orderInputs,
     };
-    const completeTx = await this.builder
-      .buildCollectOrders(options)
+    const cases: Record<
+      string,
+      (options: BuildRedeemOrdersOptions) => WarehouseBuilder
+    > = {
+      collectOrders: (o) => {
+        return this.builder.buildCollectOrders(o);
+      },
+      refundOrders: (o) => {
+        return this.builder.buildRefundOrders(o);
+      },
+      redeemOrders: (o) => {
+        return this.builder.buildRedeemOrders(o);
+      },
+    };
+    const buildFn = cases[phase];
+    const completeTx = await buildFn(options)
       .complete()
-      .complete();
+      .complete({ debug: { showDraftTx: false } });
     const signedTx = await completeTx.sign().complete();
     const txHash = await signedTx.submit();
     return txHash;

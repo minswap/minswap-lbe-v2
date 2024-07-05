@@ -11,10 +11,11 @@ export type BatchingPhase =
 export namespace BatchingPhase {
   export function from(options: {
     treasury: LbeUTxO;
-    manager?: LbeUTxO;
     now: UnixTime;
+    orders?: LbeUTxO[];
+    manager?: LbeUTxO;
   }): BatchingPhase | undefined {
-    let { treasury, manager, now } = options;
+    let { treasury, manager, orders, now } = options;
     let treasuryDatum = WarehouseBuilder.fromDatumTreasury(treasury.datum);
     // counting
     if (treasuryDatum.isCancelled || treasuryDatum.endTime < now) {
@@ -24,6 +25,8 @@ export namespace BatchingPhase {
         if (managerDatum.sellerCount === 0n) return "collectManager";
       }
       if (
+        orders &&
+        orders.length > 0 &&
         treasuryDatum.isManagerCollected &&
         treasuryDatum.collectedFund !==
           treasuryDatum.reserveRaise + treasuryDatum.totalLiquidity
