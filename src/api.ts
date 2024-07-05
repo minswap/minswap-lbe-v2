@@ -35,7 +35,8 @@ import {
   type PenaltyConfig,
   type TreasuryDatum,
   type UnixTime,
-  type WalletApi
+  type WalletApi,
+  type UTxO,
 } from ".";
 import { LbePhaseUtils, type LbePhase } from "./helper";
 
@@ -516,7 +517,11 @@ export class Api {
     return completeTx.toString();
   }
 
-  async handleOrders(lbeId: LbeId, phase: string): Promise<string> {
+  async handleOrders(
+    lbeId: LbeId,
+    phase: string,
+    seeds: UTxO[],
+  ): Promise<string> {
     invariant(
       ["collectOrders", "refundOrders", "redeemOrders"].includes(phase),
       "phase is not correct",
@@ -547,9 +552,14 @@ export class Api {
       },
     };
     const buildFn = cases[phase];
-    const completeTx = await buildFn(options)
+    const txBuilder = buildFn(options);
+    // trick
+    txBuilder.tasks.push(() => {
+      txBuilder.tx.collectFrom(seeds);
+    });
+    const completeTx = await txBuilder
       .complete()
-      .complete({ debug: { showDraftTx: false } });
+      .complete({ inputsToChoose: seeds, debug: { showDraftTx: false } });
     return completeTx.toString();
   }
 
