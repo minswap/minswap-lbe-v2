@@ -307,3 +307,14 @@ export async function mintNativeToken(options: {
     asset: { policyId, assetName },
   };
 }
+
+/**
+ * FAIL: {"MIN": 100n, "BTC": 0n}
+ * PASS: {"MIN": 100n}
+ * => this func make things right
+ */
+export function filterAssets(assets: Assets): Assets {
+  return Object.fromEntries(
+    Object.entries(assets).filter(([_, value]) => value !== 0n),
+  );
+}

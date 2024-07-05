@@ -89,6 +89,7 @@ import {
   address2PlutusAddress,
   calculateInitialLiquidity,
   computeLPAssetName,
+  filterAssets,
   hexToUtxo,
   normalizedPair,
   plutusAddress2Address,
@@ -1517,7 +1518,7 @@ export class WarehouseBuilder {
         {
           inline: WarehouseBuilder.toDatumTreasury(treasuryOutDatum),
         },
-        assets,
+        filterAssets(assets),
       );
     };
     const isCancelLBE = (
