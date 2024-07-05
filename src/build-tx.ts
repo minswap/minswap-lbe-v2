@@ -1545,10 +1545,13 @@ export class WarehouseBuilder {
         treasuryOutDatum.raiseAsset.policyId,
         treasuryOutDatum.raiseAsset.assetName,
       );
-      assets[raiseAsset] =
+      const raiseAssetOutAmount =
         (assets[raiseAsset] ?? 0n) +
         (treasuryOutDatum.collectedFund -
           this.calFinalReserveRaise(treasuryOutDatum));
+      if (raiseAssetOutAmount > 0n) {
+        assets[raiseAsset] = raiseAssetOutAmount;
+      }
       return assets;
     };
     const redeemAssets = () => {
