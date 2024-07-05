@@ -1,5 +1,5 @@
 import * as T from "@minswap/translucent";
-import { type MaestroSupportedNetworks } from "..";
+import { type BluePrintAsset, type MaestroSupportedNetworks } from "..";
 import { WarehouseBatcher } from "../batching/warehouse-batcher";
 import { WarehouseBuilder, genWarehouseBuilderOptions } from "../build-tx";
 import logger from "../logger";
@@ -20,7 +20,20 @@ const main = async () => {
   const warehouseOptions = genWarehouseBuilderOptions(t);
   const builder = new WarehouseBuilder(warehouseOptions);
   const batcher = new WarehouseBatcher(builder);
-  await batcher.batching();
+  let lbeId:
+    | { baseAsset: BluePrintAsset; raiseAsset: BluePrintAsset }
+    | undefined = undefined;
+  lbeId = {
+    baseAsset: {
+      policyId: "7b7ac17b920be487849b4a7e75d455bb5e55aeacd9372bf904b6656c",
+      assetName: "544f4e592d544553542d31373139393039363635303332",
+    },
+    raiseAsset: {
+      policyId: "",
+      assetName: "",
+    },
+  };
+  await batcher.batching(lbeId);
 
   // const poolBatcher = new WarehouseBatcher(
   //   new WarehouseBuilder(warehouseOptions),

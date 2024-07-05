@@ -350,9 +350,18 @@ export class WarehouseBatcher {
     };
   }
 
-  async batching() {
+  async batching(lbeId?: {
+    baseAsset: BluePrintAsset;
+    raiseAsset: BluePrintAsset;
+  }) {
     await this.buildMapBatchingUTxO();
     for (let batching of Object.values(this.mapBatchingUTxO)) {
+      if (lbeId) {
+        const datum = WarehouseBuilder.fromDatumTreasury(
+          batching.treasury.datum,
+        );
+        if (!compareLbeId(datum, lbeId)) continue;
+      }
       let now = this.builder.t.utils.slotToUnixTime(
         await this.builder.t.getCurrentSlot(),
       );
@@ -521,4 +530,22 @@ export class WarehouseBatcher {
       };
     }
   }
+}
+
+function compareLbeId(
+  from: {
+    baseAsset: BluePrintAsset;
+    raiseAsset: BluePrintAsset;
+  },
+  to: {
+    baseAsset: BluePrintAsset;
+    raiseAsset: BluePrintAsset;
+  },
+): boolean {
+  return (
+    from.baseAsset.policyId === to.baseAsset.policyId &&
+    from.baseAsset.assetName === to.baseAsset.assetName &&
+    from.raiseAsset.policyId === to.raiseAsset.policyId &&
+    from.raiseAsset.assetName === to.raiseAsset.assetName
+  );
 }
