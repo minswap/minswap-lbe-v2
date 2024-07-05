@@ -26,6 +26,7 @@ export type Chaining = {
   ) => Promise<TxSigned>;
   stopCondition: () => boolean;
   submit?: (tx: string) => Promise<string>;
+  dry?: boolean;
 };
 
 export async function doChaining(options: Chaining): Promise<TxHash[]> {
@@ -36,6 +37,7 @@ export async function doChaining(options: Chaining): Promise<TxHash[]> {
     buildTx,
     stopCondition,
     submit,
+    dry,
   } = options;
   const C = T.CModuleLoader.get;
   const txHashes: string[] = [];
@@ -44,10 +46,15 @@ export async function doChaining(options: Chaining): Promise<TxHash[]> {
       return txHashes;
     }
     const tx = await buildTx(mapInputs, extra);
-    (submit ? submit(tx.toString()) : submitTx(tx.toString())).catch((err) => {
-      console.error("submit Tx Fail", err);
-      throw err;
-    });
+    if (dry) {
+    } else {
+      (submit ? submit(tx.toString()) : submitTx(tx.toString())).catch(
+        (err) => {
+          console.error("submit Tx Fail", err);
+          throw err;
+        },
+      );
+    }
     const transactionHash = tx.toHash();
     txHashes.push(transactionHash);
     const txHash = C.TransactionHash.from_hex(transactionHash);
