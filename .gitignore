@@ -9,3 +9,4 @@ node_modules/
 .vscode/
 plutus.json
 plutus.js
+.env

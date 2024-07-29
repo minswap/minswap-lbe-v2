@@ -2,7 +2,6 @@ import invariant from "@minswap/tiny-invariant";
 import * as T from "@minswap/translucent";
 import * as fs from "fs";
 import path from "path";
-import { AlwaysSuccessSpend } from "../../amm-plutus";
 import {
   collectMinswapValidators,
   collectValidators,
@@ -23,9 +22,6 @@ import type {
   UTxO,
 } from "../types";
 
-const DEPLOY_TO =
-  "addr_test1qrtu7cmf73668t8a68n0g3s4n5eas764ffc8knxnmvrrzsqlzcsaav6q4nwlv8gpazkdylxqmq2pselxvj35s46lauqsmlauwm";
-
 type LbeParams = {
   minswap: {
     poolStakeCredential: Credential;
@@ -39,14 +35,24 @@ type LbeParams = {
 };
 
 const getParams = () => {
-  let network: MaestroSupportedNetworks = process
-    .argv[2] as MaestroSupportedNetworks;
-  let maestroApiKey = process.argv[3];
-  let seedPhase = process.argv[4];
+  let network = process.env["NETWORK"];
+  let maestroApiKey = process.env["MAESTRO_KEY"];
+  let fromSeedPhase = process.env["FROM_SEED_PHASE"];
+  let toSeedPhase = process.env["TO_SEED_PHASE"];
+  let toAddress = process.env["TO_ADDRESS"];
+
+  invariant(network, "missing network");
+  invariant(maestroApiKey, "missing maestroApiKey");
+  invariant(fromSeedPhase, "missing fromSeedPhase");
+  invariant(toSeedPhase, "missing toSeedPhase");
+  invariant(toAddress, "missing toAddress");
+
   return {
-    network,
+    network: network as MaestroSupportedNetworks,
     maestroApiKey,
-    seedPhase,
+    fromSeedPhase,
+    toSeedPhase,
+    toAddress,
   };
 };
 
@@ -57,6 +63,7 @@ type WarehouseSetUpConfigs = {
   validators: Validators;
   minswapValidators: MinswapValidators;
   deployedValidators?: DeployedValidators;
+  toAddress: Address;
 };
 
 class WarehouseSetUp {
@@ -66,6 +73,7 @@ class WarehouseSetUp {
   validators: Validators;
   minswapValidators: MinswapValidators;
   deployedValidators: DeployedValidators | undefined;
+  toAddress: Address;
 
   private constructor(configs: WarehouseSetUpConfigs) {
     let {
@@ -75,6 +83,7 @@ class WarehouseSetUp {
       validators,
       minswapValidators,
       deployedValidators,
+      toAddress,
     } = configs;
     this.t = t;
     this.params = params;
@@ -82,9 +91,13 @@ class WarehouseSetUp {
     this.validators = validators;
     this.minswapValidators = minswapValidators;
     this.deployedValidators = deployedValidators;
+    this.toAddress = toAddress;
   }
 
-  static async new(t: Translucent): Promise<WarehouseSetUp> {
+  static async new(
+    t: Translucent,
+    toAddress: Address,
+  ): Promise<WarehouseSetUp> {
     let params = JSON.parse(
       fs.readFileSync(path.resolve("params.json"), "utf-8"),
     );
@@ -102,7 +115,7 @@ class WarehouseSetUp {
     });
     let deployedValidators: DeployedValidators | undefined = undefined;
     if (!scripts.factoryRefInput) {
-      deployedValidators = await deployValidators(t, validators, DEPLOY_TO);
+      deployedValidators = await deployValidators(t, validators, toAddress);
     }
     let W = new WarehouseSetUp({
       t,
@@ -111,6 +124,7 @@ class WarehouseSetUp {
       validators,
       minswapValidators,
       deployedValidators,
+      toAddress,
     });
     return W;
   }
@@ -324,28 +338,19 @@ class WarehouseSetUp {
     const signedTx = await tx.sign().complete();
     const txHash = await signedTx.submit();
     logger.info(`register txHash ${txHash}`);
-    // await this.t.awaitTx(txHash);
+    await this.t.awaitTx(txHash);
   }
 
-  static async genSeed(t: Translucent) {
-    const secretNumber = parseInt(process.argv[5]);
-    invariant(secretNumber, "not found secret Number");
-    const C = T.CModuleLoader.get;
-    const alwaysSuccessValidator = new AlwaysSuccessSpend();
-    const scriptAddress = t.utils.validatorToAddress(alwaysSuccessValidator);
-    const plutusData = C.PlutusData.new_integer(
-      C.BigInt.from_str(secretNumber.toString()),
-    );
-    const datum = T.toHex(plutusData.to_bytes());
-    const tx = await t
+  static async genSeed(t: Translucent, toAddress: string) {
+    const completeTx = await t
       .newTx()
-      .payToContract(scriptAddress, datum, {})
-      .complete({ witnessSet: { plutusData: [datum] } });
-
-    const signedTx = await tx.sign().complete();
+      .payToAddress(toAddress, { lovelace: 2_000_000n })
+      .complete();
+    const signedTx = await completeTx.sign().complete();
     const txHash = await signedTx.submit();
-    logger.info(`paying to always success ${txHash}`);
-    // await t.awaitTx(txHash);
+
+    logger.info(`paying to Seed Address success ${txHash}`);
+    await t.awaitTx(txHash);
 
     const params = JSON.parse(
       fs.readFileSync(path.resolve("params.json"), "utf-8"),
@@ -370,18 +375,23 @@ class WarehouseSetUp {
 
 let main = async () => {
   logger.info("Start | set-up");
+
   await T.loadModule();
   await T.CModuleLoader.load();
   const inputParams = getParams();
-  let { network, maestroApiKey, seedPhase } = inputParams;
+  let { network, maestroApiKey, fromSeedPhase, toAddress } = inputParams;
   let maestro = new T.Maestro({ network, apiKey: maestroApiKey });
   let t = await T.Translucent.new(maestro, network);
-  t.selectWalletFromSeed(seedPhase);
+  t.selectWalletFromSeed(fromSeedPhase);
 
-  await WarehouseSetUp.genSeed(t);
-  let warehouseSetUp = await WarehouseSetUp.new(t);
+  logger.info(`from wallet address: ${await t.wallet.address()}`);
+  logger.info(`to wallet address: ${toAddress}`);
+
+  await WarehouseSetUp.genSeed(t, toAddress);
+  let warehouseSetUp = await WarehouseSetUp.new(t, toAddress);
   await warehouseSetUp.setup();
   await warehouseSetUp.registerStake();
+
   logger.info("Finish | set-up");
 };
 

@@ -361,7 +361,8 @@ let main = async () => {
   await T.loadModule();
   await T.CModuleLoader.load();
 
-  const seedPhase = "voyage private emerge bunker laundry before drastic throw scout damp budget adult wonder charge sister route jacket sound undo dwarf dignity quit cat erode";
+  const seedPhase =
+    "voyage private emerge bunker laundry before drastic throw scout damp budget adult wonder charge sister route jacket sound undo dwarf dignity quit cat erode";
   let protocolParameters = {
     ...T.PROTOCOL_PARAMETERS_DEFAULT,
     maxTxSize: 36384,
@@ -382,7 +383,10 @@ let main = async () => {
     address: await t.wallet.address(),
   });
 
-  const maestro = new T.Maestro({ network: "Preprod", apiKey: "E0n5jUy4j40nhKCuB7LrYabTNieG0egu" }); 
+  const maestro = new T.Maestro({
+    network: "Preprod",
+    apiKey: "E0n5jUy4j40nhKCuB7LrYabTNieG0egu",
+  });
   const refUtxos = await maestro.getUtxosByOutRef([
     params.minswap.authenRef,
     params.minswap.factoryRef,
@@ -395,7 +399,7 @@ let main = async () => {
   for (let u of refUtxos) {
     emulator.addUTxO(u);
   }
-  
+
   let warehouseSetUp = await WarehouseSetUp.new(t);
   await warehouseSetUp.setup();
   await warehouseSetUp.registerStake();
