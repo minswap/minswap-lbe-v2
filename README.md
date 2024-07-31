@@ -13,7 +13,7 @@
 
 ### Prerequisites
 - Install [Bun v1.1.17](https://bun.sh/docs/installation)
-- Install [Aiken v1.0.24-alpha](https://aiken-lang.org/installation-instructions)
+- Install [Aiken v1.0.26-alpha](https://aiken-lang.org/installation-instructions)
 - Run `aiken build` to double check scripts bytecode in `plutus.json` file 
 - Run `bun install` to install necessary dependencies 
 
