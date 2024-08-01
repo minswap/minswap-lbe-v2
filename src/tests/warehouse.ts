@@ -101,7 +101,7 @@ export const genWarehouse = async (maxTxSize?: number) => {
     owner: address2PlutusAddress(ACCOUNT_0.address),
     receiver: address2PlutusAddress(ACCOUNT_0.address),
     receiverDatum: "RNoDatum",
-    poolAllocation: 100n,
+    poolAllocation: 10000n,
     minimumRaise: null,
     maximumRaise: null,
     reserveBase: 69000000000000n,

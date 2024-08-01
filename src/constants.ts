@@ -21,18 +21,20 @@ export const TREASURY_MIN_ADA = 5_000_000n;
 export const MANAGER_MIN_ADA = 2_500_000n;
 export const SELLER_MIN_ADA = 2_500_000n;
 export const ORDER_MIN_ADA = 2_500_000n;
-export const MAX_PENALTY_RATE = 25n;
+export const MAX_PENALTY_RATE = 2500n;
 export const MINIMUM_SELLER_COLLECTED = 20n;
 export const MINIMUM_ORDER_COLLECTED = 30n;
 export const MINIMUM_ORDER_REDEEMED = 30n;
 
 // LBE Constraint
 export const DISCOVERY_MAX_RANGE = 30 * 24 * 60 * 60 * 1000; // 30 days
-export const POOL_ALLOCATION_MIN = 70n;
+export const POOL_ALLOCATION_MIN = 7000n;
 export const POOL_BASE_FEE_MIN = 5n;
 export const POOL_BASE_FEE_MAX = 2000n;
 export const PENALTY_MAX_RANGE = 2 * 24 * 60 * 60 * 1000;
 export const PENALTY_MAX_PERCENT = 70;
+export const DEFAULT_DENOMINATOR = 10000n;
+export const DEFAULT_USERS_LP_ASSET_AMOUNT_NUMERATOR = 5000n;
 
 // Batching
 export const MAX_COLLECT_SELLERS = 20;

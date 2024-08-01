@@ -10,7 +10,7 @@ use aiken/transaction/value.{PolicyId, Value, ada_asset_name, ada_policy_id}
 use lb_v2/order_validation.{apply_collecting_orders}
 use lb_v2/types.{Asset, FactoryDatum, OrderDatum, PenaltyConfig, UsingSeller}
 use lb_v2/utils.{
-  calculate_penalty, make_wrapper_redeemer, order_auth_an, order_commission,
+  calculate_penalty, default_denominator, make_wrapper_redeemer, order_auth_an, order_commission,
   order_minimum_ada, sort_two_consecutive_factory_datum,
 }
 use lb_v2/validation.{build_default_collected_order_value}
@@ -157,17 +157,17 @@ fn calculate_penalty_params() -> Fuzzer<(Int, Int, Int)> {
 }
 
 test test_calculate_penalty(total_amount via calculate_penalty_params()) {
-  let (total_input_amount, total_output_amount, percent) = total_amount
+  let (total_input_amount, total_output_amount, penalty_numerator) = total_amount
   let penalty_amount =
     calculate_penalty(
-      penalty_config: Some(PenaltyConfig { penalty_start_time: 200, percent }),
+      penalty_config: Some(PenaltyConfig { penalty_start_time: 200, penalty_numerator }),
       end_valid_time_range: 200,
       total_input_amount: total_input_amount,
       total_output_amount: total_output_amount,
     )
   let expect_pen_amount =
     if total_input_amount > total_output_amount {
-      ( total_input_amount - total_output_amount ) * percent / 100
+      ( total_input_amount - total_output_amount ) * penalty_numerator / default_denominator
     } else {
       0
     }

@@ -2,6 +2,7 @@ import * as T from "@minswap/translucent";
 
 import invariant from "@minswap/tiny-invariant";
 import {
+  DEFAULT_DENOMINATOR,
   DISCOVERY_MAX_RANGE,
   MAX_COLLECT_ORDERS,
   MAX_COLLECT_SELLERS,
@@ -295,7 +296,7 @@ export class Api {
     }
     invariant(reserveBase > 0, "Reserve Base > 0");
     if (penaltyConfig) {
-      let { penaltyStartTime, percent } = penaltyConfig;
+      let { penaltyStartTime, penaltyNumerator } = penaltyConfig;
       invariant(
         penaltyStartTime > BigInt(startTime),
         "Penalty Start Time > Start Time",
@@ -308,9 +309,9 @@ export class Api {
         penaltyStartTime >= BigInt(endTime - PENALTY_MAX_RANGE),
         "Maximum penalty period of 2 final days",
       );
-      invariant(percent > 0, "Penalty Percent > 0");
+      invariant(penaltyNumerator > 0, "Penalty Percent > 0");
       invariant(
-        percent <= PENALTY_MAX_PERCENT,
+        penaltyNumerator <= PENALTY_MAX_PERCENT,
         `Penalty Percent <= ${PENALTY_MAX_PERCENT}`,
       );
     }
@@ -977,7 +978,10 @@ export class Api {
     if (inAmount > outAmount) {
       // Calculate withdrawal amount and penalty
       const withdrawalAmount = inAmount - outAmount;
-      return (withdrawalAmount * penaltyConfig.percent) / 100n;
+      return (
+        (withdrawalAmount * penaltyConfig.penaltyNumerator) /
+        DEFAULT_DENOMINATOR
+      );
     }
     return 0n;
   }

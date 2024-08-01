@@ -12,7 +12,11 @@ import {
   type BuildUsingSellerOptions,
   type WarehouseBuilderOptions,
 } from "../build-tx";
-import { MINIMUM_ORDER_REDEEMED, MINIMUM_SELLER_COLLECTED } from "../constants";
+import {
+  DEFAULT_DENOMINATOR,
+  MINIMUM_ORDER_REDEEMED,
+  MINIMUM_SELLER_COLLECTED,
+} from "../constants";
 import {
   collectMinswapValidators,
   collectValidators,
@@ -193,7 +197,7 @@ test("example flow", async () => {
     owner: address2PlutusAddress(ACCOUNT_0.address),
     receiver: address2PlutusAddress(ACCOUNT_0.address),
     receiverDatum: { RInlineDatum: { hash: extraDatumHash } },
-    poolAllocation: 100n,
+    poolAllocation: 10000n,
     minimumRaise: null,
     maximumRaise: null,
     reserveBase: 69000000000000n,

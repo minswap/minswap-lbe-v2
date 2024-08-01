@@ -78,7 +78,7 @@ async function genTestWarehouse() {
     ...defaultTreasuryDatum,
     penaltyConfig: {
       penaltyStartTime: defaultTreasuryDatum.endTime - 5000n,
-      percent: 25n,
+      penaltyNumerator: 2500n,
     },
   };
   const treasuryUTxO = {
