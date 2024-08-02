@@ -592,15 +592,6 @@ pub fn validate_seller_outputs(
   } = seller_output
   expect datum: SellerDatum = raw_datum
   let SellerDatum { owner, .. } = datum
-  expect
-    datum == SellerDatum {
-      factory_policy_id,
-      base_asset,
-      raise_asset,
-      amount: 0,
-      penalty_amount: 0,
-      owner,
-    }
   // all sellers have the same owner
   and {
     value.flatten(seller_value) == [
