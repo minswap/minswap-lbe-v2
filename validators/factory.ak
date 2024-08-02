@@ -326,6 +326,7 @@ validator(
           ) == 1,
           value.quantity_of(factory_out_value, factory_hash, factory_auth_an) == 1,
           value.quantity_of(treasury_in_value, factory_hash, treasury_auth_an) == 1,
+          // Remove Factory Linked List must be correct!
           validate_factory_remove_node(
             out_datum: factory_out_datum,
             in_datum_1: factory_input_1_raw_datum,
@@ -346,9 +347,13 @@ validator(
             extra_signatories: extra_signatories,
             inputs: inputs,
           ),
+          // LBE should already cancelled
           is_cancelled,
+          // All Manager, Sellers must be collected!
           is_manager_collected,
+          // All Orders have been executed.
           reserve_raise == 0,
+          // All Penalty have been handled.
           total_penalty == 0,
         }
       }
@@ -502,6 +507,7 @@ fn validate_initialization(
   and {
     factory_reference_script == None,
     list.length(value.flatten(out_value)) == 2,
+    // Must spend @out_ref
     list.any(
       inputs,
       fn(input) {
@@ -509,8 +515,11 @@ fn validate_initialization(
         output_reference == out_ref
       },
     ),
+    // Must mint 1 Factory Token
     value.flatten(mint_value) == [(factory_policy_id, factory_auth_an, 1)],
+    // Factory Output must contain 1 Factory Token
     value.quantity_of(out_value, factory_policy_id, factory_auth_an) == 1,
+    // Factory Datum must be correct!
     datum == InlineDatum(
       FactoryDatum {
         head: #"00",
