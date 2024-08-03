@@ -14,10 +14,10 @@ import {
   TreasuryValidateTreasurySpending,
 } from "../plutus";
 import {
+  COLLECT_SELLER_COMMISSION,
   CREATE_POOL_COMMISSION,
   DUMMY_REDEEMER,
   FACTORY_AUTH_AN,
-  ORDER_COMMISSION,
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
   LP_COLATERAL,
@@ -29,13 +29,13 @@ import {
   MINSWAP_V2_MAX_LIQUIDITY,
   MINSWAP_V2_POOL_AUTH_AN,
   ORDER_AUTH_AN,
+  ORDER_COMMISSION,
   ORDER_MIN_ADA,
   SELLER_AUTH_AN,
+  SELLER_COMMISSION,
   SELLER_MIN_ADA,
   TREASURY_AUTH_AN,
   TREASURY_MIN_ADA,
-  SELLER_COMMISSION,
-  COLLECT_SELLER_COMMISSION,
 } from "./constants";
 import type {
   DeployMinswapValidators,
@@ -56,6 +56,7 @@ import type {
   MintRedeemer,
   OrderDatum,
   OrderRedeemer,
+  Redeemer,
   RewardAddress,
   SellerDatum,
   SellerRedeemer,
@@ -95,7 +96,10 @@ export type BuildCreateTreasuryOptions = {
   validFrom: UnixTime;
   validTo: UnixTime;
   extraDatum?: Datum; // the datum of treasuryDatum.receiverDatum
-  extraUtxo?: UTxO;
+  projectOwnerInput?: {
+    input: UTxO;
+    redeemer: Redeemer;
+  };
 };
 
 export type BuildAddSellersOptions = {
@@ -371,7 +375,7 @@ export class WarehouseBuilder {
       validTo,
       extraDatum,
       sellerAmount,
-      extraUtxo,
+      projectOwnerInput,
     } = options;
     const managerDatum: ManagerDatum = {
       factoryPolicyId: this.factoryHash,
@@ -442,8 +446,9 @@ export class WarehouseBuilder {
         if ("VerificationKeyCredential" in owner.paymentCredential) {
           this.tx.addSigner(plutusAddress2Address(this.t.network, owner));
         } else {
-          invariant(extraUtxo);
-          this.tx.collectFrom([extraUtxo]);
+          invariant(projectOwnerInput, "missing projectOwnerInput");
+          const { input, redeemer } = projectOwnerInput;
+          this.tx.collectFrom([input], redeemer);
         }
       },
     );
