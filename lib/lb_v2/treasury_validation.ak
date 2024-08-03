@@ -135,6 +135,7 @@ pub fn validate_creating_treasury_out(
     is_manager_collected == False,
     // treasury value
     treasury_out_value == expected_treasury_out_value,
+    // ensure that only the project owner can create | update a LBE
     validate_authorize_by_owner(
       owner_payment_credential,
       extra_signatories,

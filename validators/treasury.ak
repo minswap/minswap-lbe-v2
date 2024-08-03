@@ -106,7 +106,7 @@ validator {
           end_valid_time_range < start_time,
           // prevent updating the LBE when it has been cancelled.
           is_cancelled == False,
-          // Authorize by owner
+          // Authorize by owner in input treasury datum 
           validation.validate_authorize_by_owner(
             owner_payment_credential: owner_payment_credential,
             extra_signatories: extra_signatories,
