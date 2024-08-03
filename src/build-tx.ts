@@ -440,7 +440,7 @@ export class WarehouseBuilder {
       () => {
         const owner = treasuryDatum.owner;
         if ("VerificationKeyCredential" in owner.paymentCredential) {
-          this.tx.addSigner(plutusAddress2Address("Preprod", owner));
+          this.tx.addSigner(plutusAddress2Address(this.t.network, owner));
         } else {
           invariant(extraUtxo);
           this.tx.collectFrom([extraUtxo]);
@@ -624,7 +624,7 @@ export class WarehouseBuilder {
       },
       () => {
         if ("VerificationKeyCredential" in updatedOwner.paymentCredential) {
-          this.tx.addSigner(plutusAddress2Address("Preprod", updatedOwner));
+          this.tx.addSigner(plutusAddress2Address(this.t.network, updatedOwner));
         } else {
           invariant(extraInput);
           this.tx.collectFrom([extraInput]);
