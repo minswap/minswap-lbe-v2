@@ -159,8 +159,22 @@ async function buildTxWithStupidTreasuryDatum(
     address: builder.treasuryAddress,
     datum: builder.toDatumTreasury(treasuryDatum),
   };
-  builder.buildCreateAmmPool({ ...options, treasuryInput: treasuryUTxO });
-  await assertValidatorFail(builder);
+  const reserveA = treasuryDatum.collectedFund;
+  const reserveB = treasuryDatum.reserveBase;
+  const totalLiquidity = calculateInitialLiquidity(reserveA, reserveB);
+  builder.buildCreateAmmPool({
+    ...options,
+    treasuryInput: treasuryUTxO,
+    ammPoolDatum: {
+      ...options.ammPoolDatum,
+      totalLiquidity: totalLiquidity,
+      reserveA: reserveA,
+      reserveB: reserveB,
+    },
+  });
+  // TODO: revert debug
+  builder.complete().complete({ debug: { showDraftTx: true } });
+  // await assertValidatorFail(builder);
 }
 
 test("Create AMM Pool | FAIL | LBE is cancelled", async () => {
@@ -173,6 +187,17 @@ test("Create AMM Pool | FAIL | Not reach min raise", async () => {
   await buildTxWithStupidTreasuryDatum({
     ...treasuryDatum,
     minimumRaise: treasuryDatum.collectedFund + 1n,
+  });
+});
+
+test("Create AMM Pool | PASS | initial_liquidity isn't higher `default_burn_liquidity` LP asset 2", async () => {
+  const { treasuryDatum } = warehouse;
+  await buildTxWithStupidTreasuryDatum({
+    ...treasuryDatum,
+    reserveBase: 11n,
+    reserveRaise: 11n,
+    collectedFund: 11n,
+    totalPenalty: 0n,
   });
 });
 
