@@ -223,3 +223,36 @@ pub fn must_get_end_validity(validity_range: ValidityRange) -> Int {
   } = validity_range
   end
 }
+
+// COPY from https://github.com/minswap/minswap-dex-v2/blob/main/lib/amm_dex_v2/math.ak
+pub fn calculate_sqrt(x: Int) -> Int {
+  if x < 0 {
+    fail
+  } else if x == 0 {
+    0
+  } else if x == 1 {
+    1
+  } else if x == 2 {
+    1
+  } else {
+    do_calculate_sqrt(x, x, x / 2 + 1)
+  }
+}
+
+fn do_calculate_sqrt(x: Int, i1: Int, i2: Int) -> Int {
+  if i2 < i1 {
+    do_calculate_sqrt(x, i2, ( x / i2 + i2 ) / 2)
+  } else {
+    i1
+  }
+}
+
+pub fn calculate_initial_liquidity(out_a: Int, out_b: Int) -> Int {
+  let p = out_a * out_b
+  let sqrt = calculate_sqrt(p)
+  if sqrt * sqrt < p {
+    sqrt + 1
+  } else {
+    sqrt
+  }
+}

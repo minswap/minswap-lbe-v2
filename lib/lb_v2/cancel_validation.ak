@@ -8,7 +8,7 @@ use lb_v2/types.{
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  assert,
+  assert, calculate_initial_liquidity, default_burn_liquidity,
 }
 use lb_v2/validation.{validate_authorize_by_owner}
 
@@ -62,6 +62,7 @@ fn cancel_by_not_reach_minimum_raise(treasury_datum: TreasuryDatum) -> Bool {
     is_manager_collected,
     reserve_raise,
     total_penalty,
+    reserve_base,
     ..
   } = treasury_datum
   let min_raise =
@@ -69,11 +70,17 @@ fn cancel_by_not_reach_minimum_raise(treasury_datum: TreasuryDatum) -> Bool {
       None -> 1
       Some(min_raise) -> min_raise
     }
+  let initial_liquidity =
+    calculate_initial_liquidity(reserve_raise + total_penalty, reserve_base)
   and {
     // All Manager, Sellers must be collected
     is_manager_collected,
-    // Final reserve base = reserve_raise + total_penalty
-    reserve_raise + total_penalty < min_raise,
+    or {
+      // Final reserve base = reserve_raise + total_penalty
+      reserve_raise + total_penalty < min_raise,
+      // Cancel when LBE cannot create pool beacause initial_liquidity isn't higher `default_burn_liquidity` LP asset
+      initial_liquidity > default_burn_liquidity,
+    },
   }
 }
 
