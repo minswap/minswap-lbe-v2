@@ -123,6 +123,8 @@ validator {
             factory_policy_id: factory_policy_id,
             end_valid_time_range: end_valid_time_range,
             datums: datums,
+            extra_signatories: extra_signatories,
+            inputs: inputs,
           ),
           // mint nothing
           mint_value == value.zero(),

@@ -434,6 +434,15 @@ export class WarehouseBuilder {
           );
         }
       },
+      () => {
+        const owner = treasuryDatum.owner;
+        if ("VerificationKeyCredential" in owner.paymentCredential) {
+          this.tx.addSigner(plutusAddress2Address("Preprod", owner));
+        } else {
+          // TODO: support cript hash
+          throw Error("Do not support Script owner")
+        }
+      },
     );
     return this;
   }
