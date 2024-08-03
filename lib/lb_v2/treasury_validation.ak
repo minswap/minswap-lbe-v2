@@ -1,13 +1,14 @@
 use aiken/builtin
 use aiken/dict
 use aiken/hash
-use aiken/transaction.{DatumHash, InlineDatum, NoDatum, Output}
+use aiken/transaction.{DatumHash, InlineDatum, Input, NoDatum, Output}
+use aiken/transaction/credential.{Address}
 use aiken/transaction/value.{
   AssetName, PolicyId, Value, ada_asset_name, ada_policy_id,
 }
 use lb_v2/types.{
-  Asset, CustomDatumHash, DatumMap, PenaltyConfig, PoolDatum, RDatumHash,
-  RInlineDatum, RNoDatum, TreasuryDatum, ValidatorHash,
+  Asset, CustomDatumHash, DatumMap, PenaltyConfig, PoolDatum, PubKeyHash,
+  RDatumHash, RInlineDatum, RNoDatum, TreasuryDatum, ValidatorHash,
 }
 use lb_v2/utils.{
   amm_authen_policy_id, amm_factory_auth_asset_name, amm_pool_auth_asset_name,
@@ -15,6 +16,7 @@ use lb_v2/utils.{
   max_penalty, min_base_fee_numerator, min_pool_allocation, one_month_ms,
   treasury_auth_an, treasury_minimum_ada, two_day_ms,
 }
+use lb_v2/validation.{validate_authorize_by_owner}
 
 pub fn validate_creating_treasury_out(
   treasury_out: Output,
@@ -26,6 +28,8 @@ pub fn validate_creating_treasury_out(
   factory_policy_id: PolicyId,
   end_valid_time_range: Int,
   datums: DatumMap,
+  extra_signatories: List<PubKeyHash>,
+  inputs: List<Input>,
 ) -> Bool {
   expect Output {
     value: treasury_out_value,
@@ -56,6 +60,7 @@ pub fn validate_creating_treasury_out(
     total_penalty,
     is_cancelled,
     is_manager_collected,
+    owner: Address { payment_credential: owner_payment_credential, .. },
     ..
   } = treasury_out_datum
   let Asset { policy_id: base_asset_pid, asset_name: base_asset_an } =
@@ -130,6 +135,12 @@ pub fn validate_creating_treasury_out(
     is_manager_collected == False,
     // treasury value
     treasury_out_value == expected_treasury_out_value,
+    // ensure that only the project owner can create | update a LBE
+    validate_authorize_by_owner(
+      owner_payment_credential,
+      extra_signatories,
+      inputs,
+    ),
   }
 }
 

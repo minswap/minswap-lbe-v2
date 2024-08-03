@@ -14,10 +14,10 @@ import {
   TreasuryValidateTreasurySpending,
 } from "../plutus";
 import {
+  COLLECT_SELLER_COMMISSION,
   CREATE_POOL_COMMISSION,
   DUMMY_REDEEMER,
   FACTORY_AUTH_AN,
-  ORDER_COMMISSION,
   LBE_INIT_FACTORY_HEAD,
   LBE_INIT_FACTORY_TAIL,
   LP_COLATERAL,
@@ -29,13 +29,13 @@ import {
   MINSWAP_V2_MAX_LIQUIDITY,
   MINSWAP_V2_POOL_AUTH_AN,
   ORDER_AUTH_AN,
+  ORDER_COMMISSION,
   ORDER_MIN_ADA,
   SELLER_AUTH_AN,
+  SELLER_COMMISSION,
   SELLER_MIN_ADA,
   TREASURY_AUTH_AN,
   TREASURY_MIN_ADA,
-  SELLER_COMMISSION,
-  COLLECT_SELLER_COMMISSION,
 } from "./constants";
 import type {
   DeployMinswapValidators,
@@ -56,6 +56,7 @@ import type {
   MintRedeemer,
   OrderDatum,
   OrderRedeemer,
+  Redeemer,
   RewardAddress,
   SellerDatum,
   SellerRedeemer,
@@ -95,6 +96,10 @@ export type BuildCreateTreasuryOptions = {
   validFrom: UnixTime;
   validTo: UnixTime;
   extraDatum?: Datum; // the datum of treasuryDatum.receiverDatum
+  projectOwnerInput?: {
+    input: UTxO;
+    redeemer: Redeemer;
+  };
 };
 
 export type BuildAddSellersOptions = {
@@ -154,6 +159,7 @@ export type BuildUpdateLBEOptions = {
   reserveBase?: bigint;
   revocable?: boolean;
   penaltyConfig?: { penaltyStartTime: bigint; percent: bigint };
+  extraInput?: UTxO;
 };
 
 export type BuildCancelLBEOptions = {
@@ -369,6 +375,7 @@ export class WarehouseBuilder {
       validTo,
       extraDatum,
       sellerAmount,
+      projectOwnerInput,
     } = options;
     const managerDatum: ManagerDatum = {
       factoryPolicyId: this.factoryHash,
@@ -432,6 +439,16 @@ export class WarehouseBuilder {
             { asHash: extraDatum },
             {},
           );
+        }
+      },
+      () => {
+        const owner = treasuryDatum.owner;
+        if ("VerificationKeyCredential" in owner.paymentCredential) {
+          this.tx.addSigner(plutusAddress2Address(this.t.network, owner));
+        } else {
+          invariant(projectOwnerInput, "missing projectOwnerInput");
+          const { input, redeemer } = projectOwnerInput;
+          this.tx.collectFrom([input], redeemer);
         }
       },
     );
@@ -576,14 +593,16 @@ export class WarehouseBuilder {
       reserveBase,
       revocable,
       penaltyConfig,
+      extraInput,
     } = options;
     invariant(treasuryInput.datum);
     const inDatum = this.fromDatumTreasury(treasuryInput.datum);
+    const updatedOwner = owner ? address2PlutusAddress(owner) : inDatum.owner;
     const treasuryOutDatum: TreasuryDatum = {
       ...inDatum,
       startTime: startTime ?? inDatum.startTime,
       endTime: endTime ?? inDatum.endTime,
-      owner: owner ? address2PlutusAddress(owner) : inDatum.owner,
+      owner: updatedOwner,
       minimumOrderRaise: minimumOrderRaise ?? inDatum.minimumOrderRaise,
       minimumRaise: minimumRaise ?? inDatum.minimumRaise,
       maximumRaise: maximumRaise ?? inDatum.maximumRaise,
@@ -607,6 +626,14 @@ export class WarehouseBuilder {
       },
       () => {
         this.tx.validFrom(validFrom).validTo(validTo);
+      },
+      () => {
+        if ("VerificationKeyCredential" in updatedOwner.paymentCredential) {
+          this.tx.addSigner(plutusAddress2Address(this.t.network, updatedOwner));
+        } else {
+          invariant(extraInput);
+          this.tx.collectFrom([extraInput]);
+        }
       },
     );
     return this;
