@@ -29,6 +29,7 @@ export type PolicyId = T.PolicyId;
 export type PrivateKey = T.PrivateKey;
 export type ProtocolParameters = T.ProtocolParameters;
 export type Provider = T.Provider;
+export type Redeemer = T.Redeemer;
 export type RewardAddress = T.RewardAddress;
 export type Script = T.Script;
 export type ScriptRef = T.ScriptRef;

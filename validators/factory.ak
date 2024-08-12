@@ -137,7 +137,7 @@ validator(
         expect [factory_input] = factory_inputs
         // finding exactly 2 Factory Outputs
         expect [f_out_head, f_out_tail] = factory_outputs
-        // finding exactly 1 Treasury Input
+        // finding exactly 1 Treasury Output
         let treasury_output =
           validation.get_treasury_output(
             outputs: outputs,
@@ -241,6 +241,8 @@ validator(
             factory_policy_id: factory_hash,
             end_valid_time_range: end_valid_time_range,
             datums: datums,
+            extra_signatories: extra_signatories,
+            inputs: inputs,
           ),
           // Mint Value must be correct!
           mint_value == get_minting_treasury(
@@ -326,14 +328,12 @@ validator(
           ) == 1,
           value.quantity_of(factory_out_value, factory_hash, factory_auth_an) == 1,
           value.quantity_of(treasury_in_value, factory_hash, treasury_auth_an) == 1,
-          assert(
-            validate_factory_remove_node(
-              out_datum: factory_out_datum,
-              in_datum_1: factory_input_1_raw_datum,
-              in_datum_2: factory_input_2_raw_datum,
-              lp_asset_name: lp_asset_name,
-            ),
-            @"Remove Factory Linked List must be correct!",
+          // Remove Factory Linked List must be correct!
+          validate_factory_remove_node(
+            out_datum: factory_out_datum,
+            in_datum_1: factory_input_1_raw_datum,
+            in_datum_2: factory_input_2_raw_datum,
+            lp_asset_name: lp_asset_name,
           ),
           list.length(value.flatten(factory_out_value)) == 2,
           factory_out_ref_script == None,
@@ -349,13 +349,14 @@ validator(
             extra_signatories: extra_signatories,
             inputs: inputs,
           ),
-          assert(is_cancelled, @"LBE should already cancelled"),
-          assert(
-            is_manager_collected,
-            @"All Manager, Sellers must be collected!",
-          ),
-          assert(reserve_raise == 0, @"All Orders have been executed."),
-          assert(total_penalty == 0, @"All Penalty have been handled."),
+          // LBE should already cancelled
+          is_cancelled,
+          // All Manager, Sellers must be collected!
+          is_manager_collected,
+          // All Orders have been executed.
+          reserve_raise == 0,
+          // All Penalty have been handled.
+          total_penalty == 0,
         }
       }
       _ -> False
@@ -508,32 +509,24 @@ fn validate_initialization(
   and {
     factory_reference_script == None,
     list.length(value.flatten(out_value)) == 2,
-    assert(
-      list.any(
-        inputs,
-        fn(input) {
-          let Input { output_reference, .. } = input
-          output_reference == out_ref
-        },
-      ),
-      @"Must spend @out_ref",
+    // Must spend @out_ref
+    list.any(
+      inputs,
+      fn(input) {
+        let Input { output_reference, .. } = input
+        output_reference == out_ref
+      },
     ),
-    assert(
-      value.flatten(mint_value) == [(factory_policy_id, factory_auth_an, 1)],
-      @"Must mint 1 Factory Token",
-    ),
-    assert(
-      value.quantity_of(out_value, factory_policy_id, factory_auth_an) == 1,
-      @"Factory Output must contain 1 Factory Token",
-    ),
-    assert(
-      datum == InlineDatum(
-        FactoryDatum {
-          head: #"00",
-          tail: #"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
-        },
-      ),
-      @"Factory Datum must be correct!",
+    // Must mint 1 Factory Token
+    value.flatten(mint_value) == [(factory_policy_id, factory_auth_an, 1)],
+    // Factory Output must contain 1 Factory Token
+    value.quantity_of(out_value, factory_policy_id, factory_auth_an) == 1,
+    // Factory Datum must be correct!
+    datum == InlineDatum(
+      FactoryDatum {
+        head: #"00",
+        tail: #"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
+      },
     ),
   }
 }

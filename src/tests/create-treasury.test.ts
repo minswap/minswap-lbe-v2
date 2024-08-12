@@ -5,6 +5,8 @@ import {
   MAX_PENALTY_RATE,
   TREASURY_MIN_ADA,
 } from "../constants";
+import type { Assets, TreasuryDatum, UTxO } from "../types";
+import { address2PlutusAddress } from "../utils";
 import type { Assets, LbeUTxO, TreasuryDatum, UTxO } from "../types";
 import { assertValidator, assertValidatorFail, loadModule } from "./utils";
 import { genWarehouse } from "./warehouse";
@@ -118,6 +120,40 @@ test("create-treasury | PASS | Receiver Datum: InlineDatum", async () => {
   };
   builder = builder.buildCreateTreasury(options);
   assertValidator(builder, "");
+});
+
+test("create-treasury | FAIL | Missing Project's Owner signature | PubKey", async () => {
+  const { options } = W;
+  const builder: WarehouseBuilder = W.builder;
+  const newTreasuryDatum: TreasuryDatum = {
+    ...options.treasuryDatum,
+    owner: address2PlutusAddress(
+      "addr_test1qqy6nhfyks7wdu3dudslys37v252w2nwhv0fw2nfawemmn8k8ttq8f3gag0h89aepvx3xf69g0l9pf80tqv7cve0l33sw96paj",
+    ),
+  };
+  const failOptions = {
+    ...options,
+    treasuryDatum: newTreasuryDatum,
+  };
+  builder.buildCreateTreasury(failOptions);
+  builder.tasks.pop();
+  assertValidatorFail(builder);
+});
+
+test("create-treasury | FAIL | Missing Project's Owner signature | Script", async () => {
+  const { options } = W;
+  const builder: WarehouseBuilder = W.builder;
+  const newTreasuryDatum: TreasuryDatum = {
+    ...options.treasuryDatum,
+    owner: address2PlutusAddress(builder.treasuryAddress),
+  };
+  const failOptions = {
+    ...options,
+    treasuryDatum: newTreasuryDatum,
+  };
+  builder.buildCreateTreasury(failOptions);
+  builder.tasks.pop();
+  assertValidatorFail(builder);
 });
 
 test("create-treasury | FAIL | missing Factory Token", async () => {
