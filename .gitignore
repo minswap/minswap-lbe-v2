@@ -10,3 +10,4 @@ node_modules/
 plutus.json
 plutus.js
 .env
+src/hihi.ts

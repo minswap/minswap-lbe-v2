@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "@minswap/tiny-invariant": "^1.2.0",
-    "@minswap/translucent": "0.0.6-minswap.25",
+    "@minswap/translucent": "link:@minswap/translucent",
     "@types/winston": "2.4.4",
     "rollup": "^4.14.1",
     "rollup-plugin-dts": "^6.1.0",
