@@ -49,11 +49,13 @@ https://interface-git-lbe-v2-fe-official-minswap.vercel.app/launch-bowl
 - [Create Amm Pool](https://preprod.cardanoscan.io/transaction/fd3e1aa1ebd5a735576fcf53eeb8a4b57972d26fa7b4e1e8902cd124f8088052)
 - [Redeem Order](https://preprod.cardanoscan.io/transaction/5c537e504717d7535056f87fb3b0267b10cc4203b0710e7986dd3e6b5890e75f)
 
+### Mainnet
+
+TODO
+
 ## Audit Report
 
-The contract audit is being conducted by Certik.
-
-The audit report will be available later.
+The contract audit has been conducted by Certik. The Audit report is available under [Audit Report](/audit-report/).
 
 ## References
 
