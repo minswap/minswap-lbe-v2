@@ -3,25 +3,31 @@ use aiken/transaction.{InlineDatum, Input, Output}
 use aiken/transaction/credential.{Address, ScriptCredential}
 use aiken/transaction/value.{Value}
 use lb_v2/types.{
-  ByOwner, CancelReason, CreatedPool, NotReachMinimum, PoolDatum, PubKeyHash,
-  TreasuryDatum,
+  AmmFactoryDatum, ByOwner, CancelReason, CreatedPool, NotReachMinimum,
+  PubKeyHash, TreasuryDatum,
 }
 use lb_v2/utils.{
-  amm_authen_policy_id, amm_pool_auth_asset_name, amm_pool_validation_hash,
-  assert,
+  amm_authen_policy_id, amm_factory_auth_asset_name, amm_factory_validation_hash,
+  compute_asset_name_from_base_and_raise,
 }
 use lb_v2/validation.{validate_authorize_by_owner}
 
-// If transaction showing that AMM Pool have been created
-//  then LBE should be cancelled. 
-// Notes: The existence of the pool 
-//  is verified by passing the AMM Pool UTxO into the reference inputs.
+// If transaction showing that AMM Pool have been created then LBE should be cancelled. 
+// Notes: 
+//  - The existence of the pool is verified by passing the AMM Factory UTxO into the reference inputs.
+//  - Ensure that AMM Factory `head` matches the LBE `lp_asset_name`.
+// Theorem:
+//  - From a Factory UTxO with `{ head, tail }` datum, no matter how many times it changes,
+//      you can always find a Factory UTxO with `{ head, XXX }` datum.
+// Q&A:
+//  - Q: Why not use AMM Pool UTxO instead?
+//  - A: Because AMM Pool UTxO is spent more frequently, whereas Factory UTxO is spent less often.
 fn cancel_by_pool_exist(
   treasury_datum: TreasuryDatum,
   ref_inputs: List<Input>,
 ) -> Bool {
-  // finding AMM Pool Ref Input
-  expect [pool_ref_input] =
+  // finding AMM Factory Ref Input
+  expect [amm_factory_ref_input] =
     list.filter(
       ref_inputs,
       fn(ref_input) {
@@ -34,24 +40,27 @@ fn cancel_by_pool_exist(
           ..
         } = ref_input
         and {
-          // Ref Input belongs Amm Pool Address
-          payment_credential == ScriptCredential(amm_pool_validation_hash),
-          // Ref Input has AMM Pool Auth Token
+          // Ref Input belongs Amm Factory Address
+          payment_credential == ScriptCredential(amm_factory_validation_hash),
+          // Ref Input has AMM Factory Auth Token
           value.quantity_of(
             in_value,
             amm_authen_policy_id,
-            amm_pool_auth_asset_name,
+            amm_factory_auth_asset_name,
           ) == 1,
         }
       },
     )
   // Extract some necessary data.
-  expect Input { output: Output { datum: InlineDatum(raw_pool_datum), .. }, .. } =
-    pool_ref_input
-  expect PoolDatum { asset_a, asset_b, .. }: PoolDatum = raw_pool_datum
+  expect Input {
+    output: Output { datum: InlineDatum(raw_amm_factory_datum), .. },
+    ..
+  } = amm_factory_ref_input
+  expect AmmFactoryDatum { head, .. }: AmmFactoryDatum = raw_amm_factory_datum
   let TreasuryDatum { base_asset, raise_asset, .. } = treasury_datum
-  // Ensure that the AMM Pool ID and the LBE bootstrapping pool are the same.
-  utils.sort_two_assets(base_asset, raise_asset) == (asset_a, asset_b)
+  let lp_asset_name =
+    compute_asset_name_from_base_and_raise(base_asset, raise_asset)
+  lp_asset_name == head
 }
 
 // After Discovery Phase, If final reserve raise amount not reach target
@@ -159,6 +168,7 @@ pub fn validate_cancel_lbe(
       is_cancelled: True,
     },
     treasury_in_value == treasury_out_value,
-    assert(mint_value == value.zero(), @"Avoid minting unnecessary"),
+    // Avoid minting unnecessary
+    mint_value == value.zero(),
   }
 }

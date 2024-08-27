@@ -2,26 +2,26 @@
   "minswap": {
     "poolStakeCredential": {
       "type": "Key",
-      "hash": "83ec96719dc0591034b78e472d6f477446261fec4bc517fa4d047f02"
+      "hash": "52563c5410bff6a0d43ccebb7c37e1f69f5eb260552521adff33b9c2"
     },
     "seedOutRef": {
-      "txHash": "66e05b2723f9fca69601771bf8bda0ff6281945a2340191e04ca3954d6cf3f03",
-      "outputIndex": 2
+      "txHash": "1510c33ecb621e61f3c0568ac10ebd08fe4fce35f130db859f28e4db4c7d7a1f",
+      "outputIndex": 0
     },
     "authenRef": {
-      "txHash": "c429b8ee27e5761ba8714e26e3a5899886cd28d136d43e969d4bc1acf0f72d4a",
+      "txHash": "dbc1498500a6e79baa0f34d10de55cdb4289ca6c722bd70e1e1b78a858f136b9",
       "outputIndex": 0
     },
     "factoryRef": {
-      "txHash": "9741d59656e9ad54f197b0763482eede9a6fa1616c4547797eee6617f92a1396",
+      "txHash": "59c7fa5c30cbab4e6d38f65e15d1adef71495321365588506ad089d237b602e0",
       "outputIndex": 0
     },
     "poolRef": {
-      "txHash": "9f30b1c3948a009ceebda32d0b1d25699674b2eaf8b91ef029a43bfc1073ce28",
+      "txHash": "2536194d2a976370a932174c10975493ab58fd7c16395d50e62b7c0e1949baea",
       "outputIndex": 0
     },
     "poolBatchingRef": {
-      "txHash": "b0a6c5512735c7a183a167eed035ac75c191d6ff5be9736dfa1f1f02f7ae5dbc",
+      "txHash": "d46bd227bd2cf93dedd22ae9b6d92d30140cf0d68b756f6608e38d680c61ad17",
       "outputIndex": 0
     }
   },
