@@ -629,7 +629,9 @@ export class WarehouseBuilder {
       },
       () => {
         if ("VerificationKeyCredential" in updatedOwner.paymentCredential) {
-          this.tx.addSigner(plutusAddress2Address(this.t.network, updatedOwner));
+          this.tx.addSigner(
+            plutusAddress2Address(this.t.network, updatedOwner),
+          );
         } else {
           invariant(extraInput);
           this.tx.collectFrom([extraInput]);
