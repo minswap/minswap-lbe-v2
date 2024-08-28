@@ -78,11 +78,11 @@ pub const amm_pool_auth_asset_name = #"4d5350"
 
 // The PolicyID of AMM Authen Minting Policy  
 pub const amm_authen_policy_id =
-  #"f5808c2c990d86da54bfc97d89cee6efa20cd8461616359478d96b4c"
+  #"d6aae2059baee188f74917493cf7637e679cd219bdfbbf4dcbeb1d0b"
 
 // The ValidatorHash of AMM Pool Validator
 pub const amm_pool_validation_hash =
-  #"ea07b733d932129c378af627436e7cbc2ef0bf96e0036bb51b3bde6b"
+  #"d6ba9b7509eac866288ff5072d2a18205ac56f744bc82dcd808cb8fe"
 
 // Some LP Tokens will be burned during Pool Creation.
 pub const default_burn_liquidity = 10
