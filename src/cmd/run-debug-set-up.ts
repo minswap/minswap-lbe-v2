@@ -299,6 +299,53 @@ class WarehouseSetUp {
       }
       console.log("lbe-v2-script.json file has been saved.");
     });
+
+    const script = {
+      "factoryHash": lbeScript.factoryHash,
+      "treasuryHash": lbeScript.treasuryHash,
+      "managerHash": lbeScript.managerHash,
+      "sellerHash": lbeScript.sellerHash,
+      "orderHash": lbeScript.orderHash,
+      factoryScript: this.deployedValidators?.factoryValidator.scriptRef!.script,
+      treasuryScript: this.deployedValidators?.treasuryValidator.scriptRef!.script,
+      managerScript: this.deployedValidators?.managerValidator.scriptRef!.script,
+      sellerScript: this.deployedValidators?.sellerValidator.scriptRef!.script,
+      orderScript: this.deployedValidators?.orderValidator.scriptRef!.script,
+      "factoryAddress": lbeScript.factoryAddress,
+      "treasuryAddress": lbeScript.treasuryAddress,
+      "managerAddress": lbeScript.managerAddress,
+      "sellerAddress": lbeScript.sellerAddress,
+      "orderAddress": lbeScript.orderAddress,
+      "factoryRewardAddress": lbeScript.factoryRewardAddress,
+    }
+    fs.writeFile("script.json", JSON.stringify(script, null, 2), "utf8", (err) => {
+      if (err) {
+        console.error("Error writing JSON file:", err);
+        return;
+      }
+      console.log("script.json file has been saved.");
+    });
+
+    const reference = {
+      "factoryRefInput": lbeScript.factoryRefInput,
+      "treasuryRefInput":lbeScript.treasuryRefInput,
+      "managerRefInput": lbeScript.managerRefInput,
+      "sellerRefInput": lbeScript.sellerRefInput,
+      "orderRefInput": lbeScript.orderRefInput,
+      "factoryTxId": "834e0958594e51c525363bbdabd0cdbe773a358ac2e2c8321cc3f645b30335ae#0",
+      "treasuryTxId": "a5b0274543fbad4ca79798be047317a0b4b270ab6011dd7e08fc663ba6ee1f32#0",
+      "managerTxId": "f0c8a033bf84faad54e70c9882057a422fa1ee257843fad0a07aa5eb7ee9ebaf#0",
+      "sellerTxId": "a15c06f2fa3e91359136b346eae43997311644320e18a0c5f2ea40c8127c9284#0",
+      "orderTxId": "a08042f93335157e6dd8e87feef448d5e9000f60ef14cbe19ae365c8de9bead8#0"
+    }
+    
+    fs.writeFile("reference.json", JSON.stringify(reference, null, 2), "utf8", (err) => {
+      if (err) {
+        console.error("Error writing JSON file:", err);
+        return;
+      }
+      console.log("reference.json file has been saved.");
+    });
   }
 
   async registerStake() {

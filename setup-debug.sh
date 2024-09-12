@@ -15,4 +15,5 @@ echo "run run-debug-set-up.ts"
 bun run src/cmd/run-debug-set-up.ts
 
 echo "copy to monorepo"
-cp lbe-v2-script.json /home/tintin/minswap/monorepo/packages/sdk/src/lbe-v2/scripts/testnet/.
+cp script.json $BASE/lbe-v2-script.json
+cp reference.json $BASE/references-script.json
