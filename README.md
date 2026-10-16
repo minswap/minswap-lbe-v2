@@ -1,5 +1,57 @@
 # 😻 Minswap LBE V2 Contract
 
+> [!WARNING]
+> **This contract has a known vulnerability and is deprecated.**
+> Minswap no longer maintains or uses the LBE V2 contract. The deprecation was
+> announced publicly on X on 19 July 2026:
+> https://x.com/MinswapDEX/status/2067981437790191865
+>
+> Do not deploy this code, do not start new LBE events with it, and do not build
+> on it. See [Known Vulnerability](#known-vulnerability) below.
+
+## Known Vulnerability
+
+### Order re-collection permanently freezes an LBE event (High)
+
+**Where:** `apply_collecting_orders` in
+[lib/lb_v2/order_validation.ak](/lib/lb_v2/order_validation.ak), called by
+`validate_collect_orders`.
+
+**What:** the collect step does not check that an order input is still
+uncollected (`is_collected == False`). The only datum check is
+`out_datum == OrderDatum { ..in_datum, is_collected: True }`. For an order that
+is already collected, this is the identity, so the same order can be collected
+again. A collected order keeps its order auth token, so it is still picked up as
+a valid order input.
+
+**Effect:** each re-collection adds the order's `amount + penalty_amount` to the
+treasury `collected_fund` a second time. The attacker pays the matching raise
+tokens into the treasury output. Once `collected_fund` is larger than
+`reserve_raise + total_penalty`, no transaction can lower it back:
+
+- `CreateAmmPool` requires `collected_fund == reserve_raise + total_penalty`, so
+  the pool can never be created.
+- Refund (`validate_refund`) requires the same equality, so a cancelled event
+  cannot refund orders either.
+- `CancelLBE` does not help: `ByOwner` is only valid before `end_time`,
+  `NotReachMinimum` needs the minimum raise to be missed, and `CreatedPool`
+  still leads to the blocked refund path.
+
+All raise and base assets escrowed by the event are frozen with no way to
+recover them. Nothing can be stolen, but users lose access to their funds.
+
+**Who can trigger it:** anyone, without permission, once the manager is
+collected (`is_manager_collected == True`) and at least
+`minimum_order_collected` (30) orders are collected, until the AMM pool is
+created. The cost to the attacker is the raise tokens of the re-collected orders
+(lost to the treasury) plus transaction fees.
+
+**Fix (not applied, contract is deprecated):** require
+`in_datum.is_collected == False` in `apply_collecting_orders`.
+
+**Disclosure:** reported through coordinated disclosure in September 2026. The
+issue is not covered by the CertiK audit listed below.
+
 ## Structure
 
 - Main contracts:
