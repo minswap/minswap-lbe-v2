@@ -52,6 +52,10 @@ created. The cost to the attacker is the raise tokens of the re-collected orders
 **Disclosure:** reported through coordinated disclosure in September 2026. The
 issue is not covered by the CertiK audit listed below.
 
+**Credit:** found and reported by refangga1337
+([GitHub](https://github.com/refangga1337), [X](https://x.com/hxcbtc)). Thank
+you for the responsible disclosure.
+
 ## Structure
 
 - Main contracts:
